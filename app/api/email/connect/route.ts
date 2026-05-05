@@ -23,7 +23,6 @@ export async function GET(request: Request) {
   const authUrl = nylas.auth.urlForOAuth2({
     clientId: NYLAS_CLIENT_ID,
     redirectUri,
-    provider: provider as string,
     state: user.id,
     loginHint: user.email || undefined,
   });
