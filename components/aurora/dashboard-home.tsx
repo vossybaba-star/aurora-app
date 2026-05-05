@@ -49,6 +49,7 @@ export function DashboardHome() {
   const [findResult, setFindResult] = useState<{ count: number; message: string } | null>(null);
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
   const [viewingOpp, setViewingOpp] = useState<Opportunity | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const [isOutreachDialogOpen, setIsOutreachDialogOpen] = useState(false);
   const [greeting, setGreeting] = useState("Welcome");
 
@@ -190,9 +191,9 @@ export function DashboardHome() {
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-lg">Ready for Outreach</h2>
           {opportunities.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => setActiveTab("opportunities")}>
-              View all
-              <ChevronRight className="w-4 h-4 ml-1" />
+            <Button variant="ghost" size="sm" onClick={() => setShowAll(s => !s)}>
+              {showAll ? "Show less" : "View all"}
+              <ChevronRight className={`w-4 h-4 ml-1 transition-transform ${showAll ? "rotate-90" : ""}`} />
             </Button>
           )}
         </div>
@@ -215,7 +216,7 @@ export function DashboardHome() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {actionableOpps.slice(0, 5).map((opp) => (
+            {(showAll ? actionableOpps : actionableOpps.slice(0, 5)).map((opp) => (
               <OpportunityActionCard 
                 key={opp.id} 
                 opportunity={opp} 
@@ -225,15 +226,7 @@ export function DashboardHome() {
               />
             ))}
             
-            {actionableOpps.length > 5 && (
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={() => setActiveTab("opportunities")}
-              >
-                View {actionableOpps.length - 5} more opportunities
-              </Button>
-            )}
+
           </div>
         )}
       </div>
@@ -384,7 +377,7 @@ function OpportunityActionCard({
               <span>{typeLabels[opportunity.type]}</span>
               {opportunity.rating && (
                 <>
-                  <span className="text-muted-foreground/40">â¢</span>
+                  <span className="text-muted-foreground/40">Ã¢ÂÂ¢</span>
                   <span className="flex items-center gap-0.5">
                     <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                     {opportunity.rating.toFixed(1)}
