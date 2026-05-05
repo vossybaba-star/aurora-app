@@ -25,7 +25,7 @@ import {
   Sparkles,
   ExternalLink,
   Grid3X3,
-  Map,
+  Map as MapIcon,
   Instagram,
 } from "lucide-react";
 
@@ -295,7 +295,7 @@ export function DiscoverPage() {
               <Grid3X3 className="w-4 h-4" />
             </button>
             <button onClick={() => setViewMode("map")} className={`px-3 py-2 flex items-center ${viewMode === "map" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
-              <Map className="w-4 h-4" />
+              <MapIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -473,7 +473,7 @@ function DiscoverCard({ place, isSaved, onSave }) {
                   <Heart className="w-3 h-3 mr-1" />Save
                 </Button>
               ) : (
-                <span className="h-7 px-2 text-xs flex items-center text-primary font-medium ml-auto">✓ Saved</span>
+                <span className="h-7 px-2 text-xs flex items-center text-primary font-medium ml-auto">â Saved</span>
               )}
             </div>
           </div>
