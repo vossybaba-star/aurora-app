@@ -17,6 +17,9 @@ export async function GET(request: Request) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
   const redirectUri = `${baseUrl}/api/email/callback`;
 
+  console.log("[nylas connect] clientId:", NYLAS_CLIENT_ID);
+  console.log("[nylas connect] redirectUri:", redirectUri);
+
   const authUrl = nylas.auth.urlForOAuth2({
     clientId: NYLAS_CLIENT_ID,
     redirectUri,
