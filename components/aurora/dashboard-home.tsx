@@ -221,6 +221,16 @@ export function DashboardHome() {
             ))}
             
 
+            {actionableOpps.length > 5 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-muted-foreground mt-2"
+                onClick={() => setShowAll(s => !s)}
+              >
+                {showAll ? 'Show less' : 'Show all ' + actionableOpps.length + ' opportunities'}
+              </Button>
+            )}
           </div>
         )}
       </div>
