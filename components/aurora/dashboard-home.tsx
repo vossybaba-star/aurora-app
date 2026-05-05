@@ -371,7 +371,7 @@ function OpportunityActionCard({
               <span>{typeLabels[opportunity.type]}</span>
               {opportunity.rating && (
                 <>
-                  <span className="text-muted-foreground/40">·</span>
+                  <span className="text-muted-foreground/40">&middot;</span>
                   <span className="flex items-center gap-0.5">
                     <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                     {opportunity.rating.toFixed(1)}
