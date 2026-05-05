@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { LandingPage } from "./landing-page";
 import { OnboardingFlow } from "./onboarding-flow";
 import { Dashboard } from "./dashboard";
+import { toast } from "sonner";
 import type { UserProfile, Opportunity, OutreachMessage, FollowUpTask } from "@/lib/types";
 
 type AppState = "landing" | "onboarding" | "dashboard";
@@ -82,6 +83,26 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
       refreshData();
     }
   }, [userId, appState]);
+
+  // Handle post-OAuth redirect params
+  useEffect(() => {
+    if (appState !== "dashboard") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("email_connected") === "true") {
+      toast.success("Email account connected!");
+      setActiveTab("outreach");
+      window.history.replaceState({}, "", "/");
+    } else if (params.get("error")) {
+      const errorMap: Record<string, string> = {
+        no_code: "Email connection failed: no auth code received.",
+        auth_mismatch: "Email connection failed: session mismatch.",
+        db_error: "Email connection failed: could not save connection.",
+        oauth_failed: "Email connection failed: OAuth error.",
+      };
+      toast.error(errorMap[params.get("error")!] ?? "Email connection failed.");
+      window.history.replaceState({}, "", "/");
+    }
+  }, [appState]);
 
   const renderContent = () => {
     switch (appState) {

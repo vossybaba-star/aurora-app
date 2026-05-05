@@ -7,8 +7,10 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const state = searchParams.get("state"); // User ID passed from connect
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+
   if (!code) {
-    return NextResponse.redirect("/dashboard?error=no_code");
+    return NextResponse.redirect(`${baseUrl}/?error=no_code`);
   }
 
   const supabase = await createClient();
@@ -16,11 +18,10 @@ export async function GET(request: Request) {
 
   // Verify user matches state
   if (!user || user.id !== state) {
-    return NextResponse.redirect("/dashboard?error=auth_mismatch");
+    return NextResponse.redirect(`${baseUrl}/?error=auth_mismatch`);
   }
 
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000";
     const redirectUri = `${baseUrl}/api/email/callback`;
 
     // Exchange code for token
@@ -57,13 +58,12 @@ export async function GET(request: Request) {
 
     if (dbError) {
       console.error("Failed to save email connection:", dbError);
-      return NextResponse.redirect("/dashboard?error=db_error");
+      return NextResponse.redirect(`${baseUrl}/?error=db_error`);
     }
 
-    // Redirect back to dashboard with success
-    return NextResponse.redirect("/dashboard?email_connected=true");
+    return NextResponse.redirect(`${baseUrl}/?email_connected=true`);
   } catch (error) {
     console.error("Nylas OAuth error:", error);
-    return NextResponse.redirect("/dashboard?error=oauth_failed");
+    return NextResponse.redirect(`${baseUrl}/?error=oauth_failed`);
   }
 }

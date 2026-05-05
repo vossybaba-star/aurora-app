@@ -14,15 +14,14 @@ export async function GET(request: Request) {
   const provider = searchParams.get("provider") || "google"; // google, microsoft, imap
 
   // Get the base URL for the callback
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
   const redirectUri = `${baseUrl}/api/email/callback`;
 
-  // Generate auth URL using Nylas hosted auth
   const authUrl = nylas.auth.urlForOAuth2({
     clientId: NYLAS_CLIENT_ID,
     redirectUri,
-    provider: provider as "google" | "microsoft" | "imap",
-    state: user.id, // Pass user ID in state to link account after callback
+    provider: provider as string,
+    state: user.id,
     loginHint: user.email || undefined,
   });
 
