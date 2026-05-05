@@ -105,19 +105,21 @@ export function DiscoverPage() {
   }, [nextPageToken]); // only re-run when token changes, not isLoadingMore
 
   const loadMore = async () => {
-    if (!nextPageToken || isLoadingMore) return;
+    if (isLoadingMore) return;
+    const token = nextPageToken;
+    if (!token) return;
     setIsLoadingMore(true);
     try {
       const res = await fetch("/api/places/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchQuery || undefined, location: profile?.location, pageToken: nextPageToken }),
+        body: JSON.stringify({ query: searchQuery || undefined, location: profile?.location, pageToken: token }),
       });
       const data = await res.json();
-      if (data.places) {
+      if (data.places && data.places.length > 0) {
         setSearchResults(prev => [...prev, ...data.places]);
-        setNextPageToken(data.nextPageToken || null);
       }
+      setNextPageToken(data.nextPageToken || null);
     } catch (e) {
       console.error("Load more failed:", e);
     } finally {
@@ -478,7 +480,7 @@ function DiscoverCard({ place, isSaved, onSave }) {
                   <Heart className="w-3 h-3 mr-1" />Save
                 </Button>
               ) : (
-                <span className="h-7 px-2 text-xs flex items-center text-primary font-medium ml-auto">ÃÂ¢ÃÂÃÂ Saved</span>
+                <span className="h-7 px-2 text-xs flex items-center text-primary font-medium ml-auto">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Saved</span>
               )}
             </div>
           </div>
