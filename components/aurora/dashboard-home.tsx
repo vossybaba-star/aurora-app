@@ -190,12 +190,6 @@ export function DashboardHome() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-lg">Ready for Outreach</h2>
-          {opportunities.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => setShowAll(s => !s)}>
-              {showAll ? "Show less" : "View all"}
-              <ChevronRight className={`w-4 h-4 ml-1 transition-transform ${showAll ? "rotate-90" : ""}`} />
-            </Button>
-          )}
         </div>
 
         {actionableOpps.length === 0 ? (
@@ -377,7 +371,7 @@ function OpportunityActionCard({
               <span>{typeLabels[opportunity.type]}</span>
               {opportunity.rating && (
                 <>
-                  <span className="text-muted-foreground/40">ÃÂ¢ÃÂÃÂ¢</span>
+                  <span className="text-muted-foreground/40">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ¢</span>
                   <span className="flex items-center gap-0.5">
                     <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                     {opportunity.rating.toFixed(1)}
