@@ -1,0 +1,230 @@
+// ============================================
+// Core Types for Aurora Backend-Ready Structure
+// ============================================
+
+// ---- User Profile ----
+export interface UserProfile {
+  id: string;
+  email: string;
+  businessType: string;
+  businessName: string;
+  location: string;
+  opportunityTypes: string[];
+  pitch: string;
+  website?: string;
+  instagram?: string;
+  linkedin?: string;
+  phone?: string;
+  tone: Tone;
+  opportunitiesPerWeek: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type Tone = 'friendly' | 'professional' | 'premium' | 'casual';
+
+// ---- Contact Methods ----
+export type ContactMethodType = 'email' | 'contact_form' | 'instagram' | 'linkedin' | 'phone' | 'website' | 'facebook' | 'twitter' | 'tiktok';
+
+// Enrichment states for opportunities
+export type EnrichmentStatus = 'pending' | 'checking_links' | 'links_found' | 'no_links_found' | 'failed';
+
+// Contact form info
+export interface ContactFormInfo {
+  url: string;
+  label: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface ContactMethod {
+  id: string;
+  type: ContactMethodType;
+  value: string; // email address, phone number, handle, URL
+  isPrimary: boolean;
+  label?: string; // e.g., "Work email", "Personal Instagram"
+}
+
+// ---- Opportunity Status ----
+export type OpportunityStatus = 
+  | 'new'           // Aurora found it, user hasn't reviewed
+  | 'outreach_ready' // User reviewed, ready to reach out
+  | 'sent'          // Outreach sent, waiting for response
+  | 'follow_up_due' // Time to follow up (based on config)
+  | 'replied'       // Contact has replied
+  | 'closed';       // No longer active (won, lost, or archived)
+
+export type OpportunityType = 
+  | 'venue' 
+  | 'event_organiser' 
+  | 'market' 
+  | 'wedding_planner' 
+  | 'agency'
+  | 'brand'
+  | 'publication'
+  | 'other';
+
+// ---- Opportunity ----
+export interface Opportunity {
+  id: string;
+  name: string;
+  type: OpportunityType;
+  location: string;
+  description?: string;
+  whyGoodFit: string;
+  contactMethods: ContactMethod[]; // Multiple contact methods per opportunity
+  status: OpportunityStatus;
+  priority: 'high' | 'medium' | 'low';
+  tags: string[];
+  source?: string; // Where Aurora found this (e.g., "aurora_ai", "manual")
+  website?: string;
+  notes?: string;
+  liked?: boolean; // Whether the user has liked/saved this opportunity
+  // Google Places data
+  googlePlaceId?: string;
+  rating?: number;
+  ratingCount?: number;
+  photoReference?: string;
+  // Enrichment data
+  enrichmentStatus?: EnrichmentStatus;
+  contactForm?: ContactFormInfo;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---- Outreach Message ----
+export type OutreachMessageType = 'initial' | 'follow_up';
+
+export interface OutreachMessage {
+  id: string;
+  opportunityId: string;
+  contactMethodId: string; // Which contact method this message is for
+  type: OutreachMessageType;
+  subject?: string; // Only for email
+  body: string;
+  status: 'draft' | 'ready' | 'sent' | 'failed';
+  sentAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---- Follow-Up Task ----
+export interface FollowUpTask {
+  id: string;
+  opportunityId: string;
+  outreachMessageId?: string; // Reference to the message that triggered this
+  dueDate: string;
+  status: 'pending' | 'completed' | 'skipped' | 'snoozed';
+  priority: 'urgent' | 'normal' | 'low';
+  suggestedAction: string;
+  notes?: string;
+  completedAt?: string;
+  snoozedUntil?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---- Reply Status ----
+export type ReplyType = 'positive' | 'negative' | 'neutral' | 'out_of_office' | 'needs_response';
+
+export interface ReplyStatus {
+  id: string;
+  opportunityId: string;
+  outreachMessageId: string;
+  type: ReplyType;
+  receivedAt: string;
+  summary?: string; // AI-generated summary of the reply
+  sentiment: 'interested' | 'not_interested' | 'maybe' | 'unknown';
+  nextSteps?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+// ---- Label Maps for UI ----
+export const typeLabels: Record<OpportunityType, string> = {
+  venue: 'Venue',
+  event_organiser: 'Event Organiser',
+  market: 'Market',
+  wedding_planner: 'Wedding Planner',
+  agency: 'Agency',
+  brand: 'Brand',
+  publication: 'Publication',
+  other: 'Other',
+};
+
+export const statusLabels: Record<OpportunityStatus, string> = {
+  new: 'New',
+  outreach_ready: 'Outreach Ready',
+  sent: 'Sent',
+  follow_up_due: 'Follow-up Due',
+  replied: 'Replied',
+  closed: 'Closed',
+};
+
+export const contactMethodLabels: Record<ContactMethodType, string> = {
+  email: 'Email',
+  contact_form: 'Contact Form',
+  instagram: 'Instagram',
+  linkedin: 'LinkedIn',
+  phone: 'Phone',
+};
+
+export const contactMethodIcons: Record<ContactMethodType, string> = {
+  email: 'Mail',
+  contact_form: 'ExternalLink',
+  instagram: 'Instagram',
+  linkedin: 'Linkedin',
+  phone: 'Phone',
+};
+
+export const toneLabels: Record<Tone, string> = {
+  friendly: 'Friendly',
+  professional: 'Professional',
+  premium: 'Premium',
+  casual: 'Casual',
+};
+
+export const priorityLabels: Record<'high' | 'medium' | 'low', string> = {
+  high: 'High Priority',
+  medium: 'Medium Priority',
+  low: 'Low Priority',
+};
+
+export const replyTypeLabels: Record<ReplyType, string> = {
+  positive: 'Interested',
+  negative: 'Not Interested',
+  neutral: 'Neutral',
+  out_of_office: 'Out of Office',
+  needs_response: 'Needs Response',
+};
+
+// ---- Helper Types for Stats ----
+export interface OpportunityStats {
+  newOpportunities: number;
+  outreachReady: number;
+  sent: number;
+  followUpsDue: number;
+  repliesReceived: number;
+  closed: number;
+  total: number;
+}
+
+// ---- API Response Types (for future backend integration) ----
+export interface ApiResponse<T> {
+  data: T;
+  success: boolean;
+  error?: string;
+  meta?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+  };
+}
+
+export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
