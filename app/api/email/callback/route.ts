@@ -24,6 +24,10 @@ export async function GET(request: Request) {
   try {
     const redirectUri = `${baseUrl}/api/email/callback`;
 
+    console.log("[nylas callback] clientId:", NYLAS_CLIENT_ID);
+    console.log("[nylas callback] redirectUri:", redirectUri);
+    console.log("[nylas callback] apiKey prefix:", process.env.NYLAS_API_KEY?.slice(0, 12));
+
     // Exchange code for token
     const tokenResponse = await nylas.auth.exchangeCodeForToken({
       clientId: NYLAS_CLIENT_ID,
