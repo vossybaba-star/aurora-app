@@ -480,7 +480,7 @@ function DiscoverCard({ place, isSaved, onSave }) {
                   <Heart className="w-3 h-3 mr-1" />Save
                 </Button>
               ) : (
-                <span className="h-7 px-2 text-xs flex items-center text-primary font-medium ml-auto">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Saved</span>
+                <span className="h-7 px-2 text-xs flex items-center text-primary font-medium ml-auto">ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Saved</span>
               )}
             </div>
           </div>
