@@ -384,7 +384,7 @@ function OpportunityActionCard({
               <span>{typeLabels[opportunity.type]}</span>
               {opportunity.rating && (
                 <>
-                  <span className="text-muted-foreground/40">•</span>
+                  <span className="text-muted-foreground/40">â¢</span>
                   <span className="flex items-center gap-0.5">
                     <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                     {opportunity.rating.toFixed(1)}
@@ -745,7 +745,8 @@ function OpportunityDetailView({
         const data = await res.json();
         setSuggestedMessage(data);
       } catch (err) {
-        setMessageError('Could not generate message');
+        // Silently fail - let user compose manually
+        setSuggestedMessage(null);
       } finally {
         setIsGenerating(false);
       }
