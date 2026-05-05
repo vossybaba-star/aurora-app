@@ -1,4 +1,3 @@
-import { generateText, Output } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
@@ -255,25 +254,10 @@ export async function POST() {
       });
     }
 
-    // Use AI to evaluate and rank the opportunities
-    const { output: aiOutput } = await generateText({
-      model: "openai/gpt-4o-mini",
-      output: Output.object({
-        schema: z.object({
-          opportunities: z.array(z.object({
-            index: z.number().describe("The 1-based index number of the business from the list"),
-            relevance_score: z.number().min(1).max(10),
-            opportunity_type: z.enum([
-              "venue", "event_organiser", "market", "wedding_planner",
-              "agency", "brand", "publication", "other"
-            ]),
-            priority: z.enum(["high", "medium", "low"]),
-            why_good_fit: z.string(),
-            suggested_approach: z.string(),
-          })),
-        }),
-      }),
-      prompt: `You are an AI assistant helping a ${businessType} find the best business opportunities for outreach.
+    // Use AI to evaluate and rank opportunities via Anthropic
+    let aiOutput = null;
+    try {
+      const aiPrompt = `You are an AI assistant helping a ${businessType} find the best business opportunities for outreach.
 
 USER PROFILE:
 - Business: ${profile.business_name || businessType}
@@ -303,8 +287,28 @@ For each selected opportunity, provide:
 - opportunity_type: Best category from the allowed types
 - priority: high/medium/low
 - why_good_fit: Why it's a good fit (1-2 sentences)
-- suggested_approach: Suggested approach for outreach (1 sentence)`,
-    });
+- suggested_approach: Suggested approach for outreach (1 sentence)`;
+      const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": process.env.ANTHROPIC_API_KEY!,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 2000,
+          messages: [{ role: "user", content: aiPrompt + "\n\nRespond ONLY with valid JSON matching this schema: {\"opportunities\": [{\"index\": number, \"relevance_score\": number, \"opportunity_type\": string, \"priority\": string, \"why_good_fit\": string, \"suggested_approach\": string}]}" }],
+        }),
+      });
+      if (anthropicRes.ok) {
+        const aiData = await anthropicRes.json();
+        const text = aiData.content?.[0]?.text || "{}";
+        aiOutput = JSON.parse(text.replace(/```json|```/g, "").trim());
+      }
+    } catch (e) {
+      console.error("AI ranking failed:", e);
+    }
 
     // Save the AI-selected opportunities to the database
     const selectedOpps = aiOutput?.opportunities || [];
