@@ -88,21 +88,21 @@ export function DiscoverPage() {
     load();
   }, []);
 
-  // Infinite scroll
+  // Infinite scroll - also expose loadMore for manual trigger
   useEffect(() => {
     const el = loadMoreRef.current;
-    if (!el) return;
+    if (!el || !nextPageToken) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && nextPageToken && !isLoadingMore) {
+        if (entries[0].isIntersecting) {
           loadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0, rootMargin: '200px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [nextPageToken, isLoadingMore]);
+  }, [nextPageToken]); // only re-run when token changes, not isLoadingMore
 
   const loadMore = async () => {
     if (!nextPageToken || isLoadingMore) return;
@@ -318,12 +318,17 @@ export function DiscoverPage() {
               {searchResults.map((place) => (
                 <DiscoverCard key={place.id} place={place} isSaved={savedIds.has(place.id)} onSave={() => handleSave(place)} />
               ))}
-              <div ref={loadMoreRef} className="py-4 flex justify-center">
+              <div ref={loadMoreRef} className="py-4 flex flex-col items-center gap-2">
                 {isLoadingMore && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Loading more...
                   </div>
+                )}
+                {!isLoadingMore && nextPageToken && (
+                  <Button variant="outline" size="sm" onClick={loadMore} className="text-xs">
+                    Load more venues
+                  </Button>
                 )}
                 {!isLoadingMore && !nextPageToken && searchResults.length > 0 && (
                   <p className="text-xs text-muted-foreground">All results loaded</p>
@@ -473,7 +478,7 @@ function DiscoverCard({ place, isSaved, onSave }) {
                   <Heart className="w-3 h-3 mr-1" />Save
                 </Button>
               ) : (
-                <span className="h-7 px-2 text-xs flex items-center text-primary font-medium ml-auto">â Saved</span>
+                <span className="h-7 px-2 text-xs flex items-center text-primary font-medium ml-auto">Ã¢ÂÂ Saved</span>
               )}
             </div>
           </div>
