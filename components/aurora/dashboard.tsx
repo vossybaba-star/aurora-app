@@ -27,6 +27,7 @@ export function Dashboard() {
         return <DashboardHome />;
       case "discover":
         return <DiscoverPage />;
+      case "opportunities":
       case "outreach":
         return <OutreachPage />;
       case "saved":
