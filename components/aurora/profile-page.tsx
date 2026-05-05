@@ -181,7 +181,7 @@ function PitchEditor({
                 key={i} 
                 className="text-xs text-muted-foreground flex items-start gap-2"
               >
-                <span className="text-primary mt-0.5">â¢</span>
+                <span className="text-primary mt-0.5">Ã¢ÂÂ¢</span>
                 {prompt}
               </li>
             ))}
