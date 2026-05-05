@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,9 @@ import {
 } from "lucide-react";
 
 type ViewMode = "grid" | "map";
+
+// Module-level Instagram cache (persists across re-renders, cleared on page refresh)
+const igCache = new Map<string, string | null>();
 
 // Search prompts based on business type
 function getSearchPrompts(businessType?: string): string[] {
@@ -75,6 +78,9 @@ export function DiscoverPage() {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [findResult, setFindResult] = useState<{ count: number; message: string } | null>(null);
   const [nearbyLocation, setNearbyLocation] = useState<string>("");
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // Track which opportunities are already saved
   useEffect(() => {
@@ -92,6 +98,7 @@ export function DiscoverPage() {
         if (data.places) {
           setSearchResults(data.places);
           setNearbyLocation(data.location || '');
+          setNextPageToken(data.nextPageToken || null);
         }
       } catch (error) {
         console.error("Failed to load nearby venues:", error);
@@ -146,24 +153,25 @@ export function DiscoverPage() {
     }
   };
 
-  const handleManualSearch = async () => {
-    if (!searchQuery.trim()) return;
-    
+  const handleManualSearch = async (overrideQuery?: string) => {
+    const q = overrideQuery ?? searchQuery;
+    if (!q.trim()) return;
     setIsSearching(true);
+    setNextPageToken(null);
     try {
       const response = await fetch("/api/places/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          query: searchQuery,
+          query: q,
           location: profile?.location,
           type: selectedType !== "all" ? selectedType : undefined,
         }),
       });
-      
       const data = await response.json();
       if (data.places) {
         setSearchResults(data.places);
+        setNextPageToken(data.nextPageToken || null);
       }
     } catch (error) {
       console.error("Search failed:", error);
@@ -467,21 +475,31 @@ export function DiscoverPage() {
           )}
         </div>
       ) : (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-              <div className="text-center p-8">
-                <Map className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-                <p className="text-muted-foreground">
-                  Map view coming soon
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Search results will appear on an interactive map
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-3">
+          <div className="rounded-xl overflow-hidden border" style={{ height: "60vh" }}>
+            <iframe
+              title="Venue map"
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              loading="lazy"
+              allowFullScreen
+              src={`https://www.google.com/maps/embed/v1/search?key=AIzaSyA1kVerq-mvYsWmObYOTEWZPm4vUbcgmlY&q=${encodeURIComponent(
+                searchResults.length > 0
+                  ? searchResults.slice(0, 5).map((p: any) => p.name).join(" OR ")
+                  : `event venues near ${profile?.location || nearbyLocation || "London"}`
+              )}`}
+            />
+          </div>
+          {searchResults.slice(0, 5).map((place: any) => (
+            <DiscoverCard
+              key={place.id}
+              place={place}
+              isSaved={savedIds.has(place.id)}
+              onSave={() => handleSaveOpportunity(place)}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -500,11 +518,14 @@ function DiscoverCard({
     ? `/api/places/photo?ref=${encodeURIComponent(place.photoReference)}&maxWidth=400`
     : null;
 
-  const [instagramHandle, setInstagramHandle] = useState<string | null>(null);
-  const [enriched, setEnriched] = useState(false);
+  const [instagramHandle, setInstagramHandle] = useState<string | null>(igCache.get(place.id) ?? null);
 
-  // Enrich with Instagram on mount
   useEffect(() => {
+    // Already cached — skip fetch
+    if (igCache.has(place.id)) {
+      setInstagramHandle(igCache.get(place.id) ?? null);
+      return;
+    }
     if (!place.website && !place.id) return;
     let cancelled = false;
     const enrich = async () => {
@@ -516,17 +537,16 @@ function DiscoverCard({
         });
         if (!res.ok || cancelled) return;
         const { contactInfo } = await res.json();
-        if (!cancelled) {
-          if (contactInfo?.instagram) setInstagramHandle(contactInfo.instagram);
-          setEnriched(true);
-        }
+        const ig = contactInfo?.instagram ?? null;
+        igCache.set(place.id, ig);
+        if (!cancelled && ig) setInstagramHandle(ig);
       } catch {
-        if (!cancelled) setEnriched(true);
+        if (!cancelled) igCache.set(place.id, null);
       }
     };
     enrich();
     return () => { cancelled = true; };
-  }, [place.website, place.id]);
+  }, [place.id, place.website]);
 
   return (
     <Card className="overflow-hidden hover:border-primary/30 transition-colors">
@@ -622,12 +642,7 @@ function DiscoverCard({
                   {instagramHandle}
                 </Button>
               )}
-              {!enriched && (place.website || place.id) && (
-                <span className="h-7 px-2 text-xs flex items-center text-muted-foreground/60 italic">
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  enriching...
-                </span>
-              )}
+
               {!isSaved && (
                 <Button 
                   size="sm" 
