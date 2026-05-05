@@ -181,7 +181,7 @@ function PitchEditor({
                 key={i} 
                 className="text-xs text-muted-foreground flex items-start gap-2"
               >
-                <span className="text-primary mt-0.5">•</span>
+                <span className="text-primary mt-0.5">â¢</span>
                 {prompt}
               </li>
             ))}
@@ -468,7 +468,7 @@ export function ProfilePage() {
   const [isPending, startTransition] = useTransition();
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
-  const [emailConnected, setEmailConnected] = useState<boolean | null>(null);
+  const [emailConnected, setEmailConnected] = useState<boolean>(false);
 
   // Check email connection
   useEffect(() => {
