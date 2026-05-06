@@ -19,6 +19,7 @@ export async function GET(request: Request) {
 
   console.log("[nylas connect] clientId:", NYLAS_CLIENT_ID);
   console.log("[nylas connect] redirectUri:", redirectUri);
+  console.log("[nylas connect] apiUri:", process.env.NYLAS_API_URI);
 
   const authUrl = nylas.auth.urlForOAuth2({
     clientId: NYLAS_CLIENT_ID,
