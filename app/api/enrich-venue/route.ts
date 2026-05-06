@@ -4,22 +4,20 @@
  * On-demand AI enrichment pipeline for a single venue.
  * Called from the Discover page when a user clicks a venue card.
  *
+ * Uses raw fetch for Anthropic + Firecrawl (same pattern as find-opportunities)
+ * to avoid SDK import resolution issues in Vercel's build cache.
+ *
  * Pipeline stages:
  *   1. Auth + 48hr cache check
  *   2. Firecrawl website scrape (non-fatal)
- *   3. Claude Sonnet analysis (wedding/cultural fit, exclusive photographer, etc.)
+ *   3. Claude analysis (wedding/cultural fit, exclusive photographer, etc.)
  *   4. Signal score calculation
  *   5. DB write (if opportunity already exists for this user)
  *   6. Enrichment audit log insert
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-// FirecrawlAppV1 (named export) — has `scrapeUrl` + ScrapeResponse with .success
-import { FirecrawlAppV1 as FirecrawlApp } from "@mendable/firecrawl-js";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,10 +65,10 @@ function calculateSignalScore(
   })();
 
   // AI-scored components (weighted)
-  const weddingScore    = Math.round((ai.wedding_relevance    / 100) * 25);
-  const culturalScore   = Math.round((ai.cultural_relevance   / 100) * 20);
+  const weddingScore      = Math.round((ai.wedding_relevance    / 100) * 25);
+  const culturalScore     = Math.round((ai.cultural_relevance   / 100) * 20);
   const photographerScore = Math.round((ai.photographer_opportunity / 100) * 15);
-  const positioningScore  = Math.round((ai.positioning_match  / 100) * 10);
+  const positioningScore  = Math.round((ai.positioning_match    / 100) * 10);
 
   // Exclusive photographer penalty (–40 — significant blocker)
   const exclusivePenalty = ai.has_exclusive_photographer ? -40 : 0;
@@ -155,10 +153,9 @@ export async function POST(req: Request) {
   // ── 4. 48-hour cache check ────────────────────────────────────────────────
   if (opportunity?.last_enriched_at && opportunity?.ai_analysis) {
     const ageMs = Date.now() - new Date(opportunity.last_enriched_at).getTime();
-    const fortyEightHours = 48 * 60 * 60 * 1000;
-    if (ageMs < fortyEightHours) {
+    if (ageMs < 48 * 60 * 60 * 1000) {
       return NextResponse.json({
-        status: "cached",
+        status:          "cached",
         signal_score:    opportunity.signal_score ?? 0,
         score_breakdown: opportunity.score_breakdown ?? {},
         ai_analysis:     opportunity.ai_analysis,
@@ -167,12 +164,11 @@ export async function POST(req: Request) {
   }
 
   // ── 5. Get user profile for AI context ───────────────────────────────────
-  // Cast to any — new profile columns from ai_engine migration aren't in types yet
   const { data: rawProfile } = await supabase
     .from("profiles")
     .select(
       "full_name, business_name, business_type, location, pitch, " +
-      "speciality_tags, positioning, work_radius, past_clients"
+      "speciality_tags, positioning, work_radius"
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -189,7 +185,7 @@ export async function POST(req: Request) {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Stage 1: Firecrawl website scrape (non-fatal)
+  // Stage 1: Firecrawl website scrape via REST API (non-fatal)
   // ──────────────────────────────────────────────────────────────────────────
   const websiteToScrape = website_url || opportunity?.website;
   let websiteMarkdown = "";
@@ -197,12 +193,24 @@ export async function POST(req: Request) {
 
   if (websiteToScrape && process.env.FIRECRAWL_API_KEY) {
     try {
-      // FirecrawlApp (v1 named export) — uses scrapeUrl + ScrapeResponse shape
-      const fc = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY! });
-      const result = await fc.scrapeUrl(websiteToScrape, { formats: ["markdown"] });
-      if (result.success && (result as any).markdown) {
-        websiteMarkdown = ((result as any).markdown as string).slice(0, 8000);
-        firecrawlSuccess = true;
+      const fcRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+        },
+        body: JSON.stringify({
+          url:     websiteToScrape,
+          formats: ["markdown"],
+        }),
+      });
+
+      if (fcRes.ok) {
+        const fcData = await fcRes.json();
+        if (fcData.success && fcData.data?.markdown) {
+          websiteMarkdown = (fcData.data.markdown as string).slice(0, 8000);
+          firecrawlSuccess = true;
+        }
       }
     } catch (err) {
       console.warn("[enrich-venue] Firecrawl scrape failed (non-fatal):", err);
@@ -213,10 +221,12 @@ export async function POST(req: Request) {
   // Stage 2: Build Claude prompt
   // ──────────────────────────────────────────────────────────────────────────
   const reviewsSummary = (() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const reviews: any[] = opportunity?.full_reviews ?? [];
     if (!reviews.length) return "No reviews available.";
     return reviews
       .slice(0, 5)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((r: any) => `• ${r.author} (${r.rating}★): "${r.text}"`)
       .join("\n");
   })();
@@ -226,13 +236,13 @@ export async function POST(req: Request) {
       ? `Photographer: ${profile?.full_name || profile?.business_name}`
       : null,
     profile?.business_type ? `Business type: ${profile.business_type}` : null,
-    profile?.location ? `Based in: ${profile.location}` : null,
-    profile?.pitch ? `Pitch: ${profile.pitch}` : null,
+    profile?.location      ? `Based in: ${profile.location}`           : null,
+    profile?.pitch         ? `Pitch: ${profile.pitch}`                  : null,
     profile?.speciality_tags?.length
       ? `Specialities: ${profile.speciality_tags.join(", ")}`
       : null,
-    profile?.positioning ? `Market positioning: ${profile.positioning}` : null,
-    profile?.work_radius ? `Work radius: ${profile.work_radius}` : null,
+    profile?.positioning   ? `Market positioning: ${profile.positioning}` : null,
+    profile?.work_radius   ? `Work radius: ${profile.work_radius}`        : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -280,39 +290,50 @@ Return ONLY this JSON (all fields required):
 }`;
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Stage 3: Claude analysis
+  // Stage 3: Claude analysis via REST API (same pattern as find-opportunities)
   // ──────────────────────────────────────────────────────────────────────────
   let aiAnalysis: AiAnalysis | null = null;
   let tokensUsed = 0;
 
   try {
-    const msg = await anthropic.messages.create({
-      model: "claude-opus-4-5",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
+    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key":         process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+        "content-type":      "application/json",
+      },
+      body: JSON.stringify({
+        model:      "claude-opus-4-5",
+        max_tokens: 1024,
+        messages:   [{ role: "user", content: prompt }],
+      }),
     });
 
-    tokensUsed =
-      (msg.usage?.input_tokens ?? 0) + (msg.usage?.output_tokens ?? 0);
-    const rawText =
-      msg.content[0].type === "text" ? msg.content[0].text : "{}";
+    if (!anthropicRes.ok) {
+      throw new Error(`Anthropic API error: ${anthropicRes.status}`);
+    }
 
-    // Strip any accidental markdown fences
+    const aiData = await anthropicRes.json();
+    tokensUsed =
+      (aiData.usage?.input_tokens ?? 0) + (aiData.usage?.output_tokens ?? 0);
+
+    const rawText: string = aiData.content?.[0]?.text ?? "{}";
     const cleaned = rawText.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(cleaned);
 
     aiAnalysis = {
-      wedding_relevance:         Math.max(0, Math.min(100, Number(parsed.wedding_relevance) || 0)),
-      cultural_relevance:        Math.max(0, Math.min(100, Number(parsed.cultural_relevance) || 0)),
+      wedding_relevance:         Math.max(0, Math.min(100, Number(parsed.wedding_relevance)    || 0)),
+      cultural_relevance:        Math.max(0, Math.min(100, Number(parsed.cultural_relevance)   || 0)),
       photographer_opportunity:  Math.max(0, Math.min(100, Number(parsed.photographer_opportunity) || 0)),
       has_exclusive_photographer: Boolean(parsed.has_exclusive_photographer),
-      contact_name:              parsed.contact_name ?? null,
+      contact_name:              parsed.contact_name  ?? null,
       contact_email:             parsed.contact_email ?? null,
       venue_capacity:            parsed.venue_capacity ? Number(parsed.venue_capacity) : null,
-      positioning_match:         Math.max(0, Math.min(100, Number(parsed.positioning_match) || 0)),
+      positioning_match:         Math.max(0, Math.min(100, Number(parsed.positioning_match)    || 0)),
       key_phrases_for_email:     Array.isArray(parsed.key_phrases_for_email) ? parsed.key_phrases_for_email : [],
-      why_good_lead:             String(parsed.why_good_lead || ""),
-      why_bad_lead:              parsed.why_bad_lead ?? null,
+      why_good_lead:             String(parsed.why_good_lead    || ""),
+      why_bad_lead:              parsed.why_bad_lead  ?? null,
       recommended_angle:         String(parsed.recommended_angle || ""),
       confidence:                ["high", "medium", "low"].includes(parsed.confidence)
                                    ? parsed.confidence
@@ -321,7 +342,6 @@ Return ONLY this JSON (all fields required):
     };
   } catch (err) {
     console.error("[enrich-venue] Claude analysis failed:", err);
-    // Return a graceful error without crashing — caller shows non-blocking error
     if (opportunity?.id) {
       await supabase
         .from("opportunities")
@@ -339,7 +359,7 @@ Return ONLY this JSON (all fields required):
   // ──────────────────────────────────────────────────────────────────────────
   const { signal_score, score_breakdown } = calculateSignalScore(
     aiAnalysis,
-    opportunity?.rating ?? null,
+    opportunity?.rating       ?? null,
     opportunity?.rating_count ?? null,
     opportunity?.network_contacted_count ?? 0
   );
@@ -347,15 +367,16 @@ Return ONLY this JSON (all fields required):
   const durationMs = Date.now() - startTime;
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Stage 5: DB write (only if opportunity exists for this user)
+  // Stage 5: DB write (only if this venue is already in the user's pipeline)
   // ──────────────────────────────────────────────────────────────────────────
   if (opportunity?.id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updatePayload: Record<string, any> = {
-      ai_analysis:         aiAnalysis,
+      ai_analysis:       aiAnalysis,
       signal_score,
       score_breakdown,
-      enrichment_status:   "complete",
-      last_enriched_at:    new Date().toISOString(),
+      enrichment_status: "complete",
+      last_enriched_at:  new Date().toISOString(),
     };
 
     if (firecrawlSuccess && websiteMarkdown) {
@@ -363,7 +384,6 @@ Return ONLY this JSON (all fields required):
       updatePayload.website_last_crawled_at = new Date().toISOString();
     }
 
-    // Surface contact details into the opportunity record if found
     if (aiAnalysis.contact_name) {
       updatePayload.contact_name = aiAnalysis.contact_name;
     }
@@ -387,9 +407,9 @@ Return ONLY this JSON (all fields required):
         claude_analysis: true,
         signal_score:    true,
       },
-      tokens_used:  tokensUsed,
-      model_used:   "claude-opus-4-5",
-      duration_ms:  durationMs,
+      tokens_used: tokensUsed,
+      model_used:  "claude-opus-4-5",
+      duration_ms: durationMs,
     });
   }
 
