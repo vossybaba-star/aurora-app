@@ -233,16 +233,25 @@ export function DiscoverPage() {
     : `event venues near ${profile?.location || nearbyLocation || "London UK"}`;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold">Discover</h1>
-        <Button onClick={handleAISearch} disabled={isFinding} size="sm">
-          {isFinding ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Finding...</> : <><Sparkles className="w-4 h-4 mr-1.5" />AI Find</>}
+        <div>
+          <h1 className="text-xl font-extrabold tracking-tight">Discover</h1>
+          <p className="text-xs text-muted-foreground">Find your next opportunity</p>
+        </div>
+        <Button
+          onClick={handleAISearch}
+          disabled={isFinding}
+          className="rounded-2xl font-bold fluid-gradient border-0 shadow-md shadow-primary/25 text-white hover:opacity-90"
+          size="sm"
+        >
+          {isFinding ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Finding…</> : <><Sparkles className="w-4 h-4 mr-1.5" />AI Find</>}
         </Button>
       </div>
 
       {findResult && (
-        <div className={`p-2.5 rounded-lg text-sm ${findResult.count > 0 ? "bg-primary/10" : "bg-muted"}`}>
+        <div className={`glass-card rounded-2xl p-3 text-sm font-medium ${findResult.count > 0 ? "border-primary/20 text-primary" : "text-muted-foreground"}`}>
           {findResult.message}
         </div>
       )}
@@ -269,8 +278,10 @@ export function DiscoverPage() {
             <button
               key={prompt}
               onClick={() => { setSearchQuery(prompt); handleSearch(prompt); }}
-              className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
-                searchQuery === prompt ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:border-primary/50 hover:bg-muted/50"
+              className={`px-3 py-1 text-xs rounded-full border font-medium transition-all ${
+                searchQuery === prompt
+                  ? "fluid-gradient text-white border-transparent shadow-sm shadow-primary/25"
+                  : "glass-card border-white/60 text-foreground hover:border-primary/30"
               }`}
             >
               {prompt}
@@ -306,10 +317,12 @@ export function DiscoverPage() {
       {viewMode === "grid" ? (
         <div className="space-y-3">
           {isLoadingInitial ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">Finding venues near you...</p>
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl fluid-gradient flex items-center justify-center shadow-lg shadow-primary/25">
+                  <Loader2 className="w-5 h-5 animate-spin text-white" />
+                </div>
+                <p className="text-sm text-muted-foreground">Finding venues near you…</p>
               </div>
             </div>
           ) : searchResults.length > 0 ? (
@@ -407,15 +420,14 @@ function DiscoverCard({ place, isSaved, onSave }) {
   }, [place.id, place.website]);
 
   return (
-    <Card className="overflow-hidden hover:border-primary/30 transition-colors">
-      <CardContent className="p-0">
-        <div className="flex">
-          <div className="w-24 h-24 sm:w-28 sm:h-28 shrink-0 relative bg-muted">
+    <div className="glass-card glass-card-hover rounded-2xl overflow-hidden">
+      <div className="flex">
+        <div className="w-24 shrink-0 relative self-stretch min-h-[88px]">
             {photoUrl ? (
-              <img src={photoUrl} alt={place.name} className="w-full h-full object-cover" />
+              <img src={photoUrl} alt={place.name} className="w-full h-full object-cover absolute inset-0" />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                <MapPin className="w-8 h-8 text-primary/30" />
+              <div className="w-full h-full fluid-gradient-subtle flex items-center justify-center">
+                <MapPin className="w-8 h-8 text-primary/40" />
               </div>
             )}
             {place.rating && (
@@ -485,7 +497,6 @@ function DiscoverCard({ place, isSaved, onSave }) {
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 }

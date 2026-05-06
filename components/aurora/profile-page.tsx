@@ -588,57 +588,47 @@ export function ProfilePage() {
   return (
     <div className="space-y-6 pb-8">
       {/* Hero Header */}
-      <div className="relative -mx-4 -mt-4 px-4 pt-8 pb-6 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
-        <div className="flex items-start gap-4">
+      <div className="glass-card rounded-3xl p-5 relative overflow-hidden">
+        <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-primary/8 blur-2xl pointer-events-none" />
+        <div className="flex items-start gap-4 relative z-10">
           {/* Avatar */}
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground text-2xl font-bold shadow-lg">
+          <div className="w-16 h-16 rounded-2xl fluid-gradient flex items-center justify-center text-white text-2xl font-extrabold shadow-lg shadow-primary/25 shrink-0">
             {(profile.businessName || profile.businessType || "A").charAt(0).toUpperCase()}
           </div>
-          
+
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold truncate">
+            <h1 className="text-lg font-extrabold truncate tracking-tight">
               {profile.businessName || profile.businessType || "Your Business"}
             </h1>
             <p className="text-sm text-muted-foreground truncate">
               {profile.businessType}
             </p>
             {profile.location && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                 <MapPin className="w-3 h-3 shrink-0" />
-                <span className="truncate">{profile.location.split(',')[0]}</span>
+                <span className="truncate">{profile.location.split(",")[0]}</span>
               </p>
             )}
           </div>
-        </div>
 
-        {/* Progress Ring */}
-        <div className="absolute top-6 right-4">
-          <div className="relative w-14 h-14">
-            <svg className="w-14 h-14 -rotate-90">
-              <circle
-                cx="28"
-                cy="28"
-                r="24"
-                stroke="currentColor"
-                strokeWidth="4"
-                fill="none"
-                className="text-muted/30"
-              />
-              <circle
-                cx="28"
-                cy="28"
-                r="24"
-                stroke="currentColor"
-                strokeWidth="4"
-                fill="none"
-                strokeDasharray={150.8}
-                strokeDashoffset={150.8 - (150.8 * completionPercent / 100)}
-                className="text-primary transition-all duration-500"
+          {/* Progress Ring */}
+          <div className="relative w-12 h-12 shrink-0">
+            <svg className="w-12 h-12 -rotate-90">
+              <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" fill="none" className="text-muted/30" />
+              <circle cx="24" cy="24" r="20" stroke="url(#grad)" strokeWidth="3" fill="none"
+                strokeDasharray={125.7}
+                strokeDashoffset={125.7 - (125.7 * completionPercent / 100)}
                 strokeLinecap="round"
               />
+              <defs>
+                <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#8b78db" />
+                  <stop offset="100%" stopColor="#a594e8" />
+                </linearGradient>
+              </defs>
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-primary">
               {completionPercent}%
             </span>
           </div>

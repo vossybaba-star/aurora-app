@@ -9,19 +9,22 @@ export function DashboardHeader() {
   const { profile, refreshData, isLoading } = useAurora();
 
   return (
-    <header className="px-4 pt-4 pb-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-primary-foreground" />
+    <header className="glass-header sticky top-0 z-40 px-4 py-3">
+      <div className="flex items-center justify-between max-w-xl mx-auto">
+        {/* Logo */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl fluid-gradient flex items-center justify-center shadow-sm">
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="font-semibold">Aurora</span>
+          <span className="font-extrabold tracking-tight text-gradient">Aurora</span>
         </div>
+
+        {/* Right actions */}
         <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="w-8 h-8"
+          <Button
+            variant="ghost"
+            size="icon"
+            className="w-8 h-8 text-muted-foreground hover:text-primary hover:bg-primary/8 rounded-xl"
             onClick={refreshData}
             disabled={isLoading}
           >
@@ -31,8 +34,10 @@ export function DashboardHeader() {
               <RefreshCw className="w-4 h-4" />
             )}
           </Button>
-          <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-medium">
-            {profile?.businessType?.charAt(0).toUpperCase() || "A"}
+
+          {/* Avatar */}
+          <div className="w-8 h-8 rounded-xl fluid-gradient flex items-center justify-center text-xs font-bold text-white shadow-sm">
+            {profile?.businessName?.charAt(0).toUpperCase() || profile?.businessType?.charAt(0).toUpperCase() || "A"}
           </div>
         </div>
       </div>

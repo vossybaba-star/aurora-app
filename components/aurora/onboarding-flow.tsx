@@ -139,28 +139,31 @@ export function OnboardingFlow() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="p-4 flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={prevStep} className="rounded-full">
+      <header className="glass-header sticky top-0 z-40 px-4 py-3 flex items-center justify-between">
+        <Button variant="ghost" size="icon" onClick={prevStep} className="rounded-xl w-9 h-9">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex gap-1.5">
           {steps.map((_, i) => (
             <div
               key={i}
-              className={`h-1.5 w-8 rounded-full transition-colors ${
-                i <= onboardingStep ? "bg-primary" : "bg-muted"
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                i <= onboardingStep ? "w-8 fluid-gradient" : "w-5 bg-muted"
               }`}
             />
           ))}
         </div>
-        <div className="w-10" />
+        <div className="w-9" />
       </header>
 
       {/* Content */}
-      <main className="flex-1 px-6 pb-8 flex flex-col">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold">{steps[onboardingStep].title}</h1>
-          <p className="text-muted-foreground">{steps[onboardingStep].subtitle}</p>
+      <main className="flex-1 px-5 pb-8 pt-6 flex flex-col max-w-sm mx-auto w-full">
+        <div className="mb-7">
+          <div className="w-10 h-10 rounded-2xl fluid-gradient flex items-center justify-center shadow-md shadow-primary/25 mb-4">
+            <Sparkles className="w-5 h-5 text-white" />
+          </div>
+          <h1 className="text-2xl font-extrabold tracking-tight">{steps[onboardingStep].title}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{steps[onboardingStep].subtitle}</p>
         </div>
 
         <div className="flex-1 space-y-6">
@@ -181,7 +184,7 @@ export function OnboardingFlow() {
                       key={example}
                       type="button"
                       onClick={() => updateFormData("businessType", example)}
-                      className="text-xs px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                      className="text-xs px-3 py-1.5 rounded-full glass-card border border-white/60 text-foreground hover:border-primary/30 font-medium transition-all"
                     >
                       {example}
                     </button>
@@ -222,13 +225,13 @@ export function OnboardingFlow() {
                       key={opp}
                       type="button"
                       onClick={() => toggleOpportunity(opp)}
-                      className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                      className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
                         formData.opportunities.includes(opp)
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
+                          ? "fluid-gradient border-transparent text-white shadow-md shadow-primary/20"
+                          : "glass-card border-white/60 hover:border-primary/30"
                       }`}
                     >
-                      <span className="font-medium">{opp}</span>
+                      <span className="font-semibold text-sm">{opp}</span>
                       {formData.opportunities.includes(opp) && (
                         <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
                           <Check className="w-4 h-4 text-primary-foreground" />
@@ -386,28 +389,26 @@ export function OnboardingFlow() {
               </div>
 
               {/* Preview card */}
-              <Card className="mt-6">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    Your Aurora Profile
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground text-balance">
-                    You are a <span className="font-medium text-foreground">{formData.businessType || "[business type]"}</span> based in{" "}
-                    <span className="font-medium text-foreground">{formData.location || "[location]"}</span>, looking for{" "}
-                    <span className="font-medium text-foreground">
-                      {formData.opportunities.length > 0
-                        ? formData.opportunities.join(", ").toLowerCase()
-                        : "[opportunities]"}
-                    </span>
-                    . Aurora will find{" "}
-                    <span className="font-medium text-foreground">{formData.opportunitiesPerWeek}</span>{" "}
-                    opportunities per week.
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="glass-card ai-glow rounded-2xl p-4 mt-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-lg fluid-gradient flex items-center justify-center">
+                    <Sparkles className="w-3 h-3 text-white" />
+                  </div>
+                  <span className="text-sm font-bold">Your Aurora Profile</span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  You are a <span className="font-semibold text-foreground">{formData.businessType || "[business type]"}</span> based in{" "}
+                  <span className="font-semibold text-foreground">{formData.location || "[location]"}</span>, looking for{" "}
+                  <span className="font-semibold text-foreground">
+                    {formData.opportunities.length > 0
+                      ? formData.opportunities.join(", ").toLowerCase()
+                      : "[opportunities]"}
+                  </span>
+                  . Aurora will find{" "}
+                  <span className="font-semibold text-primary">{formData.opportunitiesPerWeek}</span>{" "}
+                  opportunities per week.
+                </p>
+              </div>
             </>
           )}
         </div>
@@ -421,14 +422,14 @@ export function OnboardingFlow() {
         <div className="pt-6">
           <Button
             size="lg"
-            className="w-full h-14 text-base rounded-xl"
+            className="w-full h-14 text-base rounded-2xl font-bold fluid-gradient border-0 shadow-lg shadow-primary/30 hover:opacity-90 transition-all active:scale-[0.98] text-white"
             onClick={nextStep}
             disabled={!canProceed() || isPending}
           >
             {isPending ? (
               <>
                 <Spinner className="mr-2" />
-                Saving...
+                Saving…
               </>
             ) : onboardingStep === steps.length - 1 ? (
               <>

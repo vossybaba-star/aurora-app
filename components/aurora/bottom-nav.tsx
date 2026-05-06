@@ -4,35 +4,47 @@ import { useAurora } from "./aurora-app";
 import { Home, Compass, Send, Heart, User } from "lucide-react";
 
 const navItems = [
-  { id: "home", label: "Home", icon: Home },
+  { id: "home",     label: "Home",     icon: Home },
   { id: "discover", label: "Discover", icon: Compass },
   { id: "outreach", label: "Outreach", icon: Send },
-  { id: "saved", label: "Saved", icon: Heart },
-  { id: "profile", label: "Profile", icon: User },
+  { id: "saved",    label: "Saved",    icon: Heart },
+  { id: "profile",  label: "Profile",  icon: User },
 ];
 
 export function BottomNav() {
   const { activeTab, setActiveTab } = useAurora();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border px-2 pb-safe">
-      <div className="flex items-center justify-around h-16">
+    <nav className="fixed bottom-0 left-0 right-0 glass-nav px-2 pb-safe z-40">
+      <div className="flex items-center justify-around h-16 max-w-md mx-auto">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           const Icon = item.icon;
-          
+
           return (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center gap-0.5 w-16 h-14 rounded-xl transition-colors ${
-                isActive 
-                  ? "text-primary" 
+              className={`flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl transition-all duration-200 ${
+                isActive
+                  ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Icon className={`w-5 h-5 ${isActive ? "stroke-[2.5]" : ""}`} />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <div className={`relative w-8 h-8 flex items-center justify-center rounded-xl transition-all ${
+                isActive ? "fluid-gradient shadow-sm shadow-primary/30" : ""
+              }`}>
+                <Icon
+                  className={`w-4.5 h-4.5 transition-all ${
+                    isActive ? "text-white stroke-[2.5]" : ""
+                  }`}
+                />
+              </div>
+              <span className={`text-[9px] font-semibold tracking-wide transition-all ${
+                isActive ? "text-primary" : "text-muted-foreground/70"
+              }`}>
+                {item.label}
+              </span>
             </button>
           );
         })}
