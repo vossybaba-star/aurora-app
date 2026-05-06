@@ -227,9 +227,10 @@ export function OnboardingFlow() {
                       onClick={() => toggleOpportunity(opp)}
                       className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
                         formData.opportunities.includes(opp)
-                          ? "fluid-gradient border-transparent text-white shadow-md shadow-primary/20"
+                          ? "border-transparent text-white shadow-md shadow-primary/20"
                           : "glass-card border-white/60 hover:border-primary/30"
                       }`}
+                      style={formData.opportunities.includes(opp) ? { background:'linear-gradient(135deg,#3525cd,#4f46e5)' } : {}}
                     >
                       <span className="font-semibold text-sm">{opp}</span>
                       {formData.opportunities.includes(opp) && (
@@ -422,7 +423,8 @@ export function OnboardingFlow() {
         <div className="pt-6">
           <Button
             size="lg"
-            className="w-full h-14 text-base rounded-2xl font-bold fluid-gradient border-0 shadow-lg shadow-primary/30 hover:opacity-90 transition-all active:scale-[0.98] text-white"
+            className="w-full h-14 text-base rounded-2xl font-bold border-0 shadow-lg shadow-primary/30 hover:opacity-90 transition-all active:scale-[0.98] text-white"
+            style={{ background:'linear-gradient(135deg,#3525cd,#4f46e5)' }}
             onClick={nextStep}
             disabled={!canProceed() || isPending}
           >

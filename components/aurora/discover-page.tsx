@@ -240,14 +240,14 @@ export function DiscoverPage() {
           <h1 className="text-xl font-extrabold tracking-tight">Discover</h1>
           <p className="text-xs text-muted-foreground">Find your next opportunity</p>
         </div>
-        <Button
+        <button
           onClick={handleAISearch}
           disabled={isFinding}
-          className="rounded-2xl font-bold fluid-gradient border-0 shadow-md shadow-primary/25 text-white hover:opacity-90"
-          size="sm"
+          className="rounded-2xl font-bold text-white px-4 py-2 text-sm flex items-center gap-1.5 shadow-md shadow-primary/25 hover:opacity-90 transition-all active:scale-[0.97] disabled:opacity-60"
+          style={{ background: 'linear-gradient(135deg,#3525cd,#4f46e5)' }}
         >
-          {isFinding ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Finding…</> : <><Sparkles className="w-4 h-4 mr-1.5" />AI Find</>}
-        </Button>
+          {isFinding ? <><Loader2 className="w-4 h-4 animate-spin" />Finding…</> : <><Sparkles className="w-4 h-4" />AI Find</>}
+        </button>
       </div>
 
       {findResult && (
@@ -278,11 +278,12 @@ export function DiscoverPage() {
             <button
               key={prompt}
               onClick={() => { setSearchQuery(prompt); handleSearch(prompt); }}
-              className={`px-3 py-1 text-xs rounded-full border font-medium transition-all ${
+              className={`px-3 py-1 text-xs rounded-full border font-semibold transition-all ${
                 searchQuery === prompt
-                  ? "fluid-gradient text-white border-transparent shadow-sm shadow-primary/25"
+                  ? "text-white border-transparent shadow-sm shadow-primary/25"
                   : "glass-card border-white/60 text-foreground hover:border-primary/30"
               }`}
+            style={searchQuery === prompt ? { background:'linear-gradient(135deg,#3525cd,#4f46e5)' } : {}}
             >
               {prompt}
             </button>
@@ -420,7 +421,7 @@ function DiscoverCard({ place, isSaved, onSave }) {
   }, [place.id, place.website]);
 
   return (
-    <div className="glass-card glass-card-hover rounded-2xl overflow-hidden">
+    <div className="glass-card glass-card-hover rounded-2xl overflow-hidden border-l-4" style={{ borderLeftColor:'#3525cd' }}>
       <div className="flex">
         <div className="w-24 shrink-0 relative self-stretch min-h-[88px]">
             {photoUrl ? (

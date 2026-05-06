@@ -25,23 +25,19 @@ export function BottomNav() {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl transition-all duration-200 ${
-                isActive
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className="flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl transition-all duration-200"
             >
               <div className={`relative w-8 h-8 flex items-center justify-center rounded-xl transition-all ${
                 isActive ? "fluid-gradient shadow-sm shadow-primary/30" : ""
               }`}>
                 <Icon
-                  className={`w-4.5 h-4.5 transition-all ${
-                    isActive ? "text-white stroke-[2.5]" : ""
+                  className={`w-[18px] h-[18px] transition-all ${
+                    isActive ? "text-white stroke-[2.5]" : "text-muted-foreground"
                   }`}
                 />
               </div>
-              <span className={`text-[9px] font-semibold tracking-wide transition-all ${
-                isActive ? "text-primary" : "text-muted-foreground/70"
+              <span className={`text-[9px] font-bold tracking-wide transition-all ${
+                isActive ? "text-primary" : "text-muted-foreground/60"
               }`}>
                 {item.label}
               </span>

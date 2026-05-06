@@ -21,26 +21,20 @@ export function Dashboard() {
             <div className="w-12 h-12 rounded-2xl fluid-gradient flex items-center justify-center shadow-lg shadow-primary/25">
               <Spinner className="w-5 h-5 text-white" />
             </div>
-            <p className="text-xs text-muted-foreground font-medium">Loading your data…</p>
+            <p className="text-xs text-muted-foreground font-medium">Loading…</p>
           </div>
         </div>
       );
     }
 
     switch (activeTab) {
-      case "home":
-        return <DashboardHome />;
-      case "discover":
-        return <DiscoverPage />;
+      case "home":        return <DashboardHome />;
+      case "discover":    return <DiscoverPage />;
       case "opportunities":
-      case "outreach":
-        return <OutreachPage />;
-      case "saved":
-        return <SavedPage />;
-      case "profile":
-        return <ProfilePage />;
-      default:
-        return <DashboardHome />;
+      case "outreach":    return <OutreachPage />;
+      case "saved":       return <SavedPage />;
+      case "profile":     return <ProfilePage />;
+      default:            return <DashboardHome />;
     }
   };
 

@@ -13,10 +13,10 @@ export function DashboardHeader() {
       <div className="flex items-center justify-between max-w-xl mx-auto">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl fluid-gradient flex items-center justify-center shadow-sm">
+          <div className="w-8 h-8 rounded-xl fluid-gradient flex items-center justify-center shadow-sm shadow-primary/30">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="font-extrabold tracking-tight text-gradient">Aurora</span>
+          <span className="font-extrabold tracking-tight liquid-gradient-text">Aurora</span>
         </div>
 
         {/* Right actions */}
@@ -37,7 +37,8 @@ export function DashboardHeader() {
 
           {/* Avatar */}
           <div className="w-8 h-8 rounded-xl fluid-gradient flex items-center justify-center text-xs font-bold text-white shadow-sm">
-            {profile?.businessName?.charAt(0).toUpperCase() || profile?.businessType?.charAt(0).toUpperCase() || "A"}
+            {profile?.businessName?.charAt(0).toUpperCase() ||
+             profile?.businessType?.charAt(0).toUpperCase() || "A"}
           </div>
         </div>
       </div>
