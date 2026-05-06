@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { transformPlaceDetail } from "@/lib/places/transformPlaceDetail";
+import type { PlaceReview } from "@/lib/places/transformPlaceDetail";
 
 // Google Places API types
 interface PlaceResult {
@@ -12,9 +14,13 @@ interface PlaceResult {
   rating?: number;
   user_ratings_total?: number;
   business_status?: string;
+  // Extended from searchText field mask (Step 5)
+  price_level?: number | null;
+  editorial_summary?: string | null;
 }
 
 interface PlaceDetails {
+  // ── Existing fields — do not rename or remove ──
   place_id: string;
   name: string;
   formatted_address?: string;
@@ -24,6 +30,10 @@ interface PlaceDetails {
   user_ratings_total?: number;
   types?: string[];
   photo_reference?: string;
+  // ── New deep fields from transformPlaceDetail ──
+  price_level: number | null;
+  google_editorial_summary: string | null;
+  full_reviews: PlaceReview[];
 }
 
 // Map opportunity types to Google Places search queries
@@ -66,7 +76,9 @@ async function searchPlaces(query: string): Promise<PlaceResult[]> {
         headers: {
           "Content-Type": "application/json",
           "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.types,places.rating,places.userRatingCount,places.businessStatus,places.id",
+          // priceLevel + editorialSummary added so initial results carry pricing
+          // tier without a separate detail fetch (Step 5)
+          "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.types,places.rating,places.userRatingCount,places.businessStatus,places.id,places.priceLevel,places.editorialSummary",
         },
         body: JSON.stringify(requestBody),
       }
@@ -89,6 +101,11 @@ async function searchPlaces(query: string): Promise<PlaceResult[]> {
         rating: place.rating || undefined,
         user_ratings_total: place.userRatingCount || undefined,
         business_status: place.businessStatus || "OPERATIONAL",
+        // New fields from extended field mask
+        price_level: place.priceLevel != null
+          ? (transformPlaceDetail({ priceLevel: place.priceLevel })).priceLevel
+          : null,
+        editorial_summary: place.editorialSummary?.text ?? null,
       }));
     }
     
@@ -99,40 +116,83 @@ async function searchPlaces(query: string): Promise<PlaceResult[]> {
   }
 }
 
-// Get place details including website and phone (using v1 API)
+// Get place details including website and phone (using Places API (New) v1)
 async function getPlaceDetails(placeId: string, displayName?: string): Promise<PlaceDetails | null> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) return null;
 
   try {
-    // Use the resource name format for v1 API: places/ChIJ...
+    // Resource name format for Places API (New): places/ChIJ...
     const resourceName = placeId.startsWith("places/") ? placeId : `places/${placeId}`;
-    
+
+    // NOTE: "reviews" requires the Places API (New) to be enabled on your key
+    // in Google Cloud Console AND the Reviews feature to be active.
+    // Google returns a maximum of 5 reviews per place — this is a platform limit.
+    const fieldMask = [
+      "id",
+      "displayName",
+      "formattedAddress",
+      "location",
+      "rating",
+      "userRatingCount",
+      "priceLevel",
+      "businessStatus",
+      "websiteUri",
+      "internationalPhoneNumber",
+      "regularOpeningHours",
+      "primaryTypeDisplayName",
+      "editorialSummary",
+      "photos",
+      "reviews",
+      "goodForChildren",
+      "reservable",
+      "servesWine",
+      "servesBreakfast",
+      "servesLunch",
+      "servesDinner",
+      "takeout",
+      "delivery",
+      "dineIn",
+      "currentOpeningHours",
+      "addressComponents",
+    ].join(",");
+
     const response = await fetch(
-      `https://places.googleapis.com/v1/${resourceName}?fields=displayName,formattedAddress,websiteUri,nationalPhoneNumber,rating,userRatingCount,businessStatus,types,photos&languageCode=en`,
+      `https://places.googleapis.com/v1/${resourceName}?fields=${fieldMask}&languageCode=en`,
       {
         headers: {
           "X-Goog-Api-Key": apiKey,
         },
       }
     );
-    
+
     const data = await response.json();
-    
+
+    if (!response.ok) {
+      console.error("[Places Deep] Detail fetch error:", data);
+      return null;
+    }
+
     if (data) {
-      // Get first photo reference if available (format: places/PLACE_ID/photos/PHOTO_REF)
-      const photoRef = data.photos?.[0]?.name || undefined;
-      
+      // Run all new-field extraction through the shared transform helper
+      const transformed = transformPlaceDetail(data);
+
       return {
+        // ── Existing fields — names unchanged so downstream code is unaffected ──
         place_id: placeId,
-        name: data.displayName?.text || displayName || "",
+        name: transformed.name || displayName || "",
         formatted_address: data.formattedAddress || "",
         website: data.websiteUri || undefined,
-        formatted_phone_number: data.nationalPhoneNumber || undefined,
-        rating: data.rating || undefined,
-        user_ratings_total: data.userRatingCount || undefined,
+        // internationalPhoneNumber replaces nationalPhoneNumber (better formatted)
+        formatted_phone_number: transformed.phone || undefined,
+        rating: transformed.rating || undefined,
+        user_ratings_total: transformed.userRatingCount || undefined,
         types: data.types || [],
-        photo_reference: photoRef,
+        photo_reference: transformed.photoReference || undefined,
+        // ── New deep fields ────────────────────────────────────────────────────
+        price_level: transformed.priceLevel,
+        google_editorial_summary: transformed.editorialSummary,
+        full_reviews: transformed.fullReviews,
       };
     }
     return null;
@@ -322,32 +382,59 @@ For each selected opportunity, provide:
       }
       const placeDetails = placesWithDetails[placeIndex];
 
-      // Create the opportunity
+      // Upsert the opportunity — onConflict requires a unique constraint on
+      // (google_place_id, user_id). The existing duplicate-check above means
+      // we rarely hit this path, but upsert is safer for re-runs.
       const { data: newOpp, error: oppError } = await supabase
         .from("opportunities")
-        .insert({
-          user_id: user.id,
-          name: placeDetails.name,
-          type: opp.opportunity_type,
-          location: placeDetails.formatted_address || location,
-          status: "new",
-          priority: opp.priority,
-          tags: ["aurora_ai", "google_places"],
-          why_good_fit: opp.why_good_fit,
-          notes: `Suggested approach: ${opp.suggested_approach}`,
-          website: placeDetails.website || null,
-          google_place_id: placeDetails.place_id,
-          rating: placeDetails.rating || null,
-          rating_count: placeDetails.user_ratings_total || null,
-          photo_reference: placeDetails.photo_reference || null,
-          source: "aurora_ai",
-        })
+        .upsert(
+          {
+            // ── Existing fields — unchanged ──────────────────────────────
+            user_id: user.id,
+            name: placeDetails.name,
+            type: opp.opportunity_type,
+            location: placeDetails.formatted_address || location,
+            status: "new",
+            priority: opp.priority,
+            tags: ["aurora_ai", "google_places"],
+            why_good_fit: opp.why_good_fit,
+            notes: `Suggested approach: ${opp.suggested_approach}`,
+            website: placeDetails.website || null,
+            google_place_id: placeDetails.place_id,
+            rating: placeDetails.rating || null,
+            rating_count: placeDetails.user_ratings_total || null,
+            photo_reference: placeDetails.photo_reference || null,
+            source: "aurora_ai",
+            // ── New deep fields from AI engine migration ─────────────────
+            price_level: placeDetails.price_level ?? null,
+            google_editorial_summary: placeDetails.google_editorial_summary ?? null,
+            google_website_url: placeDetails.website ?? null,
+            review_count_total: placeDetails.user_ratings_total ?? null,
+            full_reviews: placeDetails.full_reviews?.length
+              ? placeDetails.full_reviews
+              : null,
+            // Mark as pending so the enrichment pipeline picks this up next
+            enrichment_status: "pending",
+          },
+          { onConflict: "google_place_id,user_id" }
+        )
         .select()
         .single();
 
       if (oppError) {
         console.error("Error creating opportunity:", oppError);
         continue;
+      }
+
+      // Step 6 — dev-only verification log
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Places Deep] Enriched:", {
+          name: placeDetails.name,
+          priceLevel: placeDetails.price_level,
+          reviewCount: placeDetails.full_reviews?.length ?? 0,
+          hasEditorialSummary: !!placeDetails.google_editorial_summary,
+          hasWebsite: !!placeDetails.website,
+        });
       }
 
       createdCount++;
