@@ -250,6 +250,8 @@ function PaneDetail({
   const [emailConnected, setEmailConnected] = useState<boolean | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [personalisationScore, setPersonalisationScore] = useState<number | null>(null);
 
   const photo = thumbUrl(opportunity.photoReference, 600);
   const badge = statusBadge(opportunity.status);
@@ -269,14 +271,23 @@ function PaneDetail({
         const data = await res.json();
         if (data.steps?.length > 0) {
           setSequenceSteps(data.steps);
+          // Surface personalisation score if the sequence was AI-generated
+          const opp = await fetch(`/api/opportunities?id=${opportunity.id}`).catch(() => null);
+          // (score surfaced on regenerate; initial load just shows steps)
         } else {
-          const cr = await fetch('/api/sequences', {
+          // No steps yet — call the Copy Engine to generate AI-personalised sequence
+          const cr = await fetch('/api/generate-sequence', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ opportunityId: opportunity.id }),
+            body: JSON.stringify({ opportunity_id: opportunity.id }),
           });
           const cd = await cr.json();
-          if (cd.steps) setSequenceSteps(cd.steps);
+          if (cd.status === 'generated' || cd.status === 'cached') {
+            const r2 = await fetch(`/api/sequences?opportunityId=${opportunity.id}`);
+            const d2 = await r2.json();
+            if (d2.steps) setSequenceSteps(d2.steps);
+            if (cd.personalisation_score != null) setPersonalisationScore(cd.personalisation_score);
+          }
         }
       } catch { /* silent */ }
       finally { setIsLoadingSteps(false); }
@@ -288,6 +299,26 @@ function PaneDetail({
     const r = await fetch(`/api/sequences?opportunityId=${opportunity.id}`);
     const d = await r.json();
     if (d.steps) setSequenceSteps(d.steps);
+  };
+
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+    try {
+      const res = await fetch('/api/generate-sequence', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ opportunity_id: opportunity.id, regenerate: true }),
+      });
+      const data = await res.json();
+      if (data.status === 'generated') {
+        await refreshSteps();
+        if (data.personalisation_score != null) setPersonalisationScore(data.personalisation_score);
+        toast.success('Sequence regenerated');
+      } else {
+        toast.error(data.error || 'Regeneration failed');
+      }
+    } catch { toast.error('Failed to regenerate'); }
+    finally { setIsRegenerating(false); }
   };
 
   const handleSaveEdit = async () => {
@@ -455,21 +486,55 @@ function PaneDetail({
 
         {/* Sequence timeline */}
         <div className="glass-card rounded-2xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-white/30 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Mail className="w-4 h-4" style={{ color: ACCENT }} />
-              <span className="text-sm font-bold" style={{ color: '#131b2e' }}>
+          <div className="px-4 py-3 border-b border-white/30 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Mail className="w-4 h-4 shrink-0" style={{ color: ACCENT }} />
+              <span className="text-sm font-bold truncate" style={{ color: '#131b2e' }}>
                 Email Sequence ({sequenceSteps.length})
               </span>
+              {personalisationScore != null && (
+                <span
+                  title={personalisationScore < 50 ? 'Add more to your profile to improve personalisation' : undefined}
+                  className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                  style={
+                    personalisationScore >= 80
+                      ? { background: '#dcfce7', color: '#15803d' }
+                      : personalisationScore >= 50
+                      ? { background: '#fef9c3', color: '#a16207' }
+                      : { background: '#f1f5f9', color: '#64748b' }
+                  }
+                >
+                  {personalisationScore >= 80 ? '✦ Highly personalised' : personalisationScore >= 50 ? '✦ Personalised' : '✦ Low personalisation'}
+                </span>
+              )}
             </div>
-            <button
-              onClick={handleAddStep}
-              className="flex items-center gap-1 text-xs font-bold hover:opacity-80 transition-opacity"
-              style={{ color: ACCENT }}
-            >
-              <Plus className="w-3.5 h-3.5" /> Add
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
+                className="flex items-center gap-1 text-xs font-bold hover:opacity-80 transition-opacity disabled:opacity-50"
+                style={{ color: ACCENT }}
+                title="Regenerate with AI"
+              >
+                {isRegenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {isRegenerating ? '' : 'Regenerate'}
+              </button>
+              <span className="text-muted-foreground/40 text-xs">·</span>
+              <button
+                onClick={handleAddStep}
+                className="flex items-center gap-1 text-xs font-bold hover:opacity-80 transition-opacity"
+                style={{ color: ACCENT }}
+              >
+                <Plus className="w-3.5 h-3.5" /> Add
+              </button>
+            </div>
           </div>
+          {isRegenerating && (
+            <div className="px-4 py-2 border-b border-white/20 flex items-center gap-2" style={{ background: `${ACCENT}0a` }}>
+              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: ACCENT }} />
+              <span className="text-xs font-medium" style={{ color: ACCENT }}>Aurora is rewriting this sequence…</span>
+            </div>
+          )}
 
           {isLoadingSteps ? (
             <div className="flex items-center justify-center py-8">
@@ -1505,6 +1570,8 @@ function SequenceDetail({
   const [editBody, setEditBody] = useState("");
   const [editDelay, setEditDelay] = useState(3);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [personalisationScore, setPersonalisationScore] = useState<number | null>(null);
 
   const photoUrl = opportunity.photoReference
     ? `/api/places/photo?ref=${encodeURIComponent(opportunity.photoReference)}&maxWidth=800`
@@ -1519,13 +1586,19 @@ function SequenceDetail({
         if (data.steps?.length > 0) {
           setSequenceSteps(data.steps);
         } else {
-          const createRes = await fetch('/api/sequences', {
-            method: 'POST',
+          // No steps — call the Copy Engine to generate an AI-personalised sequence
+          const createRes = await fetch('/api/generate-sequence', {
+            method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ opportunityId: opportunity.id }),
+            body:    JSON.stringify({ opportunity_id: opportunity.id }),
           });
           const createData = await createRes.json();
-          if (createData.steps) setSequenceSteps(createData.steps);
+          if (createData.status === 'generated' || createData.status === 'cached') {
+            const r2 = await fetch(`/api/sequences?opportunityId=${opportunity.id}`);
+            const d2 = await r2.json();
+            if (d2.steps) setSequenceSteps(d2.steps);
+            if (createData.personalisation_score != null) setPersonalisationScore(createData.personalisation_score);
+          }
         }
       } catch { /* silent */ }
       finally { setIsLoadingSteps(false); }
@@ -1537,6 +1610,26 @@ function SequenceDetail({
     const r = await fetch(`/api/sequences?opportunityId=${opportunity.id}`);
     const d = await r.json();
     if (d.steps) setSequenceSteps(d.steps);
+  };
+
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+    try {
+      const res = await fetch('/api/generate-sequence', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ opportunity_id: opportunity.id, regenerate: true }),
+      });
+      const data = await res.json();
+      if (data.status === 'generated') {
+        await refreshSteps();
+        if (data.personalisation_score != null) setPersonalisationScore(data.personalisation_score);
+        toast.success('Sequence regenerated');
+      } else {
+        toast.error(data.error || 'Regeneration failed');
+      }
+    } catch { toast.error('Failed to regenerate'); }
+    finally { setIsRegenerating(false); }
   };
 
   const handleEditStep = (step: SequenceStep) => {
@@ -1685,10 +1778,47 @@ function SequenceDetail({
       {/* Email Sequence */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2"><Mail className="w-4 h-4" />Email Sequence ({sequenceSteps.length} emails)</CardTitle>
-            <Button variant="ghost" size="sm" onClick={handleAddStep}><Plus className="w-4 h-4 mr-1" />Add</Button>
+          <div className="flex items-start justify-between gap-2">
+            <div className="space-y-1">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Mail className="w-4 h-4" />Email Sequence ({sequenceSteps.length} emails)
+              </CardTitle>
+              {personalisationScore != null && (
+                <span
+                  title={personalisationScore < 50 ? 'Add more to your profile to improve personalisation' : undefined}
+                  className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={
+                    personalisationScore >= 80
+                      ? { background: '#dcfce7', color: '#15803d' }
+                      : personalisationScore >= 50
+                      ? { background: '#fef9c3', color: '#a16207' }
+                      : { background: '#f1f5f9', color: '#64748b' }
+                  }
+                >
+                  {personalisationScore >= 80 ? '✦ Highly personalised' : personalisationScore >= 50 ? '✦ Personalised' : '✦ Low personalisation'}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                variant="ghost" size="sm"
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
+                className="text-xs h-8 gap-1.5"
+                style={{ color: ACCENT }}
+              >
+                {isRegenerating
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Rewriting…</>
+                  : <><Sparkles className="w-3.5 h-3.5" />Regenerate</>}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleAddStep}><Plus className="w-4 h-4 mr-1" />Add</Button>
+            </div>
           </div>
+          {isRegenerating && (
+            <p className="text-xs mt-1" style={{ color: ACCENT }}>
+              Aurora is rewriting this sequence…
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           {isLoadingSteps ? (

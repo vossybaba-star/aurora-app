@@ -411,6 +411,24 @@ Return ONLY this JSON (all fields required):
       model_used:  "claude-opus-4-5",
       duration_ms: durationMs,
     });
+
+    // ── Stage 7: Auto-trigger copy generation (fire-and-forget) ────────────
+    // Passes the auth cookie through so the generate-sequence route can
+    // authenticate without a separate token exchange.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    fetch(`${appUrl}/api/generate-sequence`, {
+      method:  "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie:         req.headers.get("cookie") ?? "",
+      },
+      body: JSON.stringify({
+        opportunity_id: opportunity.id,
+        regenerate:     false, // skip if copy already exists
+      }),
+    }).catch((err) =>
+      console.error("[enrich-venue] Auto-generate sequence failed:", err)
+    );
   }
 
   // ── Return result ─────────────────────────────────────────────────────────
