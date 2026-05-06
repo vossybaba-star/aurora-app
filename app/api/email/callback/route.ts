@@ -23,21 +23,21 @@ export async function GET(request: Request) {
 
   try {
     const redirectUri = `${baseUrl}/api/email/callback`;
-    const codeVerifier = request.headers.get("cookie")
+    const pkceSecret = request.headers.get("cookie")
       ?.split("; ")
-      .find(c => c.startsWith("nylas_code_verifier="))
+      .find(c => c.startsWith("nylas_pkce_secret="))
       ?.split("=")[1];
 
     console.log("[nylas callback] clientId:", NYLAS_CLIENT_ID);
     console.log("[nylas callback] redirectUri:", redirectUri);
-    console.log("[nylas callback] hasCodeVerifier:", !!codeVerifier);
+    console.log("[nylas callback] hasPkceSecret:", !!pkceSecret);
 
     // Exchange code for token
     const tokenResponse = await nylas.auth.exchangeCodeForToken({
       clientId: NYLAS_CLIENT_ID,
       redirectUri,
       code,
-      ...(codeVerifier ? { codeVerifier } : {}),
+      ...(pkceSecret ? { codeVerifier: pkceSecret } : {}),
     });
 
     const { grantId, email } = tokenResponse;
