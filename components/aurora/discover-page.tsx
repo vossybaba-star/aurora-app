@@ -25,7 +25,12 @@ import {
   Grid3X3,
   Map as MapIcon,
   Instagram,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import { useVenueEnrichment } from "@/hooks/useVenueEnrichment";
+import type { VenueEnrichmentResult } from "@/hooks/useVenueEnrichment";
 
 /* ─── Constants ──────────────────────────────── */
 const ACCENT  = "#7c6ef7";
@@ -73,6 +78,7 @@ export function DiscoverPage() {
   const [searchResults, setSearchResults] = useState<Place[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState(new Set<string>());
+  const [expandedPlaceId, setExpandedPlaceId] = useState<string | null>(null);
   const [findResult, setFindResult] = useState<{ count: number; message: string } | null>(null);
   const [nearbyLocation, setNearbyLocation] = useState("");
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -386,6 +392,12 @@ export function DiscoverPage() {
                     place={place}
                     isSaved={savedIds.has(place.id)}
                     onSave={() => handleSave(place)}
+                    isExpanded={expandedPlaceId === place.id}
+                    onToggle={() =>
+                      setExpandedPlaceId(
+                        expandedPlaceId === place.id ? null : place.id
+                      )
+                    }
                   />
                 ))}
               </div>
@@ -482,6 +494,12 @@ export function DiscoverPage() {
                 place={place}
                 isSaved={savedIds.has(place.id)}
                 onSave={() => handleSave(place)}
+                isExpanded={expandedPlaceId === place.id}
+                onToggle={() =>
+                  setExpandedPlaceId(
+                    expandedPlaceId === place.id ? null : place.id
+                  )
+                }
               />
             ))}
           </div>
@@ -493,16 +511,26 @@ export function DiscoverPage() {
 
 /* ════════════════════════════════════════════════
    Vertical venue card — grid view
-   Full-width photo (160px) + details + Save CTA
+   Full-width photo (160px) + details + AI analysis
 ════════════════════════════════════════════════ */
-function DiscoverCard({ place, isSaved, onSave }: { place: Place; isSaved: boolean; onSave: () => void }) {
+interface DiscoverCardProps {
+  place:      Place;
+  isSaved:    boolean;
+  onSave:     () => void;
+  isExpanded?: boolean;
+  onToggle?:  () => void;
+}
+
+function DiscoverCard({ place, isSaved, onSave, isExpanded = false, onToggle }: DiscoverCardProps) {
   const ACCENT = "#7c6ef7";
   const photoUrl = place.photoReference
     ? `/api/places/photo?ref=${encodeURIComponent(place.photoReference)}&maxWidth=600`
     : null;
 
   const [instagramHandle, setInstagramHandle] = useState<string | null>(igCache.get(place.id) ?? null);
+  const { enrichVenue, enriching, result, error } = useVenueEnrichment();
 
+  // Fetch Instagram handle in background (unchanged)
   useEffect(() => {
     if (igCache.has(place.id)) {
       setInstagramHandle(igCache.get(place.id) ?? null);
@@ -529,8 +557,20 @@ function DiscoverCard({ place, isSaved, onSave }: { place: Place; isSaved: boole
     return () => { cancelled = true; };
   }, [place.id, place.website]);
 
+  // Trigger enrichment when card is expanded for the first time
+  useEffect(() => {
+    if (isExpanded && !result && !enriching) {
+      enrichVenue(place.id, place.website, place.name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExpanded, place.id]);
+
   return (
-    <div className="glass-card glass-card-hover rounded-2xl overflow-hidden flex flex-col" style={{ borderTop: `3px solid ${ACCENT}` }}>
+    <div
+      className="glass-card rounded-2xl overflow-hidden flex flex-col cursor-pointer transition-all"
+      style={{ borderTop: `3px solid ${ACCENT}` }}
+      onClick={onToggle}
+    >
 
       {/* Photo — full width, 160px tall */}
       <div className="relative w-full shrink-0" style={{ height: "160px" }}>
@@ -572,10 +612,17 @@ function DiscoverCard({ place, isSaved, onSave }: { place: Place; isSaved: boole
       {/* Content */}
       <div className="flex flex-col flex-1 p-3 gap-1.5">
 
-        {/* Name */}
-        <h3 className="font-bold text-sm leading-snug line-clamp-2" style={{ color: "#131b2e" }}>
-          {place.name}
-        </h3>
+        {/* Name + expand toggle */}
+        <div className="flex items-start justify-between gap-1">
+          <h3 className="font-bold text-sm leading-snug line-clamp-2 flex-1" style={{ color: "#131b2e" }}>
+            {place.name}
+          </h3>
+          <span className="shrink-0 mt-0.5 text-muted-foreground">
+            {isExpanded
+              ? <ChevronUp className="w-3.5 h-3.5" />
+              : <ChevronDown className="w-3.5 h-3.5" />}
+          </span>
+        </div>
 
         {/* Address */}
         {place.address && (
@@ -633,6 +680,152 @@ function DiscoverCard({ place, isSaved, onSave }: { place: Place; isSaved: boole
           )}
         </div>
       </div>
+
+      {/* ── AI Analysis panel — shown when card is expanded ── */}
+      {isExpanded && (
+        <div
+          className="border-t border-white/30 px-3 py-3 space-y-2.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+
+          {/* Loading state */}
+          {enriching && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: ACCENT }} />
+                <span className="text-xs font-semibold" style={{ color: ACCENT }}>
+                  Aurora is researching this venue…
+                </span>
+              </div>
+              <div className="text-xs text-muted-foreground space-y-0.5 pl-6">
+                <p>· Checking their website</p>
+                <p>· Analysing reviews</p>
+                <p>· Scoring fit</p>
+              </div>
+            </div>
+          )}
+
+          {/* Non-blocking error */}
+          {error && !enriching && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              {error}
+            </p>
+          )}
+
+          {/* Analysis result */}
+          {result && !enriching && (
+            <VenueAnalysisPanel result={result} accent={ACCENT} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   VenueAnalysisPanel — renders the AI enrichment result inside a card
+──────────────────────────────────────────────────────────────────────────── */
+function VenueAnalysisPanel({
+  result,
+  accent,
+}: {
+  result: VenueEnrichmentResult;
+  accent: string;
+}) {
+  const ai = result.ai_analysis;
+  const score = result.signal_score;
+
+  const scoreBadge =
+    score >= 70
+      ? { bg: "#dcfce7", color: "#15803d", label: "Strong lead" }
+      : score >= 40
+      ? { bg: "#fef9c3", color: "#a16207", label: "Worth trying" }
+      : { bg: "#f1f5f9", color: "#64748b", label: "Weak lead" };
+
+  return (
+    <div className="space-y-2">
+
+      {/* Signal score badge */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Aurora Score</span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="px-2 py-0.5 rounded-lg text-xs font-bold"
+            style={{ background: scoreBadge.bg, color: scoreBadge.color }}
+          >
+            {score}/100
+          </span>
+          <span className="text-[10px] text-muted-foreground">{scoreBadge.label}</span>
+        </div>
+      </div>
+
+      {/* Exclusive photographer warning */}
+      {ai.has_exclusive_photographer && (
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl"
+          style={{ background: "#fff1f2", border: "1px solid #fecdd3" }}
+        >
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: "#e11d48" }} />
+          <p className="text-xs font-medium" style={{ color: "#be123c" }}>
+            May have an exclusive photographer arrangement
+          </p>
+        </div>
+      )}
+
+      {/* Why good lead */}
+      {ai.why_good_lead && (
+        <p className="text-xs text-muted-foreground leading-relaxed">{ai.why_good_lead}</p>
+      )}
+
+      {/* Why bad lead (amber warning) */}
+      {ai.why_bad_lead && (
+        <p
+          className="text-xs leading-relaxed flex items-start gap-1"
+          style={{ color: "#92400e" }}
+        >
+          <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0 text-amber-500" />
+          {ai.why_bad_lead}
+        </p>
+      )}
+
+      {/* Recommended angle */}
+      {ai.recommended_angle && (
+        <div
+          className="rounded-xl p-2.5"
+          style={{
+            background:  `${accent}0d`,
+            borderLeft:  `2px solid ${accent}50`,
+          }}
+        >
+          <p className="text-[10px] font-bold uppercase tracking-wide mb-0.5" style={{ color: accent }}>
+            Suggested angle
+          </p>
+          <p className="text-xs text-muted-foreground leading-snug">{ai.recommended_angle}</p>
+        </div>
+      )}
+
+      {/* Venue vibe tags */}
+      {ai.venue_vibe_tags?.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {ai.venue_vibe_tags.map((tag) => (
+            <span
+              key={tag}
+              className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold"
+              style={{ background: `${accent}14`, color: accent }}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Confidence footnote */}
+      {ai.confidence === "low" && (
+        <p className="text-[10px] text-muted-foreground/60">
+          Low confidence — limited data available for this venue.
+        </p>
+      )}
     </div>
   );
 }
