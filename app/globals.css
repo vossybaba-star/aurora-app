@@ -4,65 +4,65 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ─────────────────────────────────────────────────────────────
-   Lustrous Liquid – Deep Indigo × Hot Pink × Ice Blue
+   Aurora – Soft Violet × Lilac × Lavender
 ───────────────────────────────────────────────────────────── */
 
 :root {
   /* Core MD3 token → shadcn mapping */
-  --background: oklch(0.987 0.007 270);       /* #faf8ff */
+  --background: oklch(0.968 0.012 285);       /* #f2f0fe */
   --foreground: oklch(0.175 0.035 253);        /* #131b2e */
-  --card: oklch(1 0 0 / 0.6);
+  --card: oklch(1 0 0 / 0.65);
   --card-foreground: oklch(0.175 0.035 253);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.175 0.035 253);
 
-  --primary: oklch(0.415 0.225 266);           /* #3525cd deep indigo */
+  --primary: oklch(0.62 0.155 280);            /* #7c6ef7 soft violet */
   --primary-foreground: oklch(1 0 0);
 
-  --secondary: oklch(0.94 0.02 270);
-  --secondary-foreground: oklch(0.35 0.05 270);
+  --secondary: oklch(0.94 0.02 280);
+  --secondary-foreground: oklch(0.35 0.05 280);
 
-  --muted: oklch(0.95 0.015 270);
-  --muted-foreground: oklch(0.48 0.03 270);
+  --muted: oklch(0.955 0.012 280);
+  --muted-foreground: oklch(0.50 0.03 280);
 
-  --accent: oklch(0.94 0.02 270);
-  --accent-foreground: oklch(0.35 0.05 270);
+  --accent: oklch(0.94 0.02 280);
+  --accent-foreground: oklch(0.35 0.05 280);
 
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(1 0 0);
 
-  --border: oklch(0.88 0.02 270);
-  --input: oklch(0.88 0.02 270);
-  --ring: oklch(0.415 0.225 266);
+  --border: oklch(0.89 0.018 280);
+  --input: oklch(0.89 0.018 280);
+  --ring: oklch(0.62 0.155 280);
   --radius: 0.75rem;
 
   /* sidebar */
   --sidebar: oklch(1 0 0 / 0.4);
   --sidebar-foreground: oklch(0.175 0.035 253);
-  --sidebar-primary: oklch(0.415 0.225 266);
+  --sidebar-primary: oklch(0.62 0.155 280);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.94 0.02 270);
-  --sidebar-accent-foreground: oklch(0.35 0.05 270);
-  --sidebar-border: oklch(0.88 0.02 270);
-  --sidebar-ring: oklch(0.415 0.225 266);
+  --sidebar-accent: oklch(0.94 0.02 280);
+  --sidebar-accent-foreground: oklch(0.35 0.05 280);
+  --sidebar-border: oklch(0.89 0.018 280);
+  --sidebar-ring: oklch(0.62 0.155 280);
 
   /* charts */
-  --chart-1: oklch(0.415 0.225 266);
-  --chart-2: oklch(0.51 0.24 335);
-  --chart-3: oklch(0.45 0.15 195);
+  --chart-1: oklch(0.62 0.155 280);
+  --chart-2: oklch(0.58 0.18 310);
+  --chart-3: oklch(0.55 0.14 240);
   --chart-4: oklch(0.70 0.15 55);
-  --chart-5: oklch(0.60 0.20 340);
+  --chart-5: oklch(0.65 0.16 320);
 
-  /* Lustrous Liquid palette extras */
-  --ll-primary:           #3525cd;
-  --ll-primary-container: #4f46e5;
+  /* Aurora palette extras */
+  --ll-primary:           #7c6ef7;
+  --ll-primary-container: #9585f9;
   --ll-secondary:         #b4136d;
   --ll-secondary-container: #fd56a7;
   --ll-tertiary:          #00505f;
-  --ll-liquid-a:          #e2dfff;   /* lavender */
-  --ll-liquid-b:          #ffd9e4;   /* blush pink */
-  --ll-liquid-c:          #acedff;   /* ice blue */
-  --ll-surface-container: #eaedff;
+  --ll-liquid-a:          #ede9fe;   /* soft violet-white */
+  --ll-liquid-b:          #f0ebff;   /* lilac */
+  --ll-liquid-c:          #ddd6fe;   /* lavender */
+  --ll-surface-container: #f2f0fe;
   --ll-on-surface-variant: #464555;
   --ll-outline-variant:   #c7c4d8;
 }
@@ -121,7 +121,7 @@
     @apply border-border outline-ring/50;
   }
   html {
-    background: var(--ll-liquid-a);
+    background: #f2f0fe;
   }
   body {
     @apply text-foreground;
@@ -136,12 +136,13 @@
     z-index: -1;
     background: linear-gradient(
       135deg,
-      var(--ll-liquid-a) 0%,
-      var(--ll-liquid-b) 50%,
-      var(--ll-liquid-c) 100%
+      #f2f0fe 0%,
+      #ede9fe 30%,
+      #e8e0fd 60%,
+      #ddd6fe 100%
     );
     background-size: 400% 400%;
-    animation: liquid-shift 14s ease infinite;
+    animation: liquid-shift 18s ease infinite;
   }
 }
 
@@ -156,7 +157,7 @@
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.52);
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3),
-              0 8px 32px rgba(53, 37, 205, 0.06);
+              0 8px 32px rgba(124, 110, 247, 0.06);
 }
 
 /* Light gradient glass: cards, items */
@@ -175,14 +176,14 @@
   transition: all 0.22s ease;
 }
 .glass-card-hover:hover {
-  border-color: rgba(53, 37, 205, 0.25);
+  border-color: rgba(124, 110, 247, 0.25);
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.78) 0%,
     rgba(255, 255, 255, 0.38) 100%
   );
   transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(53, 37, 205, 0.10);
+  box-shadow: 0 12px 40px rgba(124, 110, 247, 0.10);
 }
 
 /* Sticky nav / bottom bar */
@@ -200,7 +201,7 @@
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.52);
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3),
-              0 4px 24px rgba(53, 37, 205, 0.06);
+              0 4px 24px rgba(124, 110, 247, 0.06);
 }
 
 /* AI suggestion shimmer */
@@ -245,7 +246,7 @@
 
 /* Subtle indigo tint */
 .fluid-gradient-subtle {
-  background: linear-gradient(135deg, rgba(53, 37, 205, 0.10) 0%, rgba(79, 70, 229, 0.06) 100%);
+  background: linear-gradient(135deg, rgba(124, 110, 247, 0.10) 0%, rgba(149, 133, 249, 0.06) 100%);
 }
 
 /* Pink accent for follow-up / secondary steps */
@@ -256,23 +257,23 @@
 /* ── AI glow (indigo) ── */
 .ai-glow {
   box-shadow:
-    0 0 25px rgba(53, 37, 205, 0.14),
+    0 0 25px rgba(124, 110, 247, 0.14),
     inset 0 0 12px rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(53, 37, 205, 0.18);
+  border: 1px solid rgba(124, 110, 247, 0.18);
 }
 
 /* ── Dashed sequence timeline ── */
 .sequence-line {
-  border-left: 2px dashed rgba(53, 37, 205, 0.28);
+  border-left: 2px dashed rgba(124, 110, 247, 0.28);
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(53, 37, 205, 0.2);
+  background: rgba(124, 110, 247, 0.2);
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(53, 37, 205, 0.35);
+  background: rgba(124, 110, 247, 0.35);
 }

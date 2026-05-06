@@ -22,18 +22,18 @@ export function DashboardHeader() {
 
         {/* Left — mobile: Aurora logo | desktop: page title */}
         <div>
-          {/* Mobile logo (hidden on desktop) */}
-          <div className="flex items-center gap-2.5 lg:hidden">
+          {/* Mobile-only logo (hidden when sidebar appears at md+) */}
+          <div className="flex items-center gap-2.5 md:hidden">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-sm"
-                 style={{ background:"linear-gradient(135deg,#3525cd,#4f46e5)" }}>
+                 style={{ background:"linear-gradient(135deg,#7c6ef7,#9585f9)" }}>
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="font-extrabold tracking-tight liquid-gradient-text">Aurora</span>
           </div>
 
-          {/* Desktop page title (hidden on mobile) */}
-          <div className="hidden lg:block">
-            <h1 className="text-xl font-extrabold tracking-tight" style={{ color:"#131b2e" }}>{page.title}</h1>
+          {/* Page title — visible when sidebar is present (md+) */}
+          <div className="hidden md:block">
+            <h1 className="text-lg font-extrabold tracking-tight" style={{ color:"#131b2e" }}>{page.title}</h1>
             <p className="text-xs text-muted-foreground mt-0.5">{page.subtitle}</p>
           </div>
         </div>
@@ -41,7 +41,7 @@ export function DashboardHeader() {
         {/* Right actions */}
         <div className="flex items-center gap-2">
           {/* Notification bell — desktop only */}
-          <button className="hidden lg:flex w-9 h-9 items-center justify-center rounded-xl glass-card border border-white/60 text-muted-foreground hover:text-primary transition-colors">
+          <button className="hidden md:flex w-9 h-9 items-center justify-center rounded-xl glass-card border border-white/60 text-muted-foreground hover:text-primary transition-colors">
             <Bell className="w-4 h-4" />
           </button>
 
@@ -56,7 +56,7 @@ export function DashboardHeader() {
 
           {/* Avatar */}
           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-sm"
-               style={{ background:"linear-gradient(135deg,#3525cd,#4f46e5)" }}>
+               style={{ background:"linear-gradient(135deg,#7c6ef7,#9585f9)" }}>
             {profile?.businessName?.charAt(0).toUpperCase() ||
              profile?.businessType?.charAt(0).toUpperCase() || "A"}
           </div>

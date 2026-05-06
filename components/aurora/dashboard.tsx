@@ -20,7 +20,7 @@ export function Dashboard() {
         <div className="flex items-center justify-center py-24">
           <div className="flex flex-col items-center gap-3">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25"
-                 style={{ background:"linear-gradient(135deg,#3525cd,#4f46e5)" }}>
+                 style={{ background:"linear-gradient(135deg,#7c6ef7,#9585f9)" }}>
               <Spinner className="w-5 h-5 text-white" />
             </div>
             <p className="text-xs text-muted-foreground font-medium">Loading…</p>
@@ -42,13 +42,13 @@ export function Dashboard() {
   return (
     <div className="min-h-screen flex">
 
-      {/* ── Desktop sidebar (lg+) ── */}
-      <div className="hidden lg:block">
+      {/* ── Sidebar: icon-only at md (60px), full at lg (220px) ── */}
+      <div className="hidden md:block">
         <SidebarNav />
       </div>
 
       {/* ── Right column: header + scrollable content ── */}
-      <div className="flex flex-col flex-1 min-h-screen lg:ml-64">
+      <div className="flex flex-col flex-1 min-h-screen md:ml-16 lg:ml-[220px]">
 
         {/* Sticky top bar */}
         <DashboardHeader />
@@ -57,7 +57,7 @@ export function Dashboard() {
         <main className="flex-1 overflow-y-auto">
           {/* Mobile: compact padding + bottom-nav clearance */}
           {/* Desktop: generous padding, wider content */}
-          <div className="px-4 py-5 lg:px-8 lg:py-8 pb-24 lg:pb-10 max-w-5xl mx-auto w-full">
+          <div className="px-4 py-5 md:px-5 lg:px-8 lg:py-8 pb-24 md:pb-6 lg:pb-10 max-w-[1400px] mx-auto w-full">
             {renderContent()}
           </div>
         </main>

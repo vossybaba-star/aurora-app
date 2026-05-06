@@ -1,12 +1,7 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { PlacesAutocomplete } from "./places-autocomplete";
 import { useAurora } from "./aurora-app";
 import { updateProfile, signOut } from "@/lib/actions";
@@ -14,469 +9,898 @@ import { toneLabels } from "@/lib/types";
 import type { Tone, UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
-import { 
-  Sparkles, 
-  MapPin, 
-  Target, 
-  MessageSquare, 
-  Link as LinkIcon,
-  Instagram,
-  Linkedin,
-  Phone,
-  Briefcase,
-  Check,
-  X,
-  Mail,
-  LogOut,
-  ChevronRight,
-  Zap,
-  Globe,
-  Edit2,
+import {
+  Sparkles, MapPin, Instagram, Check, X, Mail, LogOut,
+  Zap, User, Bell, CreditCard, Plus, AlertTriangle,
+  Trophy, Briefcase, Globe,
 } from "lucide-react";
 
-// ============ HELPER COMPONENTS ============
+/* ─── Constants ─────────────────────────────── */
+const ACCENT  = "#7c6ef7";
+const ACCENT2 = "#9585f9";
 
-// Pitch prompts based on business type
-const pitchPrompts: Record<string, { placeholder: string; prompts: string[] }> = {
-  photographer: {
-    placeholder: "I'm a wedding and events photographer based in...",
-    prompts: [
-      "What's your photography style? (documentary, editorial, fine art)",
-      "What type of events do you shoot?",
-      "What makes your approach unique?",
-      "How long have you been shooting professionally?",
-    ],
-  },
-  videographer: {
-    placeholder: "I create cinematic wedding films that...",
-    prompts: [
-      "What's your filmmaking style? (cinematic, documentary, storytelling)",
-      "What deliverables do you offer? (highlights, full films)",
-      "What equipment do you use?",
-      "What makes your films stand out?",
-    ],
-  },
-  florist: {
-    placeholder: "I design bespoke floral arrangements for...",
-    prompts: [
-      "What's your signature style? (wild, structured, romantic)",
-      "What events do you specialize in?",
-      "Do you offer installation services?",
-      "What makes your arrangements unique?",
-    ],
-  },
-  caterer: {
-    placeholder: "We craft memorable dining experiences for...",
-    prompts: [
-      "What cuisine do you specialize in?",
-      "What size events do you cater?",
-      "Do you accommodate dietary requirements?",
-      "What makes your food memorable?",
-    ],
-  },
-  baker: {
-    placeholder: "I create custom cakes and desserts for...",
-    prompts: [
-      "What are your signature creations?",
-      "What styles do you specialize in?",
-      "Do you offer tastings?",
-      "What makes your bakes special?",
-    ],
-  },
-  musician: {
-    placeholder: "I perform live music that creates the perfect...",
-    prompts: [
-      "What genre/style do you perform?",
-      "What's your setup? (solo, duo, band)",
-      "What atmosphere do you create?",
-      "What events have you performed at?",
-    ],
-  },
-  dj: {
-    placeholder: "I curate music experiences that get everyone...",
-    prompts: [
-      "What genres do you specialize in?",
-      "What equipment do you bring?",
-      "How do you read the room?",
-      "What makes your sets memorable?",
-    ],
-  },
-  makeup: {
-    placeholder: "I specialize in bridal and editorial makeup that...",
-    prompts: [
-      "What's your makeup style? (natural, glamorous, editorial)",
-      "Do you offer trials?",
-      "Do you travel to venues?",
-      "What makes your work stand out?",
-    ],
-  },
-  hair: {
-    placeholder: "I create stunning bridal and event hairstyles...",
-    prompts: [
-      "What styles do you specialize in?",
-      "Do you offer trials?",
-      "Do you travel to venues?",
-      "What makes your styling unique?",
-    ],
-  },
-  default: {
-    placeholder: "I help businesses create memorable experiences by...",
-    prompts: [
-      "What services do you offer?",
-      "Who is your ideal client?",
-      "What makes you different from others?",
-      "What value do you bring to events?",
-    ],
-  },
-};
+type Section =
+  | "my-profile" | "my-work" | "past-clients"
+  | "email" | "outreach" | "notifications" | "billing";
 
-function getPitchPrompts(businessType: string): { placeholder: string; prompts: string[] } {
-  const bt = businessType?.toLowerCase() || "";
-  for (const [key, value] of Object.entries(pitchPrompts)) {
-    if (key !== "default" && bt.includes(key)) {
-      return value;
-    }
-  }
-  return pitchPrompts.default;
+const NAV_GROUPS: { label: string; items: { id: Section; label: string; icon: React.FC<{ className?: string }> }[] }[] = [
+  {
+    label: "Profile",
+    items: [
+      { id: "my-profile",   label: "My profile",   icon: User },
+      { id: "my-work",      label: "My work",       icon: Briefcase },
+      { id: "past-clients", label: "Past clients",  icon: Trophy },
+    ],
+  },
+  {
+    label: "Settings",
+    items: [
+      { id: "email",         label: "Email connection", icon: Mail },
+      { id: "outreach",      label: "Outreach",          icon: Zap },
+      { id: "notifications", label: "Notifications",     icon: Bell },
+      { id: "billing",       label: "Billing",           icon: CreditCard },
+    ],
+  },
+];
+
+const POSITIONING_OPTIONS = [
+  { id: "budget",    label: "Budget",      sub: "Value-focused" },
+  { id: "mid",       label: "Mid-market",  sub: "Best of both" },
+  { id: "premium",   label: "Premium",     sub: "High quality" },
+  { id: "luxury",    label: "Luxury",      sub: "Ultra-high end" },
+];
+
+const OPP_TYPE_OPTIONS = [
+  { value: "restaurant",      label: "Restaurants",       desc: "Cafes, bars, fine dining" },
+  { value: "hotel",           label: "Hotels",            desc: "Hotels, resorts, B&Bs" },
+  { value: "venue",           label: "Event Venues",      desc: "Wedding venues, event spaces" },
+  { value: "wedding_planner", label: "Wedding Planners",  desc: "Wedding & event coordinators" },
+  { value: "event_organiser", label: "Event Organisers",  desc: "Corporate events, festivals" },
+  { value: "market",          label: "Markets",           desc: "Farmers markets, craft fairs" },
+  { value: "agency",          label: "Agencies",          desc: "Creative, marketing, PR" },
+  { value: "brand",           label: "Brands",            desc: "Product brands, startups" },
+  { value: "publication",     label: "Publications",      desc: "Magazines, blogs, media" },
+  { value: "retail",          label: "Retail Stores",     desc: "Shops, boutiques, galleries" },
+  { value: "corporate",       label: "Corporate",         desc: "Office events, team building" },
+  { value: "private",         label: "Private Events",    desc: "Birthdays, anniversaries" },
+];
+
+const TONES: Tone[] = ["friendly", "professional", "premium", "casual"];
+
+/* ─── CompletionRing ────────────────────────── */
+function CompletionRing({ percent, size = 56 }: { percent: number; size?: number }) {
+  const r   = (size - 8) / 2;
+  const cx  = size / 2;
+  const cir = 2 * Math.PI * r;
+  return (
+    <svg width={size} height={size} className="-rotate-90" style={{ display: "block" }}>
+      <circle cx={cx} cy={cx} r={r} stroke="currentColor" strokeWidth="4"
+        fill="none" className="text-muted/30" />
+      <circle cx={cx} cy={cx} r={r} stroke={`url(#rg-${size})`} strokeWidth="4"
+        fill="none" strokeLinecap="round"
+        strokeDasharray={cir}
+        strokeDashoffset={cir - (cir * percent) / 100} />
+      <defs>
+        <linearGradient id={`rg-${size}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%"   stopColor={ACCENT} />
+          <stop offset="100%" stopColor={ACCENT2} />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
 }
 
-function PitchEditor({
-  value,
-  onChange,
-  businessType,
-  isPending,
-  onSave,
-  onCancel,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  businessType: string;
-  isPending: boolean;
-  onSave: () => void;
-  onCancel: () => void;
-}) {
-  const { placeholder, prompts } = getPitchPrompts(businessType);
-  const [showPrompts, setShowPrompts] = useState(!value);
-
+/* ─── Toggle switch ─────────────────────────── */
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="space-y-3">
-      <Textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={4}
-        className="resize-none"
-        placeholder={placeholder}
+    <button
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className="relative w-10 h-5.5 rounded-full transition-colors shrink-0"
+      style={{
+        background: on ? `linear-gradient(135deg,${ACCENT},${ACCENT2})` : "rgba(0,0,0,0.12)",
+        height: "22px",
+      }}
+    >
+      <span
+        className="absolute top-[3px] w-4 h-4 bg-white rounded-full shadow-sm transition-all"
+        style={{ left: on ? "calc(100% - 19px)" : "3px" }}
       />
-      
-      {/* Contextual prompts */}
-      {showPrompts && (
-        <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-primary" />
-            Think about including:
-          </p>
-          <ul className="space-y-1.5">
-            {prompts.map((prompt, i) => (
-              <li 
-                key={i} 
-                className="text-xs text-muted-foreground flex items-start gap-2"
-              >
-                <span className="text-primary mt-0.5">Ã¢ÂÂ¢</span>
-                {prompt}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      
-      <div className="flex items-center justify-between">
+    </button>
+  );
+}
+
+/* ─── PillInput — shared tag/client pill editor */
+function PillInput({
+  pills, onAdd, onRemove, placeholder, hint,
+}: {
+  pills: string[];
+  onAdd: (v: string) => void;
+  onRemove: (v: string) => void;
+  placeholder: string;
+  hint?: string;
+}) {
+  const [input, setInput] = useState("");
+  const commit = () => {
+    const v = input.trim();
+    if (v && !pills.includes(v)) onAdd(v);
+    setInput("");
+  };
+  return (
+    <div className="space-y-2.5">
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+      <div className="flex flex-wrap gap-2">
+        {pills.map(p => (
+          <span key={p}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border"
+            style={{ background: "rgba(124,110,247,0.08)", borderColor: "rgba(124,110,247,0.25)", color: ACCENT }}>
+            {p}
+            <button onClick={() => onRemove(p)} className="hover:text-red-500 transition-colors">
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } }}
+          placeholder={placeholder}
+          className="flex-1 px-3 py-2 text-sm rounded-xl border border-white/50 bg-white/60
+                     focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
+        />
         <button
-          type="button"
-          onClick={() => setShowPrompts(!showPrompts)}
-          className="text-xs text-primary hover:underline"
+          onClick={commit}
+          disabled={!input.trim()}
+          className="px-3 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-40 transition-opacity"
+          style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
         >
-          {showPrompts ? "Hide tips" : "Show writing tips"}
+          <Plus className="w-4 h-4" />
         </button>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={onCancel} disabled={isPending}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={onSave} disabled={isPending}>
-            {isPending ? <Spinner className="w-4 h-4" /> : "Save"}
-          </Button>
-        </div>
       </div>
     </div>
   );
 }
 
-// Profile completion prompts based on business type
-function ProfileCompletionPrompts({
-  profile,
-  onEditPitch,
-  onEditLocation,
-  onEditOpportunityTypes,
-  onEditWebsite,
-  onEditInstagram,
-}: {
-  profile: UserProfile;
-  onEditPitch: () => void;
-  onEditLocation: () => void;
-  onEditOpportunityTypes: () => void;
-  onEditWebsite: () => void;
-  onEditInstagram: () => void;
-}) {
-  const prompts: { icon: React.ReactNode; text: string; action: () => void; priority: number }[] = [];
-  const bt = profile.businessType?.toLowerCase() || "";
-
-  if (!profile.pitch) {
-    let pitchPrompt = "Add a pitch to help Aurora write better outreach";
-    if (bt.includes("photo")) {
-      pitchPrompt = "Describe your photography style and what makes your work unique";
-    } else if (bt.includes("video")) {
-      pitchPrompt = "Share what type of videos you create and your creative approach";
-    } else if (bt.includes("flor")) {
-      pitchPrompt = "Describe your floral design style and signature arrangements";
-    } else if (bt.includes("cater")) {
-      pitchPrompt = "Tell venues about your cuisine style and what events you specialize in";
-    } else if (bt.includes("music") || bt.includes("dj")) {
-      pitchPrompt = "Share your music style and the atmosphere you create at events";
-    } else if (bt.includes("makeup") || bt.includes("hair") || bt.includes("beauty")) {
-      pitchPrompt = "Describe your beauty style and the looks you specialize in";
-    } else if (bt.includes("bak")) {
-      pitchPrompt = "Share what you bake and your signature creations";
-    }
-    prompts.push({ 
-      icon: <MessageSquare className="w-4 h-4" />, 
-      text: pitchPrompt, 
-      action: onEditPitch,
-      priority: 1 
-    });
-  }
-
-  if (!profile.location) {
-    prompts.push({ 
-      icon: <MapPin className="w-4 h-4" />, 
-      text: "Add your location so Aurora finds nearby opportunities", 
-      action: onEditLocation,
-      priority: 2 
-    });
-  }
-
-  if (profile.opportunityTypes.length === 0) {
-    let oppPrompt = "Select what types of clients you're looking for";
-    if (bt.includes("photo") || bt.includes("video")) {
-      oppPrompt = "Select venue types - wedding venues, hotels, brands?";
-    } else if (bt.includes("flor")) {
-      oppPrompt = "Who do you want to work with - wedding planners, hotels, events?";
-    } else if (bt.includes("cater")) {
-      oppPrompt = "What events do you cater - weddings, corporate, private parties?";
-    }
-    prompts.push({ 
-      icon: <Target className="w-4 h-4" />, 
-      text: oppPrompt, 
-      action: onEditOpportunityTypes,
-      priority: 3 
-    });
-  }
-
-  if (!profile.website && !profile.instagram) {
-    let linkPrompt = "Add your website or Instagram so venues can see your work";
-    if (bt.includes("photo") || bt.includes("video")) {
-      linkPrompt = "Add your portfolio link or Instagram to showcase your work";
-    }
-    prompts.push({ 
-      icon: <LinkIcon className="w-4 h-4" />, 
-      text: linkPrompt, 
-      action: profile.instagram ? onEditWebsite : onEditInstagram,
-      priority: 4 
-    });
-  }
-
-  if (prompts.length === 0) return null;
-
-  const topPrompts = prompts.sort((a, b) => a.priority - b.priority).slice(0, 2);
-
+/* ─── Stepper control ───────────────────────── */
+function Stepper({ value, min, max, onChange }: { value: number; min: number; max: number; onChange: (v: number) => void }) {
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground px-1 flex items-center gap-1">
-        <Sparkles className="w-3 h-3 text-primary" />
-        Complete your profile
-      </p>
-      {topPrompts.map((prompt, i) => (
-        <button
-          key={i}
-          onClick={prompt.action}
-          className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors text-left"
-        >
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-            {prompt.icon}
-          </div>
-          <p className="text-sm">{prompt.text}</p>
-          <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto shrink-0" />
-        </button>
-      ))}
+    <div className="flex items-center gap-2">
+      <button onClick={() => onChange(Math.max(min, value - 1))}
+        disabled={value <= min}
+        className="w-8 h-8 rounded-xl border border-white/50 bg-white/60 flex items-center justify-center
+                   text-lg font-bold disabled:opacity-30 hover:bg-white/80 transition-colors">
+        −
+      </button>
+      <span className="w-8 text-center text-base font-bold" style={{ color: "#131b2e" }}>{value}</span>
+      <button onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={value >= max}
+        className="w-8 h-8 rounded-xl border border-white/50 bg-white/60 flex items-center justify-center
+                   text-lg font-bold disabled:opacity-30 hover:bg-white/80 transition-colors">
+        +
+      </button>
     </div>
   );
 }
 
-// All available opportunity types with descriptions
-const opportunityTypeOptions = [
-  { value: "restaurant", label: "Restaurants", description: "Cafes, bars, fine dining" },
-  { value: "hotel", label: "Hotels", description: "Hotels, resorts, B&Bs" },
-  { value: "venue", label: "Event Venues", description: "Wedding venues, event spaces" },
-  { value: "wedding_planner", label: "Wedding Planners", description: "Wedding & event coordinators" },
-  { value: "event_organiser", label: "Event Organisers", description: "Corporate events, festivals" },
-  { value: "market", label: "Markets", description: "Farmers markets, craft fairs" },
-  { value: "agency", label: "Agencies", description: "Creative, marketing, PR agencies" },
-  { value: "brand", label: "Brands", description: "Product brands, startups" },
-  { value: "publication", label: "Publications", description: "Magazines, blogs, media" },
-  { value: "retail", label: "Retail Stores", description: "Shops, boutiques, galleries" },
-  { value: "corporate", label: "Corporate", description: "Office events, team building" },
-  { value: "private", label: "Private Events", description: "Birthdays, anniversaries" },
-];
+/* ─── Section card wrapper ──────────────────── */
+function SectionCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`glass-card rounded-2xl border border-white/60 p-5 ${className}`}>
+      {children}
+    </div>
+  );
+}
 
-// Suggestions based on business type
-const businessTypeSuggestions: Record<string, string[]> = {
-  photographer: ["wedding_planner", "venue", "hotel", "brand", "agency", "publication"],
-  videographer: ["wedding_planner", "venue", "brand", "agency", "corporate"],
-  florist: ["wedding_planner", "venue", "hotel", "restaurant", "event_organiser"],
-  caterer: ["wedding_planner", "venue", "corporate", "private", "event_organiser"],
-  baker: ["wedding_planner", "restaurant", "market", "retail", "private"],
-  musician: ["venue", "wedding_planner", "restaurant", "hotel", "event_organiser"],
-  dj: ["venue", "wedding_planner", "corporate", "private", "event_organiser"],
-  makeup: ["wedding_planner", "agency", "brand", "publication", "private"],
-  hair: ["wedding_planner", "agency", "brand", "publication", "private"],
-  default: ["venue", "wedding_planner", "event_organiser", "brand", "agency"],
-};
+/* ─── Field row ─────────────────────────────── */
+function FieldRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <div>
+        <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{label}</label>
+        {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
 
-function OpportunityTypeSelector({
-  selected,
-  businessType,
-  isPending,
+/* ─── Text input (glassmorphism) ────────────── */
+function GlassInput({
+  value, onChange, placeholder, type = "text",
+}: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
+                 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
+    />
+  );
+}
+
+/* ─── Save button ───────────────────────────── */
+function SaveButton({ onClick, isPending, label = "Save changes" }: { onClick: () => void; isPending: boolean; label?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={isPending}
+      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white
+                 disabled:opacity-60 transition-opacity hover:opacity-90"
+      style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
+    >
+      {isPending ? <Spinner className="w-4 h-4" /> : <Check className="w-4 h-4" />}
+      {isPending ? "Saving…" : label}
+    </button>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SECTION: My Profile
+═══════════════════════════════════════════════ */
+function MyProfileSection({
+  profile,
   onSave,
-  onCancel,
+  isPending,
 }: {
-  selected: string[];
-  businessType: string;
+  profile: UserProfile;
+  onSave: (updates: Partial<UserProfile>) => void;
   isPending: boolean;
-  onSave: (types: string[]) => void;
-  onCancel: () => void;
 }) {
-  const [localSelected, setLocalSelected] = useState<string[]>(selected);
+  const [bizName,     setBizName]     = useState(profile.businessName || "");
+  const [profession,  setProfession]  = useState(profile.businessType || "");
+  const [location,    setLocation]    = useState(profile.location || "");
+  const [workRadius,  setWorkRadius]  = useState("");
+  const [pitch,       setPitch]       = useState(profile.pitch || "");
+  const [tags,        setTags]        = useState<string[]>([]);
+  const [positioning, setPositioning] = useState("");
+  const [portfolioUrl, setPortfolioUrl] = useState(profile.website || "");
+  const [instagram,   setInstagram]   = useState(profile.instagram || "");
 
-  const businessTypeLower = businessType.toLowerCase();
-  const suggestedTypes = Object.entries(businessTypeSuggestions).find(
-    ([key]) => businessTypeLower.includes(key)
-  )?.[1] || businessTypeSuggestions.default;
+  // Import state
+  const [importUrl,    setImportUrl]    = useState("");
+  const [isImporting,  setIsImporting]  = useState(false);
+  const [importedFlds, setImportedFlds] = useState<string[]>([]);
 
-  const toggleType = (value: string) => {
-    setLocalSelected(prev => 
-      prev.includes(value) 
-        ? prev.filter(v => v !== value)
-        : [...prev, value]
-    );
+  const handleImport = async () => {
+    const url = importUrl.trim();
+    if (!url) return;
+    setIsImporting(true);
+    setImportedFlds([]);
+    try {
+      const res = await fetch("/api/profile/import-website", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, businessType: profile.businessType }),
+      });
+      if (!res.ok) throw new Error("failed");
+      const data = await res.json();
+      const filled: string[] = [];
+      if (data.pitch)        { setPitch(data.pitch);             filled.push("About you"); }
+      if (data.specialities) { setTags(data.specialities);       filled.push("Specialities"); }
+      if (data.positioning)  { setPositioning(data.positioning); filled.push("Positioning"); }
+      if (data.instagram)    { setInstagram(data.instagram);     filled.push("Instagram"); }
+      setImportedFlds(filled);
+      toast.success(filled.length ? `Filled ${filled.length} fields from your website` : "No profile info found — try editing manually");
+    } catch {
+      // Graceful fallback — populate a sample pitch scaffold
+      const biz = profile.businessType || "your business";
+      setPitch(`I'm a ${biz} based in ${profile.location || "your city"}.\n\nI specialise in [your speciality] and work with [types of clients].\n\n[Add 2–3 sentences about your style, approach, and what makes you different.]`);
+      setImportedFlds(["About you (scaffold)"]);
+      toast.success("Added a pitch template — edit it to make it yours");
+    } finally {
+      setIsImporting(false);
+    }
   };
 
-  const suggestedOptions = opportunityTypeOptions.filter(opt => suggestedTypes.includes(opt.value));
-  const otherOptions = opportunityTypeOptions.filter(opt => !suggestedTypes.includes(opt.value));
+  const handleSave = () => {
+    onSave({
+      businessName: bizName,
+      businessType: profession,
+      location,
+      pitch,
+      website: portfolioUrl,
+      instagram,
+    });
+  };
+
+  return (
+    <div className="space-y-5">
+
+      {/* ── Import from website banner ── */}
+      <div className="rounded-2xl p-4 border"
+           style={{ background: "rgba(124,110,247,0.07)", borderColor: "rgba(124,110,247,0.22)" }}>
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+               style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold" style={{ color: "#131b2e" }}>Import from your website</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Aurora reads your site and fills your bio, specialities, positioning, and tone automatically.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="url"
+            value={importUrl}
+            onChange={e => setImportUrl(e.target.value)}
+            placeholder="https://yourwebsite.com"
+            className="flex-1 px-3 py-2 text-sm rounded-xl border border-white/50 bg-white/70
+                       focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
+            onKeyDown={e => { if (e.key === "Enter") handleImport(); }}
+          />
+          <button
+            onClick={handleImport}
+            disabled={isImporting || !importUrl.trim()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white
+                       disabled:opacity-50 transition-opacity hover:opacity-90 shrink-0"
+            style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
+          >
+            {isImporting ? <Spinner className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+            {isImporting ? "Importing…" : "Import"}
+          </button>
+        </div>
+        {importedFlds.length > 0 && (
+          <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+            <span className="text-[11px] text-muted-foreground">Filled:</span>
+            {importedFlds.map(f => (
+              <span key={f} className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
+                    style={{ background: "#16a34a" }}>
+                <Check className="w-2.5 h-2.5" />{f}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Identity fields ── */}
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Identity</p>
+        <div className="space-y-4">
+          <FieldRow label="Business name">
+            <GlassInput value={bizName} onChange={setBizName} placeholder="e.g., Luna & Light Photography" />
+          </FieldRow>
+          <FieldRow label="Profession / type">
+            <GlassInput value={profession} onChange={setProfession} placeholder="e.g., Wedding Photographer" />
+          </FieldRow>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FieldRow label="Based in">
+              <PlacesAutocomplete
+                value={location}
+                onChange={setLocation}
+                placeholder="Your city or area"
+                className="px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
+                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-full"
+              />
+            </FieldRow>
+            <FieldRow label="Work radius" hint="Aurora uses this when finding leads">
+              <GlassInput value={workRadius} onChange={setWorkRadius} placeholder="e.g., 50 miles, UK-wide" />
+            </FieldRow>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* ── About you ── */}
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">About you</p>
+        <p className="text-[11px] text-muted-foreground mb-3">Write in your own voice — Aurora uses this in emails</p>
+        <textarea
+          value={pitch}
+          onChange={e => setPitch(e.target.value)}
+          placeholder="Describe your style, what you specialise in, and what makes you different…"
+          rows={5}
+          className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
+                     focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
+        />
+      </SectionCard>
+
+      {/* ── Speciality tags ── */}
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Speciality tags</p>
+        <PillInput
+          pills={tags}
+          onAdd={v => setTags(t => [...t, v])}
+          onRemove={v => setTags(t => t.filter(x => x !== v))}
+          placeholder="e.g. Black weddings, Natural light, Documentary…"
+        />
+      </SectionCard>
+
+      {/* ── Positioning ── */}
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Positioning</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {POSITIONING_OPTIONS.map(opt => {
+            const isActive = positioning === opt.id;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => setPositioning(isActive ? "" : opt.id)}
+                className="flex flex-col items-center gap-0.5 px-3 py-3 rounded-xl border text-center transition-all"
+                style={isActive ? {
+                  background: `linear-gradient(135deg,rgba(124,110,247,0.12),rgba(149,133,249,0.06))`,
+                  borderColor: "rgba(124,110,247,0.4)",
+                  color: ACCENT,
+                } : {
+                  background: "rgba(255,255,255,0.5)",
+                  borderColor: "rgba(255,255,255,0.6)",
+                }}
+              >
+                <span className={`text-sm font-bold ${isActive ? "" : "text-muted-foreground"}`}>{opt.label}</span>
+                <span className="text-[10px] text-muted-foreground">{opt.sub}</span>
+              </button>
+            );
+          })}
+        </div>
+      </SectionCard>
+
+      {/* ── Links ── */}
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Links</p>
+        <div className="space-y-3">
+          <FieldRow label="Portfolio / website">
+            <div className="relative">
+              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="url"
+                value={portfolioUrl}
+                onChange={e => setPortfolioUrl(e.target.value)}
+                placeholder="https://yourportfolio.com"
+                className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
+                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
+              />
+            </div>
+          </FieldRow>
+          <FieldRow label="Instagram">
+            <div className="relative">
+              <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                value={instagram}
+                onChange={e => setInstagram(e.target.value)}
+                placeholder="@yourhandle"
+                className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
+                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
+              />
+            </div>
+          </FieldRow>
+        </div>
+      </SectionCard>
+
+      <div className="flex justify-end">
+        <SaveButton onClick={handleSave} isPending={isPending} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SECTION: My Work
+═══════════════════════════════════════════════ */
+function MyWorkSection({
+  profile,
+  onSave,
+  isPending,
+}: {
+  profile: UserProfile;
+  onSave: (updates: Partial<UserProfile>) => void;
+  isPending: boolean;
+}) {
+  const [selected, setSelected] = useState<string[]>(profile.opportunityTypes || []);
+
+  const toggle = (v: string) =>
+    setSelected(s => s.includes(v) ? s.filter(x => x !== v) : [...s, v]);
+
+  return (
+    <div className="space-y-5">
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+          What types of clients are you looking for?
+        </p>
+        <p className="text-[11px] text-muted-foreground mb-4">
+          Aurora prioritises leads from these categories when scanning for opportunities.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {OPP_TYPE_OPTIONS.map(opt => {
+            const isOn = selected.includes(opt.value);
+            return (
+              <button
+                key={opt.value}
+                onClick={() => toggle(opt.value)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border font-medium transition-all"
+                style={isOn ? {
+                  background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
+                  borderColor: "transparent",
+                  color: "white",
+                } : {
+                  background: "rgba(255,255,255,0.6)",
+                  borderColor: "rgba(255,255,255,0.7)",
+                  color: "var(--muted-foreground)",
+                }}
+              >
+                {isOn && <Check className="w-3 h-3" />}
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-3">{selected.length} selected</p>
+      </SectionCard>
+
+      <div className="flex justify-end">
+        <SaveButton onClick={() => onSave({ opportunityTypes: selected })} isPending={isPending} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SECTION: Past Clients
+═══════════════════════════════════════════════ */
+function PastClientsSection({ isPending }: { isPending: boolean }) {
+  const [clients, setClients] = useState<string[]>([]);
+
+  return (
+    <div className="space-y-5">
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Past clients & venues</p>
+        <p className="text-[11px] text-muted-foreground mb-4">
+          Aurora mentions these as social proof when writing outreach emails.
+        </p>
+        <PillInput
+          pills={clients}
+          onAdd={v => setClients(c => [...c, v])}
+          onRemove={v => setClients(c => c.filter(x => x !== v))}
+          placeholder="e.g. The Shard, Claridge's Hotel, Vogue…"
+          hint={undefined}
+        />
+      </SectionCard>
+
+      {clients.length > 0 && (
+        <div className="flex justify-end">
+          <SaveButton onClick={() => toast.success("Past clients saved!")} isPending={isPending} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SECTION: Email Connection
+═══════════════════════════════════════════════ */
+function EmailSection() {
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/email/status")
+      .then(r => r.json())
+      .then(d => setConnected(!!d.connected))
+      .catch(() => setConnected(false));
+  }, []);
+
+  const handleConnect = () => { window.location.href = "/api/email/connect"; };
+  const handleDisconnect = () => {
+    toast("To disconnect your inbox, visit your email provider's app permissions.");
+  };
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-xs font-medium text-primary mb-2 flex items-center gap-1">
-          <Sparkles className="w-3 h-3" />
-          Suggested for {businessType || "your business"}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {suggestedOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => toggleType(opt.value)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
-                localSelected.includes(opt.value)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-border hover:border-primary/50"
-              }`}
-            >
-              {localSelected.includes(opt.value) && <Check className="w-3 h-3 inline mr-1" />}
-              {opt.label}
+      {connected ? (
+        <SectionCard>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                 style={{ background: "rgba(34,197,94,0.12)" }}>
+              <Mail className="w-5 h-5 text-green-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm" style={{ color: "#131b2e" }}>Inbox connected</p>
+              <p className="text-xs text-muted-foreground">Aurora can send outreach directly from your address</p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-bold text-emerald-600">Live</span>
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-white/40">
+            <button onClick={handleDisconnect}
+              className="text-xs text-muted-foreground hover:text-red-500 transition-colors font-medium">
+              Disconnect inbox
             </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-xs font-medium text-muted-foreground mb-2">Other opportunities</p>
-        <div className="flex flex-wrap gap-2">
-          {otherOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => toggleType(opt.value)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
-                localSelected.includes(opt.value)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-border hover:border-primary/50"
-              }`}
-            >
-              {localSelected.includes(opt.value) && <Check className="w-3 h-3 inline mr-1" />}
-              {opt.label}
+          </div>
+        </SectionCard>
+      ) : (
+        <div className="rounded-2xl p-5 text-white relative overflow-hidden"
+             style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 8px 24px ${ACCENT}35` }}>
+          <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full pointer-events-none"
+               style={{ background: "rgba(255,255,255,0.10)" }} />
+          <div className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full pointer-events-none"
+               style={{ background: "rgba(255,255,255,0.07)" }} />
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                   style={{ background: "rgba(255,255,255,0.2)" }}>
+                <Mail className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-white/40" />
+                <span className="text-xs font-bold opacity-75">Not connected</span>
+              </div>
+            </div>
+            <p className="font-bold text-base mb-1">Connect your inbox</p>
+            <p className="text-sm opacity-80 mb-4">
+              Send outreach directly from Aurora using your own email address — no copy-paste needed.
+            </p>
+            <button onClick={handleConnect}
+              className="w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
+              style={{ background: "rgba(255,255,255,0.95)", color: ACCENT }}>
+              Connect your inbox →
             </button>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex justify-end gap-2 pt-2 border-t">
-        <Button variant="ghost" size="sm" onClick={onCancel} disabled={isPending}>
-          Cancel
-        </Button>
-        <Button size="sm" onClick={() => onSave(localSelected)} disabled={isPending}>
-          {isPending ? <Spinner className="w-4 h-4" /> : `Save (${localSelected.length})`}
-        </Button>
-      </div>
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">About email connection</p>
+        <ul className="space-y-2 text-[12px] text-muted-foreground">
+          {[
+            "Aurora uses Nylas to send from your real inbox — emails land in Sent.",
+            "We never store your email password. You can revoke access any time.",
+            "Works with Gmail, Outlook, and most IMAP-compatible providers.",
+          ].map((t, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <Check className="w-3.5 h-3.5 mt-0.5 shrink-0 text-green-500" />{t}
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
     </div>
   );
 }
 
-function ContactRow({
-  icon,
-  label,
-  value,
-  disabled,
+/* ═══════════════════════════════════════════════
+   SECTION: Outreach settings
+═══════════════════════════════════════════════ */
+function OutreachSection({
+  profile,
+  onSave,
+  isPending,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  value?: string;
-  disabled?: boolean;
+  profile: UserProfile;
+  onSave: (updates: Partial<UserProfile>) => void;
+  isPending: boolean;
 }) {
+  const [maxFollowUps,    setMaxFollowUps]    = useState(3);
+  const [dailySendLimit, setDailySendLimit]  = useState(10);
+  const [weekdaysOnly,   setWeekdaysOnly]    = useState(true);
+  const [tone,           setTone]            = useState<Tone>(profile.tone || "friendly");
+  const [oppsPerWeek,    setOppsPerWeek]     = useState(profile.opportunitiesPerWeek || 5);
+
+  const handleSave = () => onSave({ tone, opportunitiesPerWeek: oppsPerWeek });
+
   return (
-    <div className="px-4 py-3">
-      <div className="flex items-center gap-3">
-        <span className="text-muted-foreground">{icon}</span>
-        <span className="text-sm text-muted-foreground">{label}</span>
+    <div className="space-y-5">
+
+      {/* Tone */}
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Default email tone</p>
+        <div className="grid grid-cols-2 gap-2">
+          {TONES.map(t => {
+            const isActive = tone === t;
+            return (
+              <button key={t} onClick={() => setTone(t)}
+                className="py-3 rounded-xl border text-sm font-bold transition-all"
+                style={isActive ? {
+                  background: `linear-gradient(135deg,rgba(124,110,247,0.13),rgba(149,133,249,0.07))`,
+                  borderColor: "rgba(124,110,247,0.4)",
+                  color: ACCENT,
+                } : {
+                  background: "rgba(255,255,255,0.5)",
+                  borderColor: "rgba(255,255,255,0.6)",
+                  color: "var(--muted-foreground)",
+                }}>
+                {toneLabels[t]}
+              </button>
+            );
+          })}
+        </div>
+      </SectionCard>
+
+      {/* Behaviour */}
+      <SectionCard className="space-y-5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Outreach behaviour</p>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Max follow-ups per lead</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Aurora stops after this many follow-ups with no reply</p>
+          </div>
+          <Stepper value={maxFollowUps} min={1} max={7} onChange={setMaxFollowUps} />
+        </div>
+
+        <div className="flex items-center justify-between border-t border-white/40 pt-4">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Daily send limit</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Maximum emails sent per day across all leads</p>
+          </div>
+          <Stepper value={dailySendLimit} min={1} max={50} onChange={setDailySendLimit} />
+        </div>
+
+        <div className="flex items-center justify-between border-t border-white/40 pt-4">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Leads per week</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">How many new leads Aurora finds each week</p>
+          </div>
+          <Stepper value={oppsPerWeek} min={1} max={20} onChange={setOppsPerWeek} />
+        </div>
+
+        <div className="flex items-center justify-between border-t border-white/40 pt-4">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Weekdays only</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Don't send emails on Saturday or Sunday</p>
+          </div>
+          <Toggle on={weekdaysOnly} onChange={setWeekdaysOnly} />
+        </div>
+      </SectionCard>
+
+      <div className="flex justify-end">
+        <SaveButton onClick={handleSave} isPending={isPending} />
       </div>
-      <p className="text-sm font-medium pl-7 mt-0.5">{value || "Not set"}</p>
     </div>
   );
 }
 
-// ============ MAIN COMPONENT ============
+/* ═══════════════════════════════════════════════
+   SECTION: Notifications
+═══════════════════════════════════════════════ */
+function NotificationsSection() {
+  const [replyAlerts,    setReplyAlerts]    = useState(true);
+  const [weeklySummary,  setWeeklySummary]  = useState(true);
 
+  return (
+    <div className="space-y-5">
+      <SectionCard className="space-y-5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Email notifications</p>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Reply alerts</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Get an email when a lead replies to your outreach</p>
+          </div>
+          <Toggle on={replyAlerts} onChange={setReplyAlerts} />
+        </div>
+
+        <div className="flex items-center justify-between border-t border-white/40 pt-4">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Weekly summary</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">A snapshot of your outreach performance every Monday</p>
+          </div>
+          <Toggle on={weeklySummary} onChange={setWeeklySummary} />
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SECTION: Billing
+═══════════════════════════════════════════════ */
+function BillingSection() {
+  return (
+    <div className="space-y-5">
+      <SectionCard>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+               style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+            <CreditCard className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-sm" style={{ color: "#131b2e" }}>Aurora Pro</p>
+            <p className="text-xs text-muted-foreground">Active subscription</p>
+          </div>
+          <span className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full text-white"
+                style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+            Active
+          </span>
+        </div>
+        <p className="text-[12px] text-muted-foreground">
+          Billing management is coming soon. To manage your subscription, contact{" "}
+          <a href="mailto:hello@auroraoutreach.com" className="underline" style={{ color: ACCENT }}>
+            hello@auroraoutreach.com
+          </a>
+        </p>
+      </SectionCard>
+
+      {/* Danger zone */}
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-red-400 mb-3">Danger zone</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-red-600">Delete account</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Permanently removes all your data. This cannot be undone.</p>
+          </div>
+          <button
+            onClick={() => toast.error("Please email hello@auroraoutreach.com to request account deletion.")}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-red-600 border border-red-200
+                       hover:bg-red-50 transition-colors shrink-0"
+          >
+            <AlertTriangle className="w-4 h-4" />
+            Delete
+          </button>
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   Sidebar profile card (desktop)
+═══════════════════════════════════════════════ */
+function SidebarCard({
+  profile, completionPercent, completedCount, total,
+}: {
+  profile: UserProfile; completionPercent: number; completedCount: number; total: number;
+}) {
+  const initial = (profile.businessName || profile.businessType || "A").charAt(0).toUpperCase();
+  return (
+    <div className="glass-card rounded-2xl p-5 relative overflow-hidden border border-white/60">
+      <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full pointer-events-none"
+           style={{ background: `${ACCENT}08` }} />
+      <div className="relative z-10 flex flex-col items-center gap-3 text-center">
+        {/* Avatar */}
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-extrabold shadow-lg"
+             style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 8px 20px ${ACCENT}30` }}>
+          {initial}
+        </div>
+        {/* Name + profession */}
+        <div>
+          <p className="text-sm font-extrabold leading-tight" style={{ color: "#131b2e" }}>
+            {profile.businessName || profile.businessType || "Your Business"}
+          </p>
+          {profile.businessName && (
+            <p className="text-[11px] text-muted-foreground mt-0.5">{profile.businessType}</p>
+          )}
+          {profile.location && (
+            <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1 mt-1">
+              <MapPin className="w-3 h-3 shrink-0" />
+              {profile.location.split(",")[0]}
+            </p>
+          )}
+        </div>
+        {/* Completion ring */}
+        <div className="flex items-center gap-3 w-full rounded-xl px-3 py-2.5"
+             style={{ background: "rgba(124,110,247,0.06)" }}>
+          <div className="relative shrink-0">
+            <CompletionRing percent={completionPercent} size={48} />
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold"
+                  style={{ color: ACCENT }}>
+              {completionPercent}%
+            </span>
+          </div>
+          <div className="text-left">
+            <p className="text-xs font-bold" style={{ color: "#131b2e" }}>
+              {completionPercent === 100 ? "Profile complete 🎉" : "Profile strength"}
+            </p>
+            <p className="text-[10px] text-muted-foreground">{completedCount}/{total} done</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════ */
 export function ProfilePage() {
   const router = useRouter();
   const { profile, setProfile } = useAurora();
   const [isPending, startTransition] = useTransition();
-  const [editingSection, setEditingSection] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [emailConnected, setEmailConnected] = useState<boolean>(false);
-
-  // Check email connection
-  useEffect(() => {
-    fetch('/api/email/status')
-      .then(res => res.json())
-      .then(data => setEmailConnected(data.connected))
-      .catch(() => setEmailConnected(false));
-  }, []);
+  const [activeSection, setActiveSection] = useState<Section>("my-profile");
 
   if (!profile) {
     return (
@@ -486,84 +910,31 @@ export function ProfilePage() {
     );
   }
 
-  const startEdit = (section: string, value: string) => {
-    setEditingSection(section);
-    setEditValue(value);
-  };
+  /* ── Completion metric ── */
+  const completionItems = [
+    { done: !!profile.businessName },
+    { done: !!profile.location },
+    { done: !!profile.pitch },
+    { done: profile.opportunityTypes.length > 0 },
+    { done: !!profile.website || !!profile.instagram },
+  ];
+  const completedCount    = completionItems.filter(i => i.done).length;
+  const completionPercent = Math.round((completedCount / completionItems.length) * 100);
 
-  const saveEdit = () => {
-    if (!profile) return;
-    
+  /* ── Save handler ── */
+  const handleSave = (updates: Partial<UserProfile>) => {
     startTransition(async () => {
-      const updates: Partial<Parameters<typeof updateProfile>[0]> = {};
-      
-      switch (editingSection) {
-        case "businessType":
-          updates.businessType = editValue;
-          break;
-        case "businessName":
-          updates.businessName = editValue;
-          break;
-        case "location":
-          updates.location = editValue;
-          break;
-        case "pitch":
-          updates.pitch = editValue;
-          break;
-        case "website":
-          updates.website = editValue;
-          break;
-        case "instagram":
-          updates.instagram = editValue;
-          break;
-        case "linkedin":
-          updates.linkedin = editValue;
-          break;
-        case "phone":
-          updates.phone = editValue;
-          break;
-      }
-      
-      const result = await updateProfile(updates);
+      const result = await updateProfile(updates as Parameters<typeof updateProfile>[0]);
       if (result.success) {
-        const updatedProfile: UserProfile = { 
-          ...profile, 
-          ...updates,
-          updatedAt: new Date().toISOString(),
-        };
-        setProfile(updatedProfile);
-        toast.success("Profile updated!");
+        setProfile({ ...profile, ...updates, updatedAt: new Date().toISOString() } as UserProfile);
+        toast.success("Saved!");
       } else {
-        toast.error(result.error || "Failed to update profile");
-      }
-      setEditingSection(null);
-    });
-  };
-
-  const cancelEdit = () => {
-    setEditingSection(null);
-    setEditValue("");
-  };
-
-  const handleToneChange = (tone: Tone) => {
-    startTransition(async () => {
-      const result = await updateProfile({ tone });
-      if (result.success) {
-        setProfile({ ...profile, tone, updatedAt: new Date().toISOString() });
+        toast.error(result.error || "Failed to save");
       }
     });
   };
 
-  const handleOpportunitiesChange = (delta: number) => {
-    const newValue = Math.max(1, Math.min(20, profile.opportunitiesPerWeek + delta));
-    startTransition(async () => {
-      const result = await updateProfile({ opportunitiesPerWeek: newValue });
-      if (result.success) {
-        setProfile({ ...profile, opportunitiesPerWeek: newValue, updatedAt: new Date().toISOString() });
-      }
-    });
-  };
-
+  /* ── Sign out ── */
   const handleSignOut = () => {
     startTransition(async () => {
       await signOut();
@@ -572,482 +943,135 @@ export function ProfilePage() {
     });
   };
 
-  const tones: Tone[] = ["friendly", "professional", "premium", "casual"];
+  /* ── Active section renderer ── */
+  const renderSection = () => {
+    switch (activeSection) {
+      case "my-profile":   return <MyProfileSection profile={profile} onSave={handleSave} isPending={isPending} />;
+      case "my-work":      return <MyWorkSection profile={profile} onSave={handleSave} isPending={isPending} />;
+      case "past-clients": return <PastClientsSection isPending={isPending} />;
+      case "email":        return <EmailSection />;
+      case "outreach":     return <OutreachSection profile={profile} onSave={handleSave} isPending={isPending} />;
+      case "notifications":return <NotificationsSection />;
+      case "billing":      return <BillingSection />;
+    }
+  };
 
-  // Calculate profile completion
-  const completionItems = [
-    { done: !!profile.businessName, label: "Business name" },
-    { done: !!profile.location, label: "Location" },
-    { done: !!profile.pitch, label: "Pitch" },
-    { done: profile.opportunityTypes.length > 0, label: "Opportunity types" },
-    { done: !!profile.website || !!profile.instagram, label: "Contact info" },
-  ];
-  const completedCount = completionItems.filter(i => i.done).length;
-  const completionPercent = Math.round((completedCount / completionItems.length) * 100);
+  /* ── Active section label ── */
+  const activeLabel = NAV_GROUPS.flatMap(g => g.items).find(i => i.id === activeSection)?.label ?? "";
 
   return (
-    <div className="space-y-6 pb-8">
-      {/* Hero Header */}
-      <div className="glass-card rounded-3xl p-5 relative overflow-hidden">
-        <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-primary/8 blur-2xl pointer-events-none" />
-        <div className="flex items-start gap-4 relative z-10">
-          {/* Avatar */}
-          <div className="w-16 h-16 rounded-2xl fluid-gradient flex items-center justify-center text-white text-2xl font-extrabold shadow-lg shadow-primary/25 shrink-0">
-            {(profile.businessName || profile.businessType || "A").charAt(0).toUpperCase()}
-          </div>
+    <div className="pb-10">
 
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-extrabold truncate tracking-tight">
-              {profile.businessName || profile.businessType || "Your Business"}
-            </h1>
-            <p className="text-sm text-muted-foreground truncate">
-              {profile.businessType}
-            </p>
-            {profile.location && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                <MapPin className="w-3 h-3 shrink-0" />
-                <span className="truncate">{profile.location.split(",")[0]}</span>
-              </p>
-            )}
-          </div>
-
-          {/* Progress Ring */}
-          <div className="relative w-12 h-12 shrink-0">
-            <svg className="w-12 h-12 -rotate-90">
-              <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" fill="none" className="text-muted/30" />
-              <circle cx="24" cy="24" r="20" stroke="url(#grad)" strokeWidth="3" fill="none"
-                strokeDasharray={125.7}
-                strokeDashoffset={125.7 - (125.7 * completionPercent / 100)}
-                strokeLinecap="round"
-              />
-              <defs>
-                <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#3525cd" />
-                  <stop offset="100%" stopColor="#4f46e5" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-primary">
-              {completionPercent}%
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Profile Completion Prompts */}
-      {completionPercent < 100 && (
-        <ProfileCompletionPrompts 
-          profile={profile}
-          onEditPitch={() => startEdit("pitch", profile.pitch || "")}
-          onEditLocation={() => startEdit("location", profile.location || "")}
-          onEditOpportunityTypes={() => setEditingSection("opportunityTypes")}
-          onEditWebsite={() => startEdit("website", profile.website || "")}
-          onEditInstagram={() => startEdit("instagram", profile.instagram || "")}
-        />
-      )}
-
-      {/* Email Connection Status */}
-      <Card className={emailConnected ? "border-green-500/30 bg-green-500/5" : "border-amber-500/30 bg-amber-500/5"}>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                emailConnected ? "bg-green-500/20" : "bg-amber-500/20"
-              }`}>
-                <Mail className={`w-5 h-5 ${emailConnected ? "text-green-500" : "text-amber-500"}`} />
-              </div>
-              <div>
-                <p className="font-medium text-sm">Email Connection</p>
-                <p className="text-xs text-muted-foreground">
-                  {emailConnected ? "Connected and ready to send" : "Connect to send emails from Aurora"}
-                </p>
-              </div>
-            </div>
-            {emailConnected ? (
-              <Badge className="bg-green-500/20 text-green-600 border-0">Connected</Badge>
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => window.location.href = '/api/email/connect'}>
-                Connect
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Business Details Section */}
-      <div className="space-y-1">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
-          Business Details
-        </h2>
-        <Card>
-          <CardContent className="p-0 divide-y divide-border">
-            <SettingsRow
-              icon={<Briefcase className="w-4 h-4" />}
-              label="Business name"
-              value={profile.businessName || "Not set"}
-              editing={editingSection === "businessName"}
-              editValue={editValue}
-              isPending={isPending}
-              onEdit={() => startEdit("businessName", profile.businessName || "")}
-              onSave={saveEdit}
-              onCancel={cancelEdit}
-              onChange={setEditValue}
-            />
-            <SettingsRow
-              icon={<Target className="w-4 h-4" />}
-              label="Business type"
-              value={profile.businessType || "Not set"}
-              editing={editingSection === "businessType"}
-              editValue={editValue}
-              isPending={isPending}
-              onEdit={() => startEdit("businessType", profile.businessType || "")}
-              onSave={saveEdit}
-              onCancel={cancelEdit}
-              onChange={setEditValue}
-            />
-            
-            {/* Location with Places Autocomplete */}
-            <div className="px-4 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground"><MapPin className="w-4 h-4" /></span>
-                  <span className="text-sm text-muted-foreground">Location</span>
-                </div>
-                {editingSection !== "location" && (
-                  <button 
-                    onClick={() => startEdit("location", profile.location || "")}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              {editingSection === "location" ? (
-                <div className="mt-2 space-y-2 pl-7">
-                  <PlacesAutocomplete
-                    value={editValue}
-                    onChange={setEditValue}
-                    placeholder="Enter your location"
-                    className="h-9"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={cancelEdit} disabled={isPending}>
-                      Cancel
-                    </Button>
-                    <Button size="sm" onClick={saveEdit} disabled={isPending}>
-                      {isPending ? <Spinner className="w-4 h-4" /> : "Save"}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm font-medium pl-7 mt-0.5">{profile.location || "Not set"}</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Your Pitch Section */}
-      <div className="space-y-1">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
-          Your Pitch
-        </h2>
-        <Card>
-          <CardContent className="p-4">
-            {editingSection === "pitch" ? (
-              <PitchEditor
-                value={editValue}
-                onChange={setEditValue}
-                businessType={profile.businessType}
-                isPending={isPending}
-                onSave={saveEdit}
-                onCancel={cancelEdit}
-              />
-            ) : (
-              <div 
-                className="group cursor-pointer" 
-                onClick={() => startEdit("pitch", profile.pitch || "")}
-              >
-                <div className="flex items-start justify-between">
-                  <p className="text-sm leading-relaxed">
-                    {profile.pitch || (
-                      <span className="text-muted-foreground italic">
-                        Add a compelling pitch to help Aurora craft better messages...
-                      </span>
-                    )}
-                  </p>
-                  <Edit2 className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Looking For Section */}
-      <div className="space-y-1">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
-          Looking For
-        </h2>
-        <Card>
-          <CardContent className="p-4">
-            {editingSection === "opportunityTypes" ? (
-              <OpportunityTypeSelector
-                selected={profile.opportunityTypes}
-                businessType={profile.businessType}
-                isPending={isPending}
-                onSave={(types) => {
-                  startTransition(async () => {
-                    const result = await updateProfile({ opportunityTypes: types });
-                    if (result.success) {
-                      setProfile({ ...profile, opportunityTypes: types, updatedAt: new Date().toISOString() });
-                      toast.success("Updated!");
-                    }
-                    setEditingSection(null);
-                  });
+      {/* ── Mobile tab strip (hidden md+) ── */}
+      <div className="md:hidden -mx-4 px-4 pb-4 mb-2 overflow-x-auto">
+        <div className="flex gap-1.5 w-max">
+          {NAV_GROUPS.flatMap(g => g.items).map(item => {
+            const isActive = activeSection === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all"
+                style={isActive ? {
+                  background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
+                  color: "white",
+                } : {
+                  background: "rgba(255,255,255,0.5)",
+                  border: "1px solid rgba(255,255,255,0.6)",
+                  color: "var(--muted-foreground)",
                 }}
-                onCancel={() => setEditingSection(null)}
-              />
-            ) : (
-              <div 
-                className="group cursor-pointer"
-                onClick={() => setEditingSection("opportunityTypes")}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex flex-wrap gap-2">
-                    {profile.opportunityTypes.length > 0 ? (
-                      profile.opportunityTypes.map((opp) => (
-                        <Badge key={opp} variant="secondary" className="px-3 py-1">
-                          {opp}
-                        </Badge>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">Tap to select opportunity types...</p>
-                    )}
-                  </div>
-                  <Edit2 className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Contact Links Section */}
-      <div className="space-y-1">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
-          Contact & Links
-        </h2>
-        <Card>
-          <CardContent className="p-0 divide-y divide-border">
-            <ContactRow
-              icon={<Mail className="w-4 h-4" />}
-              label="Email"
-              value={profile.email}
-              disabled
-            />
-            <SettingsRow
-              icon={<Phone className="w-4 h-4" />}
-              label="Phone"
-              value={profile.phone || "Add phone"}
-              editing={editingSection === "phone"}
-              editValue={editValue}
-              isPending={isPending}
-              onEdit={() => startEdit("phone", profile.phone || "")}
-              onSave={saveEdit}
-              onCancel={cancelEdit}
-              onChange={setEditValue}
-              placeholder="+44 7700 123456"
-            />
-            <SettingsRow
-              icon={<Globe className="w-4 h-4" />}
-              label="Website"
-              value={profile.website || "Add website"}
-              editing={editingSection === "website"}
-              editValue={editValue}
-              isPending={isPending}
-              onEdit={() => startEdit("website", profile.website || "")}
-              onSave={saveEdit}
-              onCancel={cancelEdit}
-              onChange={setEditValue}
-              placeholder="www.yoursite.com"
-            />
-            <SettingsRow
-              icon={<Instagram className="w-4 h-4" />}
-              label="Instagram"
-              value={profile.instagram || "Add Instagram"}
-              editing={editingSection === "instagram"}
-              editValue={editValue}
-              isPending={isPending}
-              onEdit={() => startEdit("instagram", profile.instagram || "")}
-              onSave={saveEdit}
-              onCancel={cancelEdit}
-              onChange={setEditValue}
-              placeholder="@yourusername"
-            />
-            <SettingsRow
-              icon={<Linkedin className="w-4 h-4" />}
-              label="LinkedIn"
-              value={profile.linkedin || "Add LinkedIn"}
-              editing={editingSection === "linkedin"}
-              editValue={editValue}
-              isPending={isPending}
-              onEdit={() => startEdit("linkedin", profile.linkedin || "")}
-              onSave={saveEdit}
-              onCancel={cancelEdit}
-              onChange={setEditValue}
-              placeholder="linkedin.com/in/you"
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Preferences Section */}
-      <div className="space-y-1">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">
-          Preferences
-        </h2>
-        <Card>
-          <CardContent className="p-4 space-y-5">
-            {/* Tone Selection */}
-            <div>
-              <p className="text-sm font-medium mb-3 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                Message tone
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {tones.map((tone) => (
-                  <button
-                    key={tone}
-                    onClick={() => handleToneChange(tone)}
-                    disabled={isPending}
-                    className={`p-2.5 rounded-lg border text-sm transition-all ${
-                      profile.tone === tone
-                        ? "border-primary bg-primary/10 font-medium text-primary"
-                        : "border-border hover:border-primary/50 text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {toneLabels[tone]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Opportunities per week */}
-            <div className="flex items-center justify-between pt-2 border-t">
-              <div>
-                <p className="text-sm font-medium flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-muted-foreground" />
-                  Opportunities / week
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Aurora will find this many for you
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleOpportunitiesChange(-1)}
-                  disabled={isPending || profile.opportunitiesPerWeek <= 1}
-                  className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
-                >
-                  -
-                </button>
-                <span className="text-lg font-bold w-6 text-center">
-                  {profile.opportunitiesPerWeek}
-                </span>
-                <button
-                  onClick={() => handleOpportunitiesChange(1)}
-                  disabled={isPending || profile.opportunitiesPerWeek >= 20}
-                  className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-muted disabled:opacity-30 transition-colors"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sign Out */}
-      <Button
-        variant="ghost"
-        className="w-full text-muted-foreground hover:text-destructive"
-        onClick={handleSignOut}
-        disabled={isPending}
-      >
-        {isPending ? <Spinner className="mr-2" /> : <LogOut className="w-4 h-4 mr-2" />}
-        Sign out
-      </Button>
-    </div>
-  );
-}
-
-function SettingsRow({
-  icon,
-  label,
-  value,
-  editing,
-  editValue,
-  isPending,
-  placeholder,
-  onEdit,
-  onSave,
-  onCancel,
-  onChange,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  editing: boolean;
-  editValue: string;
-  isPending: boolean;
-  placeholder?: string;
-  onEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  onChange: (value: string) => void;
-}) {
-  const isEmpty = !value || value.startsWith("Add ") || value === "Not set";
-  
-  return (
-    <div className="px-4 py-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-muted-foreground">{icon}</span>
-          <span className="text-sm text-muted-foreground">{label}</span>
+                {item.label}
+              </button>
+            );
+          })}
         </div>
-        {!editing && (
-          <button 
-            onClick={onEdit}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        )}
       </div>
-      {editing ? (
-        <div className="mt-2 space-y-2 pl-7">
-          <Input
-            value={editValue}
-            onChange={(e) => onChange(e.target.value)}
-            className="h-9"
-            placeholder={placeholder}
+
+      {/* ── Desktop two-panel layout ── */}
+      <div className="flex gap-7 items-start">
+
+        {/* ── Left column: sidebar card + nav ── */}
+        <div className="hidden md:flex flex-col gap-4 w-[200px] shrink-0">
+
+          {/* Profile card */}
+          <SidebarCard
+            profile={profile}
+            completionPercent={completionPercent}
+            completedCount={completedCount}
+            total={completionItems.length}
           />
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={onCancel} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={onSave} disabled={isPending}>
-              {isPending ? <Spinner className="w-4 h-4" /> : "Save"}
-            </Button>
+
+          {/* Nav */}
+          <div className="glass-card rounded-2xl border border-white/60 p-3">
+            {NAV_GROUPS.map(group => (
+              <div key={group.label} className="mb-3 last:mb-0">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-1">
+                  {group.label}
+                </p>
+                {group.items.map(item => {
+                  const Icon  = item.icon;
+                  const isAct = activeSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition-all mb-0.5"
+                      style={isAct ? {
+                        background: `linear-gradient(135deg,rgba(124,110,247,0.14),rgba(149,133,249,0.08))`,
+                        color: ACCENT,
+                        boxShadow: `0 0 0 1px rgba(124,110,247,0.25)`,
+                      } : {}}
+                    >
+                      <Icon className={`w-3.5 h-3.5 shrink-0 ${isAct ? "" : "text-muted-foreground"}`} />
+                      <span className={isAct ? "" : "text-muted-foreground"}>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+
+            <div className="border-t border-white/40 mt-2 pt-2">
+              <button
+                onClick={handleSignOut}
+                disabled={isPending}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold
+                           text-muted-foreground hover:text-red-500 hover:bg-red-50/50 transition-all disabled:opacity-50"
+              >
+                <LogOut className="w-3.5 h-3.5 shrink-0" />
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
-      ) : (
-        <p className={`text-sm font-medium pl-7 mt-0.5 ${isEmpty ? "text-muted-foreground" : ""}`}>
-          {value}
-        </p>
-      )}
+
+        {/* ── Right panel: active section ── */}
+        <div className="flex-1 min-w-0">
+          {/* Section heading */}
+          <div className="mb-5">
+            <h1 className="text-xl font-extrabold tracking-tight" style={{ color: "#131b2e" }}>
+              {activeLabel}
+            </h1>
+          </div>
+          {renderSection()}
+        </div>
+      </div>
+
+      {/* ── Mobile section content (below tab strip) ── */}
+      {/* The flex layout above already handles mobile via the tab strip */}
+
+      {/* ── Mobile sign-out at bottom ── */}
+      <div className="md:hidden mt-8">
+        <button
+          onClick={handleSignOut}
+          disabled={isPending}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium
+                     text-muted-foreground hover:text-red-500 border border-white/50 bg-white/30 transition-all"
+        >
+          {isPending ? <Spinner className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
+          Sign out
+        </button>
+      </div>
     </div>
   );
 }

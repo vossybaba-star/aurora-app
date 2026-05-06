@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -14,10 +12,10 @@ import {
 } from "@/components/ui/select";
 import { useAurora } from "./aurora-app";
 import { typeLabels } from "@/lib/types";
-import type { Opportunity, OpportunityType } from "@/lib/types";
-import { 
-  Search, 
-  MapPin, 
+import type { OpportunityType } from "@/lib/types";
+import {
+  Search,
+  MapPin,
   Star,
   Heart,
   Loader2,
@@ -29,12 +27,16 @@ import {
   Instagram,
 } from "lucide-react";
 
+/* ─── Constants ──────────────────────────────── */
+const ACCENT  = "#7c6ef7";
+const ACCENT2 = "#9585f9";
+
 type ViewMode = "grid" | "map";
 
-// Module-level Instagram cache - persists across re-renders within session
-const igCache = new Map();
+// Module-level Instagram cache — persists across re-renders within session
+const igCache = new Map<string, string | null>();
 
-function getSearchPrompts(businessType) {
+function getSearchPrompts(businessType: string | undefined): string[] {
   const bt = (businessType || "").toLowerCase();
   if (bt.includes("photo") || bt.includes("video")) {
     return ["Wedding venues", "Luxury hotels", "Event planners", "Brands", "Restaurants", "PR agencies"];
@@ -47,24 +49,36 @@ function getSearchPrompts(businessType) {
   return ["Wedding venues", "Hotels", "Event planners", "Restaurants", "Corporate", "Agencies"];
 }
 
+/* ─── Place shape (from API) ────────────────── */
+interface Place {
+  id: string;
+  name: string;
+  address?: string;
+  rating?: number;
+  ratingCount?: number;
+  photoReference?: string;
+  website?: string;
+  types?: string[];
+}
+
 export function DiscoverPage() {
   const { profile, opportunities, refreshData, setActiveTab } = useAurora();
-  const [viewMode, setViewMode] = useState("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
   const [isSearching, setIsSearching] = useState(false);
   const [isFinding, setIsFinding] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
-  const [nextPageToken, setNextPageToken] = useState(null);
-  const [savedIds, setSavedIds] = useState(new Set());
-  const [findResult, setFindResult] = useState(null);
+  const [searchResults, setSearchResults] = useState<Place[]>([]);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState(new Set<string>());
+  const [findResult, setFindResult] = useState<{ count: number; message: string } | null>(null);
   const [nearbyLocation, setNearbyLocation] = useState("");
-  const loadMoreRef = useRef(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const ids = new Set(opportunities.map(o => o.googlePlaceId).filter(Boolean));
+    const ids = new Set(opportunities.map((o) => o.googlePlaceId).filter(Boolean) as string[]);
     setSavedIds(ids);
   }, [opportunities]);
 
@@ -88,21 +102,19 @@ export function DiscoverPage() {
     load();
   }, []);
 
-  // Infinite scroll - also expose loadMore for manual trigger
+  // Infinite scroll
   useEffect(() => {
     const el = loadMoreRef.current;
     if (!el || !nextPageToken) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          loadMore();
-        }
+        if (entries[0].isIntersecting) loadMore();
       },
-      { threshold: 0, rootMargin: '200px' }
+      { threshold: 0, rootMargin: "200px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [nextPageToken]); // only re-run when token changes, not isLoadingMore
+  }, [nextPageToken]);
 
   const loadMore = async () => {
     if (isLoadingMore) return;
@@ -117,7 +129,7 @@ export function DiscoverPage() {
       });
       const data = await res.json();
       if (data.places && data.places.length > 0) {
-        setSearchResults(prev => [...prev, ...data.places]);
+        setSearchResults((prev) => [...prev, ...data.places]);
       }
       setNextPageToken(data.nextPageToken || null);
     } catch (e) {
@@ -151,7 +163,7 @@ export function DiscoverPage() {
     }
   };
 
-  const handleSearch = async (query) => {
+  const handleSearch = async (query?: string) => {
     const q = query !== undefined ? query : searchQuery;
     if (!q || !q.trim()) return;
     setIsSearching(true);
@@ -174,9 +186,9 @@ export function DiscoverPage() {
     }
   };
 
-  const handleSave = async (place) => {
+  const handleSave = async (place: Place) => {
     try {
-      let contactMethods = [];
+      let contactMethods: { type: string; value: string; isPrimary: boolean }[] = [];
       if (place.website || place.id) {
         try {
           const enrichRes = await fetch("/api/enrich-contact", {
@@ -187,19 +199,21 @@ export function DiscoverPage() {
           if (enrichRes.ok) {
             const { contactInfo } = await enrichRes.json();
             if (contactInfo.emails?.length > 0) {
-              contactInfo.emails.forEach((email, i) => contactMethods.push({ type: "email", value: email, isPrimary: i === 0 }));
+              contactInfo.emails.forEach((email: string, i: number) =>
+                contactMethods.push({ type: "email", value: email, isPrimary: i === 0 })
+              );
             }
             if (contactInfo.instagram) {
               igCache.set(place.id, contactInfo.instagram);
               contactMethods.push({ type: "instagram", value: contactInfo.instagram, isPrimary: contactMethods.length === 0 });
             }
             if (contactInfo.phone) contactMethods.push({ type: "phone", value: contactInfo.phone, isPrimary: contactMethods.length === 0 });
-            if (contactInfo.facebook) contactMethods.push({ type: "facebook", value: contactInfo.facebook });
-            if (contactInfo.linkedin) contactMethods.push({ type: "linkedin", value: contactInfo.linkedin });
+            if (contactInfo.facebook) contactMethods.push({ type: "facebook", value: contactInfo.facebook, isPrimary: false });
+            if (contactInfo.linkedin) contactMethods.push({ type: "linkedin", value: contactInfo.linkedin, isPrimary: false });
           }
         } catch { /* skip enrichment */ }
       }
-      if (place.website && !contactMethods.some(c => c.type === "website")) {
+      if (place.website && !contactMethods.some((c) => c.type === "website")) {
         contactMethods.push({ type: "website", value: place.website, isPrimary: contactMethods.length === 0 });
       }
       const response = await fetch("/api/opportunities", {
@@ -220,7 +234,7 @@ export function DiscoverPage() {
         }),
       });
       if (response.ok) {
-        setSavedIds(prev => new Set([...prev, place.id]));
+        setSavedIds((prev) => new Set([...prev, place.id]));
         await refreshData();
       }
     } catch { console.error("Failed to save"); }
@@ -229,23 +243,104 @@ export function DiscoverPage() {
   const opportunityTypes = ["all", "venue", "event_organiser", "market", "wedding_planner", "agency", "brand", "publication"];
 
   const mapQuery = searchResults.length > 0
-    ? searchResults.slice(0, 5).map(p => p.name).join(" ")
+    ? searchResults.slice(0, 5).map((p) => p.name).join(" ")
     : `event venues near ${profile?.location || nearbyLocation || "London UK"}`;
+
+  const mapSrc = `https://www.google.com/maps/embed/v1/search?key=AIzaSyA1kVerq-mvYsWmObYOTEWZPm4vUbcgmlY&q=${encodeURIComponent(mapQuery)}`;
+
+  /* ── Sticky search + filter bar ── */
+  const SearchBar = (
+    <div className="space-y-2 sticky top-0 z-10 pb-2"
+         style={{ background: 'rgba(242,240,254,0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+      {/* Search input row */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search venues or tap a suggestion…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            className="pl-10"
+          />
+        </div>
+        <Button variant="outline" size="icon" onClick={() => handleSearch()} disabled={isSearching || !searchQuery.trim()}>
+          {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+        </Button>
+      </div>
+
+      {/* Suggestion chips */}
+      <div className="flex flex-wrap gap-1.5">
+        {getSearchPrompts(profile?.businessType).map((prompt) => (
+          <button
+            key={prompt}
+            onClick={() => { setSearchQuery(prompt); handleSearch(prompt); }}
+            className={`px-3 py-1 text-xs rounded-full border font-semibold transition-all ${
+              searchQuery === prompt
+                ? "text-white border-transparent shadow-sm"
+                : "glass-card border-white/60 text-foreground hover:border-primary/30"
+            }`}
+            style={searchQuery === prompt ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 2px 8px ${ACCENT}40` } : {}}
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+
+      {/* Filter + view toggle row */}
+      <div className="flex items-center gap-2">
+        <Select value={selectedType} onValueChange={(v) => setSelectedType(v)}>
+          <SelectTrigger className="w-[130px] shrink-0">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            {opportunityTypes.filter((t) => t !== "all").map((type) => (
+              <SelectItem key={type} value={type}>
+                {typeLabels[type as OpportunityType] || type}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* View toggle */}
+        <div className="flex rounded-xl border border-white/60 overflow-hidden shrink-0 glass-card">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`px-3 py-2 flex items-center transition-colors ${viewMode === "grid" ? "text-white" : "hover:bg-white/30 text-muted-foreground"}`}
+            style={viewMode === "grid" ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` } : {}}
+          >
+            <Grid3X3 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("map")}
+            className={`px-3 py-2 flex items-center transition-colors ${viewMode === "map" ? "text-white" : "hover:bg-white/30 text-muted-foreground"}`}
+            style={viewMode === "map" ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` } : {}}
+          >
+            <MapIcon className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
-      {/* Header — title hidden on desktop (shown in top bar) */}
+
+      {/* ── Page header ── */}
       <div className="flex items-center justify-between gap-3">
         <div className="lg:hidden">
           <h1 className="text-xl font-extrabold tracking-tight">Discover</h1>
           <p className="text-xs text-muted-foreground">Find your next opportunity</p>
         </div>
         <div className="hidden lg:block" />
+        {/* AI Find — always top-right */}
         <button
           onClick={handleAISearch}
           disabled={isFinding}
-          className="rounded-2xl font-bold text-white px-4 py-2 text-sm flex items-center gap-1.5 shadow-md shadow-primary/25 hover:opacity-90 transition-all active:scale-[0.97] disabled:opacity-60"
-          style={{ background: 'linear-gradient(135deg,#3525cd,#4f46e5)' }}
+          className="rounded-2xl font-bold text-white px-4 py-2 text-sm flex items-center gap-1.5 shadow-md hover:opacity-90 transition-all active:scale-[0.97] disabled:opacity-60"
+          style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 4px 12px ${ACCENT}40` }}
         >
           {isFinding ? <><Loader2 className="w-4 h-4 animate-spin" />Finding…</> : <><Sparkles className="w-4 h-4" />AI Find</>}
         </button>
@@ -257,72 +352,19 @@ export function DiscoverPage() {
         </div>
       )}
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search or tap a suggestion below..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="pl-10"
-            />
-          </div>
-          <Button variant="outline" size="icon" onClick={() => handleSearch()} disabled={isSearching || !searchQuery.trim()}>
-            {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-          </Button>
-        </div>
+      {/* ── Sticky search + filters ── */}
+      {SearchBar}
 
-        <div className="flex flex-wrap gap-1.5">
-          {getSearchPrompts(profile?.businessType).map((prompt) => (
-            <button
-              key={prompt}
-              onClick={() => { setSearchQuery(prompt); handleSearch(prompt); }}
-              className={`px-3 py-1 text-xs rounded-full border font-semibold transition-all ${
-                searchQuery === prompt
-                  ? "text-white border-transparent shadow-sm shadow-primary/25"
-                  : "glass-card border-white/60 text-foreground hover:border-primary/30"
-              }`}
-            style={searchQuery === prompt ? { background:'linear-gradient(135deg,#3525cd,#4f46e5)' } : {}}
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          <Select value={selectedType} onValueChange={(v) => setSelectedType(v)}>
-            <SelectTrigger className="w-[130px] shrink-0">
-              <Filter className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {opportunityTypes.filter(t => t !== "all").map((type) => (
-                <SelectItem key={type} value={type}>{typeLabels[type] || type}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="flex rounded-lg border overflow-hidden shrink-0">
-            <button onClick={() => setViewMode("grid")} className={`px-3 py-2 flex items-center ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
-              <Grid3X3 className="w-4 h-4" />
-            </button>
-            <button onClick={() => setViewMode("map")} className={`px-3 py-2 flex items-center ${viewMode === "map" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
-              <MapIcon className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {viewMode === "grid" ? (
-        <div className="space-y-3">
+      {/* ════════════════════════════════
+          GRID VIEW
+      ════════════════════════════════ */}
+      {viewMode === "grid" && (
+        <div className="space-y-4">
           {isLoadingInitial ? (
-            /* Loading */
             <div className="flex items-center justify-center py-16">
               <div className="text-center flex flex-col items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl fluid-gradient flex items-center justify-center shadow-lg shadow-primary/25">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg"
+                     style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 8px 24px ${ACCENT}40` }}>
                   <Loader2 className="w-5 h-5 animate-spin text-white" />
                 </div>
                 <p className="text-sm text-muted-foreground">Finding venues near you…</p>
@@ -331,75 +373,139 @@ export function DiscoverPage() {
           ) : searchResults.length > 0 ? (
             <>
               <p className="text-sm text-muted-foreground">
-                {searchQuery ? `${searchResults.length} results found` : `${searchResults.length} venues near ${nearbyLocation || "you"}`}
+                {searchQuery
+                  ? `${searchResults.length} results for "${searchQuery}"`
+                  : `${searchResults.length} venues near ${nearbyLocation || "you"}`}
               </p>
-              {/* Two-column grid on desktop */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+
+              {/* Responsive card grid: 1 col mobile / 2 col tablet / 3 col desktop */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {searchResults.map((place) => (
-                  <DiscoverCard key={place.id} place={place} isSaved={savedIds.has(place.id)} onSave={() => handleSave(place)} />
+                  <DiscoverCard
+                    key={place.id}
+                    place={place}
+                    isSaved={savedIds.has(place.id)}
+                    onSave={() => handleSave(place)}
+                  />
                 ))}
               </div>
+
+              {/* Infinite scroll sentinel + load more button */}
               <div ref={loadMoreRef} className="py-4 flex flex-col items-center gap-2">
                 {isLoadingMore && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Loading more...
+                    Loading more venues…
                   </div>
                 )}
                 {!isLoadingMore && nextPageToken && (
-                  <Button variant="outline" size="sm" onClick={loadMore} className="text-xs">
+                  <Button variant="outline" size="sm" onClick={loadMore} className="text-xs rounded-xl">
                     Load more venues
                   </Button>
                 )}
                 {!isLoadingMore && !nextPageToken && searchResults.length > 0 && (
-                  <p className="text-xs text-muted-foreground">All results loaded</p>
+                  <p className="text-xs text-muted-foreground">All venues loaded</p>
                 )}
               </div>
             </>
           ) : !isSearching ? (
             <div className="glass-panel rounded-3xl p-8 text-center">
-              <MapPin className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
-              <h3 className="font-semibold mb-2" style={{ color:"#131b2e" }}>No Venues Found</h3>
+              <div className="w-14 h-14 rounded-3xl flex items-center justify-center mx-auto mb-3"
+                   style={{ background: `rgba(124,110,247,0.10)` }}>
+                <MapPin className="w-7 h-7" style={{ color: `${ACCENT}80` }} />
+              </div>
+              <h3 className="font-semibold mb-2" style={{ color: "#131b2e" }}>No Venues Found</h3>
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                Try searching or update your location in your profile.
+                Try a different search or update your location in your profile.
               </p>
             </div>
           ) : null}
         </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="rounded-xl overflow-hidden border" style={{ height: "60vh" }}>
-            <iframe
-              title="Venue map"
-              width="100%"
-              height="100%"
-              style={{ border: 0 }}
-              loading="lazy"
-              allowFullScreen
-              referrerPolicy="no-referrer-when-downgrade"
-              src={`https://www.google.com/maps/embed/v1/search?key=AIzaSyA1kVerq-mvYsWmObYOTEWZPm4vUbcgmlY&q=${encodeURIComponent(mapQuery)}`}
-            />
+      )}
+
+      {/* ════════════════════════════════
+          MAP VIEW
+      ════════════════════════════════ */}
+      {viewMode === "map" && (
+        <>
+          {/* Desktop: 30/70 side-by-side split */}
+          <div className="hidden lg:flex gap-4" style={{ height: "calc(100vh - 320px)", minHeight: "480px" }}>
+
+            {/* Left 30% — scrollable card list */}
+            <div className="w-[30%] shrink-0 overflow-y-auto space-y-3 pr-1">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
+                {searchResults.length} venues
+              </p>
+              {searchResults.slice(0, 12).map((place) => (
+                <DiscoverCardCompact
+                  key={place.id}
+                  place={place}
+                  isSaved={savedIds.has(place.id)}
+                  onSave={() => handleSave(place)}
+                />
+              ))}
+            </div>
+
+            {/* Right 70% — map */}
+            <div className="flex-1 rounded-2xl overflow-hidden border border-white/40 shadow-sm">
+              <iframe
+                title="Venue map"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                referrerPolicy="no-referrer-when-downgrade"
+                src={mapSrc}
+              />
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">{searchResults.length} venues</p>
-          {searchResults.slice(0, 5).map((place) => (
-            <DiscoverCard key={place.id} place={place} isSaved={savedIds.has(place.id)} onSave={() => handleSave(place)} />
-          ))}
-        </div>
+
+          {/* Mobile / tablet: stacked */}
+          <div className="lg:hidden space-y-3">
+            <div className="rounded-2xl overflow-hidden border border-white/40" style={{ height: "55vmax", minHeight: "260px", maxHeight: "480px" }}>
+              <iframe
+                title="Venue map"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                referrerPolicy="no-referrer-when-downgrade"
+                src={mapSrc}
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">{searchResults.length} venues</p>
+            {searchResults.slice(0, 5).map((place) => (
+              <DiscoverCard
+                key={place.id}
+                place={place}
+                isSaved={savedIds.has(place.id)}
+                onSave={() => handleSave(place)}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-function DiscoverCard({ place, isSaved, onSave }) {
+/* ════════════════════════════════════════════════
+   Vertical venue card — grid view
+   Full-width photo (160px) + details + Save CTA
+════════════════════════════════════════════════ */
+function DiscoverCard({ place, isSaved, onSave }: { place: Place; isSaved: boolean; onSave: () => void }) {
+  const ACCENT = "#7c6ef7";
   const photoUrl = place.photoReference
-    ? `/api/places/photo?ref=${encodeURIComponent(place.photoReference)}&maxWidth=400`
+    ? `/api/places/photo?ref=${encodeURIComponent(place.photoReference)}&maxWidth=600`
     : null;
 
-  const [instagramHandle, setInstagramHandle] = useState(igCache.get(place.id) || null);
+  const [instagramHandle, setInstagramHandle] = useState<string | null>(igCache.get(place.id) ?? null);
 
   useEffect(() => {
     if (igCache.has(place.id)) {
-      setInstagramHandle(igCache.get(place.id) || null);
+      setInstagramHandle(igCache.get(place.id) ?? null);
       return;
     }
     if (!place.website && !place.id) return;
@@ -413,7 +519,7 @@ function DiscoverCard({ place, isSaved, onSave }) {
         });
         if (!res.ok || cancelled) return;
         const { contactInfo } = await res.json();
-        const ig = contactInfo?.instagram || null;
+        const ig: string | null = contactInfo?.instagram || null;
         igCache.set(place.id, ig);
         if (!cancelled && ig) setInstagramHandle(ig);
       } catch {
@@ -424,83 +530,161 @@ function DiscoverCard({ place, isSaved, onSave }) {
   }, [place.id, place.website]);
 
   return (
-    <div className="glass-card glass-card-hover rounded-2xl overflow-hidden border-l-4" style={{ borderLeftColor:'#3525cd' }}>
-      <div className="flex">
-        <div className="w-24 shrink-0 relative self-stretch min-h-[88px]">
-            {photoUrl ? (
-              <img src={photoUrl} alt={place.name} className="w-full h-full object-cover absolute inset-0" />
-            ) : (
-              <div className="w-full h-full fluid-gradient-subtle flex items-center justify-center">
-                <MapPin className="w-8 h-8 text-primary/40" />
-              </div>
-            )}
-            {place.rating && (
-              <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-white text-xs font-medium flex items-center gap-1">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                {place.rating.toFixed(1)}
-              </div>
+    <div className="glass-card glass-card-hover rounded-2xl overflow-hidden flex flex-col" style={{ borderTop: `3px solid ${ACCENT}` }}>
+
+      {/* Photo — full width, 160px tall */}
+      <div className="relative w-full shrink-0" style={{ height: "160px" }}>
+        {photoUrl ? (
+          <img
+            src={photoUrl}
+            alt={place.name}
+            className="w-full h-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center"
+               style={{ background: `linear-gradient(135deg,rgba(124,110,247,0.10),rgba(149,133,249,0.05))` }}>
+            <MapPin className="w-10 h-10" style={{ color: `${ACCENT}40` }} />
+          </div>
+        )}
+
+        {/* Rating badge over photo */}
+        {place.rating && (
+          <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-lg text-white text-xs font-semibold"
+               style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}>
+            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+            {place.rating.toFixed(1)}
+            {place.ratingCount && (
+              <span className="opacity-75 text-[10px]">({place.ratingCount})</span>
             )}
           </div>
+        )}
 
-          <div className="flex-1 p-3 min-w-0 flex flex-col">
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <h3 className="font-semibold text-sm leading-tight line-clamp-1">{place.name}</h3>
-              <button
-                onClick={(e) => { e.stopPropagation(); if (!isSaved) onSave(); }}
-                className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                  isSaved ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground hover:text-primary"
-                }`}
-                disabled={isSaved}
-              >
-                <Heart className={`w-4 h-4 ${isSaved ? "fill-primary" : ""}`} />
-              </button>
-            </div>
-
-            {place.address && (
-              <p className="text-xs text-muted-foreground line-clamp-1 mb-1 flex items-center gap-1">
-                <MapPin className="w-3 h-3 shrink-0" />
-                {place.address}
-              </p>
-            )}
-
-            {place.types && place.types.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-1">
-                {place.types.slice(0, 2).map((type) => (
-                  <Badge key={type} variant="secondary" className="text-[10px] px-1.5 py-0">
-                    {type.replace(/_/g, " ")}
-                  </Badge>
-                ))}
-              </div>
-            )}
-
-            <div className="flex gap-1.5 mt-auto flex-wrap">
-              {place.website && (
-                <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
-                  onClick={(e) => { e.stopPropagation(); window.open(place.website, "_blank"); }}>
-                  <ExternalLink className="w-3 h-3 mr-1" />Website
-                </Button>
-              )}
-              {instagramHandle && (
-                <Button size="sm" variant="outline"
-                  className="h-7 px-2 text-xs border-pink-500/40 text-pink-600 hover:bg-pink-50"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(`https://instagram.com/${instagramHandle.replace("@", "")}`, "_blank");
-                  }}>
-                  <Instagram className="w-3 h-3 mr-1" />{instagramHandle}
-                </Button>
-              )}
-              {!isSaved ? (
-                <Button size="sm" className="h-7 px-2 text-xs ml-auto"
-                  onClick={(e) => { e.stopPropagation(); onSave(); }}>
-                  <Heart className="w-3 h-3 mr-1" />Save
-                </Button>
-              ) : (
-                <span className="h-7 px-2 text-xs flex items-center text-primary font-medium ml-auto">✓ Saved</span>
-              )}
-            </div>
+        {/* Saved indicator over photo */}
+        {isSaved && (
+          <div className="absolute top-2 right-2 px-2 py-0.5 rounded-lg text-white text-[10px] font-bold"
+               style={{ background: `${ACCENT}cc`, backdropFilter: "blur(4px)" }}>
+            ✓ Saved
           </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex flex-col flex-1 p-3 gap-1.5">
+
+        {/* Name */}
+        <h3 className="font-bold text-sm leading-snug line-clamp-2" style={{ color: "#131b2e" }}>
+          {place.name}
+        </h3>
+
+        {/* Address */}
+        {place.address && (
+          <p className="text-xs text-muted-foreground line-clamp-1 flex items-center gap-1">
+            <MapPin className="w-3 h-3 shrink-0" />
+            {place.address}
+          </p>
+        )}
+
+        {/* Instagram handle */}
+        {instagramHandle && (
+          <button
+            className="flex items-center gap-1 text-xs font-medium w-fit transition-opacity hover:opacity-75"
+            style={{ color: "#e1306c" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(`https://instagram.com/${instagramHandle.replace("@", "")}`, "_blank");
+            }}
+          >
+            <Instagram className="w-3 h-3" />
+            {instagramHandle}
+          </button>
+        )}
+
+        {/* Website link */}
+        {place.website && (
+          <button
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-fit"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(place.website, "_blank");
+            }}
+          >
+            <ExternalLink className="w-3 h-3" />
+            Website
+          </button>
+        )}
+
+        {/* Save button — pinned at bottom */}
+        <div className="mt-auto pt-2">
+          {!isSaved ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSave(); }}
+              className="w-full py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-[0.97] flex items-center justify-center gap-1.5"
+              style={{ background: `linear-gradient(135deg,${ACCENT},#9585f9)`, boxShadow: `0 2px 10px ${ACCENT}35` }}
+            >
+              <Heart className="w-3.5 h-3.5" />
+              Save to Pipeline
+            </button>
+          ) : (
+            <div className="w-full py-2 rounded-xl text-xs font-bold text-center"
+                 style={{ color: ACCENT, background: `${ACCENT}12` }}>
+              ✓ Added to Pipeline
+            </div>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════
+   Compact horizontal card — map view left sidebar
+════════════════════════════════════════════════ */
+function DiscoverCardCompact({ place, isSaved, onSave }: { place: Place; isSaved: boolean; onSave: () => void }) {
+  const ACCENT = "#7c6ef7";
+  const photoUrl = place.photoReference
+    ? `/api/places/photo?ref=${encodeURIComponent(place.photoReference)}&maxWidth=200`
+    : null;
+
+  return (
+    <div className="glass-card glass-card-hover rounded-xl overflow-hidden flex gap-2 p-2" style={{ borderLeft: `3px solid ${ACCENT}` }}>
+
+      {/* Thumbnail */}
+      <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 relative bg-muted/40">
+        {photoUrl ? (
+          <img src={photoUrl} alt={place.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center"
+               style={{ background: `rgba(124,110,247,0.10)` }}>
+            <MapPin className="w-4 h-4" style={{ color: `${ACCENT}60` }} />
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+        <p className="text-xs font-bold line-clamp-1" style={{ color: "#131b2e" }}>{place.name}</p>
+        {place.address && (
+          <p className="text-[10px] text-muted-foreground line-clamp-1">{place.address}</p>
+        )}
+        {place.rating && (
+          <div className="flex items-center gap-0.5">
+            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+            <span className="text-[10px] font-semibold text-muted-foreground">{place.rating.toFixed(1)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Save icon */}
+      <button
+        onClick={(e) => { e.stopPropagation(); if (!isSaved) onSave(); }}
+        disabled={isSaved}
+        className={`shrink-0 self-center w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+          isSaved ? "text-primary" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+        }`}
+      >
+        <Heart className={`w-4 h-4 ${isSaved ? "fill-primary" : ""}`} />
+      </button>
     </div>
   );
 }
