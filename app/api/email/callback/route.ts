@@ -5,7 +5,7 @@ import nylas, { NYLAS_CLIENT_ID } from "@/lib/nylas";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
-  const state = searchParams.get("state"); // User ID passed from connect
+  const state = searchParams.get("state");
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
 
@@ -16,33 +16,21 @@ export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Verify user matches state
   if (!user || user.id !== state) {
     return NextResponse.redirect(`${baseUrl}/?error=auth_mismatch`);
   }
 
   try {
     const redirectUri = `${baseUrl}/api/email/callback`;
-    const pkceSecret = request.headers.get("cookie")
-      ?.split("; ")
-      .find(c => c.startsWith("nylas_pkce_secret="))
-      ?.split("=")[1];
 
-    console.log("[nylas callback] clientId:", NYLAS_CLIENT_ID);
-    console.log("[nylas callback] redirectUri:", redirectUri);
-    console.log("[nylas callback] hasPkceSecret:", !!pkceSecret);
-
-    // Exchange code for token
     const tokenResponse = await nylas.auth.exchangeCodeForToken({
       clientId: NYLAS_CLIENT_ID,
       redirectUri,
       code,
-      ...(pkceSecret ? { codeVerifier: pkceSecret } : {}),
     });
 
     const { grantId, email } = tokenResponse;
 
-    // Determine provider from email domain
     let provider = "other";
     if (email?.includes("@gmail.com") || email?.includes("@googlemail.com")) {
       provider = "google";
@@ -50,7 +38,6 @@ export async function GET(request: Request) {
       provider = "microsoft";
     }
 
-    // Store the connection in database
     const { error: dbError } = await supabase
       .from("email_connections")
       .upsert({
@@ -58,7 +45,7 @@ export async function GET(request: Request) {
         grant_id: grantId,
         email: email || "",
         provider,
-        access_token: grantId, // Grant ID is used for API calls
+        access_token: grantId,
         connected_at: new Date().toISOString(),
         is_active: true,
       }, {

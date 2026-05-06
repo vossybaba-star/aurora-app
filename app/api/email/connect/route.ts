@@ -13,25 +13,12 @@ export async function GET(request: Request) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
   const redirectUri = `${baseUrl}/api/email/callback`;
 
-  console.log("[nylas connect] clientId:", NYLAS_CLIENT_ID);
-  console.log("[nylas connect] redirectUri:", redirectUri);
-  console.log("[nylas connect] apiUri:", process.env.NYLAS_API_URI);
-
-  const { secret, url } = nylas.auth.urlForOAuth2PKCE({
+  const authUrl = nylas.auth.urlForOAuth2({
     clientId: NYLAS_CLIENT_ID,
     redirectUri,
     state: user.id,
     loginHint: user.email || undefined,
   });
 
-  const response = NextResponse.redirect(url);
-  response.cookies.set("nylas_pkce_secret", secret, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    maxAge: 600,
-    path: "/",
-  });
-
-  return response;
+  return NextResponse.redirect(authUrl);
 }
