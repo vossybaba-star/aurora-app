@@ -26,6 +26,7 @@ export async function GET(request: Request) {
     redirectUri,
     state: user.id,
     loginHint: user.email || undefined,
+    accessType: "offline",
   });
 
   return NextResponse.redirect(authUrl);
