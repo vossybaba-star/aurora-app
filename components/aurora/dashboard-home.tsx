@@ -75,7 +75,9 @@ export function DashboardHome() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
+      {/* ── Left column (hero + stats) ── */}
+      <div className="lg:col-span-5 space-y-5">
       {/* Hero Panel */}
       <div className="glass-panel rounded-3xl p-5 relative overflow-hidden">
         {/* Decorative blobs */}
@@ -130,9 +132,14 @@ export function DashboardHome() {
         </div>
       </div>
 
+      </div>{/* end left column */}
+
+      {/* ── Right column (opportunity feed) ── */}
+      <div className="lg:col-span-7 space-y-3">
+
       {/* Find result */}
       {findResult && (
-        <div className={`glass-card rounded-2xl p-4 flex items-center gap-3 shimmer-ai ${findResult.count > 0 ? "" : ""}`}>
+        <div className="glass-card rounded-2xl p-4 flex items-center gap-3 shimmer-ai">
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${findResult.count > 0 ? "fluid-gradient" : "bg-muted"}`}>
             {findResult.count > 0
               ? <Sparkles className="w-4 h-4 text-white" />
@@ -194,7 +201,8 @@ export function DashboardHome() {
             )}
           </div>
         )}
-      </div>
+      </div>{/* end opportunities inner */}
+      </div>{/* end right column */}
 
       {/* Dialog */}
       <OutreachMethodDialog

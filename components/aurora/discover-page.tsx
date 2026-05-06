@@ -234,12 +234,13 @@ export function DiscoverPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header — title hidden on desktop (shown in top bar) */}
       <div className="flex items-center justify-between gap-3">
-        <div>
+        <div className="lg:hidden">
           <h1 className="text-xl font-extrabold tracking-tight">Discover</h1>
           <p className="text-xs text-muted-foreground">Find your next opportunity</p>
         </div>
+        <div className="hidden lg:block" />
         <button
           onClick={handleAISearch}
           disabled={isFinding}
@@ -318,6 +319,7 @@ export function DiscoverPage() {
       {viewMode === "grid" ? (
         <div className="space-y-3">
           {isLoadingInitial ? (
+            /* Loading */
             <div className="flex items-center justify-center py-16">
               <div className="text-center flex flex-col items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl fluid-gradient flex items-center justify-center shadow-lg shadow-primary/25">
@@ -331,9 +333,12 @@ export function DiscoverPage() {
               <p className="text-sm text-muted-foreground">
                 {searchQuery ? `${searchResults.length} results found` : `${searchResults.length} venues near ${nearbyLocation || "you"}`}
               </p>
-              {searchResults.map((place) => (
-                <DiscoverCard key={place.id} place={place} isSaved={savedIds.has(place.id)} onSave={() => handleSave(place)} />
-              ))}
+              {/* Two-column grid on desktop */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {searchResults.map((place) => (
+                  <DiscoverCard key={place.id} place={place} isSaved={savedIds.has(place.id)} onSave={() => handleSave(place)} />
+                ))}
+              </div>
               <div ref={loadMoreRef} className="py-4 flex flex-col items-center gap-2">
                 {isLoadingMore && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -352,15 +357,13 @@ export function DiscoverPage() {
               </div>
             </>
           ) : !isSearching ? (
-            <Card className="border-dashed">
-              <CardContent className="p-8 text-center">
-                <MapPin className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-                <h3 className="font-semibold mb-2">No Venues Found</h3>
-                <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                  Try searching manually or update your location in your profile.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="glass-panel rounded-3xl p-8 text-center">
+              <MapPin className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
+              <h3 className="font-semibold mb-2" style={{ color:"#131b2e" }}>No Venues Found</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                Try searching or update your location in your profile.
+              </p>
+            </div>
           ) : null}
         </div>
       ) : (
