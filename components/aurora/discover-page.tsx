@@ -266,7 +266,8 @@ export function DiscoverPage() {
   // Called by DiscoverCard after a successful save
   const handleSaved = useCallback((placeId: string) => {
     setSavedIds((prev) => new Set([...prev, placeId]));
-    refreshData().catch(() => {});
+    // Silent refresh — don't show the global loading spinner which would unmount DiscoverPage
+    refreshData(true).catch(() => {});
   }, [refreshData]);
 
   // Background Instagram handle fetch — Firecrawl only, no Claude (skip_ai=true).
@@ -660,6 +661,7 @@ function DiscoverCard({
           photoReference: place.photoReference,
           website:        place.website,
           source:         "manual_search",
+          status:         "outreach_ready",
           liked:          true,
           // Pass signal score so priority is derived correctly
           signalScore:    result?.signal_score ?? null,
@@ -1030,6 +1032,7 @@ function DiscoverCardCompact({
           photoReference: place.photoReference,
           website:        place.website,
           source:         "manual_search",
+          status:         "outreach_ready",
           liked:          true,
         }),
       });

@@ -25,7 +25,7 @@ interface AuroraContextType {
   setOnboardingStep: (step: number) => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  refreshData: () => Promise<void>;
+  refreshData: (silent?: boolean) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -54,10 +54,10 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
   const [activeTab, setActiveTab] = useState("home");
   const [isLoading, setIsLoading] = useState(false);
 
-  const refreshData = async () => {
+  const refreshData = async (silent = false) => {
     if (!userId) return;
-    
-    setIsLoading(true);
+
+    if (!silent) setIsLoading(true);
     try {
       const [profileRes, oppsRes, msgsRes, tasksRes] = await Promise.all([
         fetch("/api/profile").then(r => r.json()),
