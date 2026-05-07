@@ -110,7 +110,7 @@ export async function GET(req: Request) {
   // ── Nurture sequence: send due steps ─────────────────────────────────────
   let nurturesSent = 0;
 
-  if (process.env.NYLAS_API_KEY && process.env.NYLAS_GRANT_ID) {
+  if (process.env.NYLAS_API_KEY) {
     const now = new Date().toISOString();
 
     // Step 2: due today
@@ -154,17 +154,32 @@ export async function GET(req: Request) {
 
       if (!contact?.email || contact.unsubscribed_at) return false;
 
-      // Load user profile for from address
+      // Load user's Nylas grant from email_connections
+      const { data: emailConn } = await service
+        .from("email_connections")
+        .select("grant_id, email")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (!emailConn?.grant_id) {
+        console.warn(`[nightly-enrichment] No active email connection for user ${userId} — skipping nurture`);
+        return false;
+      }
+
+      // Load user profile for display name
       const { data: profile } = await service
         .from("profiles")
-        .select("email, business_name")
+        .select("business_name")
         .eq("id", userId)
         .single();
 
-      // Send via Nylas
+      const nylasApiUri = process.env.NYLAS_API_URI ?? "https://api.us.nylas.com";
+
+      // Send via Nylas using the user's own grant ID
       try {
         const res = await fetch(
-          `https://api.us.nylas.com/v3/grants/${process.env.NYLAS_GRANT_ID}/messages/send`,
+          `${nylasApiUri}/v3/grants/${emailConn.grant_id}/messages/send`,
           {
             method:  "POST",
             headers: {
@@ -175,8 +190,8 @@ export async function GET(req: Request) {
               subject,
               body,
               to: [{ name: contact.name, email: contact.email }],
-              from: profile?.email
-                ? [{ name: profile.business_name ?? "Aurora", email: profile.email }]
+              from: emailConn.email
+                ? [{ name: profile?.business_name ?? "Aurora", email: emailConn.email }]
                 : undefined,
             }),
           }
