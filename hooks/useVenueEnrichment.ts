@@ -36,6 +36,8 @@ export interface VenueEnrichmentResult {
   score_breakdown:   Record<string, number>;
   ai_analysis:       VenueAiAnalysis;
   instagram_handle?: string | null;
+  contact_email?:    string | null;
+  contact_form_url?: string | null;
   website_crawled?:  boolean;
   duration_ms?:      number;
 }

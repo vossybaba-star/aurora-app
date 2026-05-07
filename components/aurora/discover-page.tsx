@@ -29,6 +29,10 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
+  Mail,
+  FileText,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useVenueEnrichment } from "@/hooks/useVenueEnrichment";
 import type { VenueEnrichmentResult } from "@/hooks/useVenueEnrichment";
@@ -896,6 +900,11 @@ function VenueAnalysisPanel({
 }) {
   const ai = result.ai_analysis;
   const score = result.signal_score;
+  const [copiedEmail, setCopiedEmail] = useState(false);
+
+  // Prefer top-level fields (regex-extracted), fall back to Claude's ai_analysis
+  const contactEmail   = result.contact_email   ?? ai.contact_email   ?? null;
+  const contactFormUrl = result.contact_form_url ?? null;
 
   const scoreBadge =
     score >= 70
@@ -920,6 +929,57 @@ function VenueAnalysisPanel({
           <span className="text-[10px] text-muted-foreground">{scoreBadge.label}</span>
         </div>
       </div>
+
+      {/* Contact intel — email and/or enquiry form found on their website */}
+      {(contactEmail || contactFormUrl) && (
+        <div className="rounded-xl p-2.5 space-y-1.5" style={{ background: 'rgba(124,110,247,0.06)', border: '1px solid rgba(124,110,247,0.15)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: accent }}>
+            Contact found
+          </p>
+          {contactEmail && (
+            <div className="flex items-center gap-2 group">
+              <Mail className="w-3 h-3 shrink-0" style={{ color: accent }} />
+              <a
+                href={`mailto:${contactEmail}`}
+                className="text-xs font-medium flex-1 truncate hover:underline"
+                style={{ color: '#131b2e' }}
+                onClick={e => e.stopPropagation()}
+              >
+                {contactEmail}
+              </a>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(contactEmail).catch(() => {});
+                  setCopiedEmail(true);
+                  setTimeout(() => setCopiedEmail(false), 2000);
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded"
+              >
+                {copiedEmail
+                  ? <Check className="w-3 h-3 text-green-500" />
+                  : <Copy className="w-3 h-3 text-muted-foreground" />}
+              </button>
+            </div>
+          )}
+          {contactFormUrl && (
+            <div className="flex items-center gap-2">
+              <FileText className="w-3 h-3 shrink-0 text-amber-500" />
+              <a
+                href={contactFormUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium hover:underline"
+                style={{ color: '#131b2e' }}
+                onClick={e => e.stopPropagation()}
+              >
+                Enquiry form
+              </a>
+              <ExternalLink className="w-3 h-3 text-muted-foreground shrink-0" />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Exclusive photographer warning */}
       {ai.has_exclusive_photographer && (

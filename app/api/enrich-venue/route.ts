@@ -18,6 +18,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { extractEmailRegex, extractContactFormRegex } from "@/lib/venues/extractContact";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -154,12 +155,16 @@ export async function POST(req: Request) {
   if (opportunity?.last_enriched_at && opportunity?.ai_analysis) {
     const ageMs = Date.now() - new Date(opportunity.last_enriched_at).getTime();
     if (ageMs < 48 * 60 * 60 * 1000) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const opp = opportunity as any;
       return NextResponse.json({
         status:           "cached",
-        signal_score:     opportunity.signal_score ?? 0,
-        score_breakdown:  opportunity.score_breakdown ?? {},
-        ai_analysis:      opportunity.ai_analysis,
-        instagram_handle: (opportunity as any).instagram_handle ?? null,
+        signal_score:     opp.signal_score ?? 0,
+        score_breakdown:  opp.score_breakdown ?? {},
+        ai_analysis:      opp.ai_analysis,
+        instagram_handle: opp.instagram_handle ?? null,
+        contact_email:    opp.contact_email ?? opp.ai_analysis?.contact_email ?? null,
+        contact_form_url: opp.contact_form_url ?? null,
       });
     }
   }
@@ -234,6 +239,10 @@ export async function POST(req: Request) {
       console.warn("[enrich-venue] Firecrawl scrape failed (non-fatal):", err);
     }
   }
+
+  // ── Regex contact extraction (fast, free) ────────────────────────────────
+  const { email: regexEmail } = extractEmailRegex(websiteMarkdown);
+  const { url: regexFormUrl } = extractContactFormRegex(websiteMarkdown, websiteToScrape ?? undefined);
 
   // ── skip_ai mode: return Instagram handle only, no Claude analysis ──────────
   // Used by the Discover page to populate Instagram handles on tiles without
@@ -482,12 +491,19 @@ Return ONLY this JSON (all fields required):
   }
 
   // ── Return result ─────────────────────────────────────────────────────────
+  // Prefer regex-extracted values (exact strings from the page) over Claude's
+  // best-guess extraction stored in ai_analysis.
+  const finalEmail   = regexEmail   ?? aiAnalysis?.contact_email   ?? null;
+  const finalFormUrl = regexFormUrl ?? null;
+
   return NextResponse.json({
     status:            "complete",
     signal_score,
     score_breakdown,
     ai_analysis:       aiAnalysis,
     instagram_handle:  instagramHandle,
+    contact_email:     finalEmail,
+    contact_form_url:  finalFormUrl,
     website_crawled:   firecrawlSuccess,
     duration_ms:       durationMs,
   });
