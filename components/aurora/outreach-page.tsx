@@ -1346,10 +1346,16 @@ function TemplatesModal({ onClose }: { onClose: () => void }) {
    Main Outreach Page
 ════════════════════════════════════════════════ */
 export function OutreachPage() {
-  const { opportunities, outreachMessages, followUpTasks, refreshData } = useAurora();
+  const { opportunities, outreachMessages, followUpTasks, refreshData, outreachStage, goToOutreachStage } = useAurora();
 
-  // Pipeline stage
-  const [activeStage, setActiveStage] = useState<PipelineStage>('sent');
+  // Pipeline stage — seeded from context so metric-card nav can pre-select a tab
+  const [activeStage, setActiveStage] = useState<PipelineStage>(outreachStage as PipelineStage ?? 'sent');
+
+  // Reset context stage after mount so future direct visits default to 'sent'
+  useEffect(() => {
+    goToOutreachStage('sent');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Selected contact (desktop right pane / mobile full-screen)
   const [selectedSequence, setSelectedSequence] = useState<OutreachSequence | null>(null);

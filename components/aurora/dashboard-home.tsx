@@ -66,15 +66,23 @@ function MetricCard({
   sub,
   highlight = false,
   trend,
+  onClick,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   highlight?: boolean;
   trend?: number;          // positive = up, negative = down
+  onClick?: () => void;
 }) {
   return (
-    <div className="glass-card rounded-2xl p-4 flex flex-col gap-1.5 border border-white/60">
+    <div
+      className={`glass-card rounded-2xl p-4 flex flex-col gap-1.5 border border-white/60 ${onClick ? "cursor-pointer transition-transform hover:scale-[1.02] hover:shadow-md active:scale-[0.99]" : ""}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+    >
       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none">
         {label}
       </p>
@@ -100,6 +108,11 @@ function MetricCard({
           style={{ color: highlight && (typeof value === "number" ? value > 0 : parseInt(value) > 0) ? "#fca5a5" : undefined }}
         >
           <span className="text-muted-foreground">{sub}</span>
+        </p>
+      )}
+      {onClick && (
+        <p className="text-[10px] font-semibold mt-0.5" style={{ color: ACCENT }}>
+          View →
         </p>
       )}
     </div>
@@ -293,7 +306,7 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
    Main Dashboard Home
 ═══════════════════════════════════════════════ */
 export function DashboardHome() {
-  const { setActiveTab, profile, opportunities, refreshData, goToProfileSection } = useAurora();
+  const { setActiveTab, profile, opportunities, refreshData, goToProfileSection, goToOutreachStage } = useAurora();
 
   const [selectedOpp,          setSelectedOpp]          = useState<Opportunity | null>(null);
   const [viewingOpp,            setViewingOpp]            = useState<Opportunity | null>(null);
@@ -425,13 +438,7 @@ export function DashboardHome() {
                 : "You're all caught up — ready to find new leads"}
             </p>
           </div>
-          <span
-            className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold shimmer-ai glass-card"
-            style={{ color: ACCENT }}
-          >
-            <Sparkles className="w-3 h-3" style={{ fill: ACCENT }} />
-            Daily Insight
-          </span>
+          {/* TODO: Daily Insight — wire to AI-generated briefing modal (top 3 actions) */}
         </div>
 
         {/* ── Connect email banner — shown only when email is not connected ── */}
@@ -472,6 +479,7 @@ export function DashboardHome() {
             value={sentThisWeek}
             trend={sentTrend}
             sub={sentLastWeek > 0 ? `vs ${sentLastWeek} last week` : "Your first reply is one send away"}
+            onClick={() => goToOutreachStage("sent")}
           />
           <MetricCard
             label="Response rate"
@@ -481,12 +489,14 @@ export function DashboardHome() {
                 ? `${totalReplied} ${totalReplied === 1 ? "reply" : "replies"} received`
                 : "Replies will show here"
             }
+            onClick={() => goToOutreachStage("replied")}
           />
           <MetricCard
             label="Follow-ups due"
             value={totalFollowUps}
             highlight={totalFollowUps > 0}
             sub={overdueCount > 0 ? `${overdueCount} overdue` : "All up to date"}
+            onClick={() => goToOutreachStage("sent")}
           />
           <MetricCard
             label="New leads found"
@@ -496,6 +506,7 @@ export function DashboardHome() {
                 ? `${readyToContact} ready to contact`
                 : "Discover more leads"
             }
+            onClick={() => setActiveTab("discover")}
           />
         </div>
       </div>

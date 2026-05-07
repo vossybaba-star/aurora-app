@@ -29,6 +29,8 @@ interface AuroraContextType {
   profileSection: string;
   goToProfileHome: () => void;
   goToProfileSection: (section: string) => void;
+  outreachStage: string;
+  goToOutreachStage: (stage: string) => void;
   refreshData: (silent?: boolean) => Promise<void>;
   isLoading: boolean;
 }
@@ -58,6 +60,7 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
   const [activeTab, setActiveTab] = useState("home");
   const [profileNavKey, setProfileNavKey] = useState(0);
   const [profileSection, setProfileSection] = useState("my-profile");
+  const [outreachStage, setOutreachStage] = useState("sent");
   const [isLoading, setIsLoading] = useState(false);
 
   // Navigate to Account > My Profile, forcing a fresh mount even if already on the tab
@@ -72,6 +75,12 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
     setProfileSection(section);
     setActiveTab("profile");
     setProfileNavKey(k => k + 1);
+  };
+
+  // Navigate to the Outreach page at a specific pipeline stage
+  const goToOutreachStage = (stage: string) => {
+    setOutreachStage(stage);
+    setActiveTab("outreach");
   };
 
   const refreshData = async (silent = false) => {
@@ -159,6 +168,8 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
         profileSection,
         goToProfileHome,
         goToProfileSection,
+        outreachStage,
+        goToOutreachStage,
         refreshData,
         isLoading,
       }}
