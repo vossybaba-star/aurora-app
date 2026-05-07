@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { useVenueEnrichment } from "@/hooks/useVenueEnrichment";
 import type { VenueEnrichmentResult } from "@/hooks/useVenueEnrichment";
+import { CompanyCard } from "@/components/discover/CompanyCard";
+import type { ApolloCompany } from "@/lib/apollo";
 
 /* ─── Constants ──────────────────────────────── */
 const ACCENT  = "#7c6ef7";
@@ -167,6 +169,9 @@ export function DiscoverPage() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [lastTextQuery, setLastTextQuery] = useState<string | null>(null);
   const [igMap, setIgMap] = useState<Map<string, string>>(new Map());
+  const [apolloCompanies,      setApolloCompanies]      = useState<ApolloCompany[]>([]);
+  const [savedApolloIds,       setSavedApolloIds]       = useState(new Set<string>());
+  const [isLoadingApollo,      setIsLoadingApollo]      = useState(false);
   const toastCounter = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -214,6 +219,31 @@ export function DiscoverPage() {
     };
     load();
   }, []);
+
+  // Load Apollo companies for MUA / startup personas
+  useEffect(() => {
+    const persona = getPersona(profile?.businessType);
+    if (persona !== "mua" && persona !== "startup") return;
+    const apolloPersona = persona === "mua" ? "makeup_artist" : "startup_founder";
+    let cancelled = false;
+    const load = async () => {
+      setIsLoadingApollo(true);
+      try {
+        const res = await fetch("/api/apollo/companies", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ persona: apolloPersona, location: profile?.location }),
+        });
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setApolloCompanies(data.companies ?? []);
+        }
+      } catch { /* non-fatal */ }
+      finally { if (!cancelled) setIsLoadingApollo(false); }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [profile?.businessType, profile?.location]);
 
   // Infinite scroll
   useEffect(() => {
@@ -305,6 +335,11 @@ export function DiscoverPage() {
   const handleSaved = useCallback((placeId: string) => {
     setSavedIds((prev) => new Set([...prev, placeId]));
     // Silent refresh — don't show the global loading spinner which would unmount DiscoverPage
+    refreshData(true).catch(() => {});
+  }, [refreshData]);
+
+  const handleApolloSaved = useCallback((companyId: string) => {
+    setSavedApolloIds((prev) => new Set([...prev, companyId]));
     refreshData(true).catch(() => {});
   }, [refreshData]);
 
@@ -536,27 +571,67 @@ export function DiscoverPage() {
               </p>
 
               {/* Responsive card grid: 1 col mobile / 2 col tablet / 3 col desktop */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {sortedResults.map((place) => (
-                  <DiscoverCard
-                    key={place.id}
-                    place={place}
-                    isSaved={savedIds.has(place.id)}
-                    savedInstagram={savedInstagramMap.get(place.id) ?? null}
-                    igHandle={igMap.get(place.id) ?? null}
-                    onSaved={handleSaved}
-                    onToast={showToast}
-                    selectedType={selectedType}
-                    isExpanded={expandedPlaceId === place.id}
-                    onToggle={() =>
-                      setExpandedPlaceId(
-                        expandedPlaceId === place.id ? null : place.id
-                      )
-                    }
-                    onScoreReady={handleScoreReady}
-                  />
-                ))}
-              </div>
+              {(() => {
+                const persona = getPersona(profile?.businessType);
+                const useApollo = persona === "mua" || persona === "startup";
+                if (useApollo) {
+                  const apolloPersona = persona === "mua" ? "makeup_artist" : "startup_founder";
+                  if (isLoadingApollo) {
+                    return (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Finding companies…
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (apolloCompanies.length === 0) {
+                    return (
+                      <div className="glass-panel rounded-3xl p-8 text-center">
+                        <p className="text-sm text-muted-foreground">No companies found. Try a different search.</p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {apolloCompanies.map((company) => (
+                        <CompanyCard
+                          key={company.id}
+                          company={company}
+                          persona={apolloPersona}
+                          isSaved={savedApolloIds.has(company.id)}
+                          onSaved={handleApolloSaved}
+                          onToast={showToast}
+                        />
+                      ))}
+                    </div>
+                  );
+                }
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {sortedResults.map((place) => (
+                      <DiscoverCard
+                        key={place.id}
+                        place={place}
+                        isSaved={savedIds.has(place.id)}
+                        savedInstagram={savedInstagramMap.get(place.id) ?? null}
+                        igHandle={igMap.get(place.id) ?? null}
+                        onSaved={handleSaved}
+                        onToast={showToast}
+                        selectedType={selectedType}
+                        isExpanded={expandedPlaceId === place.id}
+                        onToggle={() =>
+                          setExpandedPlaceId(
+                            expandedPlaceId === place.id ? null : place.id
+                          )
+                        }
+                        onScoreReady={handleScoreReady}
+                      />
+                    ))}
+                  </div>
+                );
+              })()}
 
               {/* Infinite scroll sentinel + load more button */}
               <div ref={loadMoreRef} className="py-4 flex flex-col items-center gap-2">
