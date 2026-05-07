@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAurora } from "./aurora-app";
-import { createOutreachMessage, markMessageAsSent, updateOpportunity } from "@/lib/actions";
+import { createOutreachMessage, markMessageAsSent, updateOpportunity, createOpportunity } from "@/lib/actions";
 import { typeLabels, contactMethodLabels, statusLabels } from "@/lib/types";
 import type { Opportunity, OutreachMessage, ContactMethod, ContactMethodType, FollowUpTask } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
@@ -113,11 +113,11 @@ function PipelineStrip({
   active: PipelineStage;
   onChange: (s: PipelineStage) => void;
 }) {
-  const stages: { id: PipelineStage; label: string }[] = [
-    { id: 'ready',   label: 'Ready'   },
-    { id: 'sent',    label: 'Sent'    },
-    { id: 'replied', label: 'Replied' },
-    { id: 'won',     label: 'Won'     },
+  const stages: { id: PipelineStage; label: string; desc: string }[] = [
+    { id: 'ready',   label: 'Ready',   desc: 'Drafted, waiting to send' },
+    { id: 'sent',    label: 'Sent',    desc: 'Awaiting reply'           },
+    { id: 'replied', label: 'Replied', desc: 'They got back to you'     },
+    { id: 'won',     label: 'Won',     desc: 'Booking confirmed'        },
   ];
 
   return (
@@ -128,22 +128,30 @@ function PipelineStrip({
           <div key={stage.id} className="flex items-center flex-1">
             <button
               onClick={() => onChange(stage.id)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-sm font-bold transition-all duration-200"
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-2 rounded-xl text-sm font-bold transition-all duration-200"
               style={isActive ? {
                 background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
                 color: '#fff',
                 boxShadow: `0 4px 14px rgba(124,110,247,0.3)`,
               } : { color: '#6b7280' }}
             >
-              <span className="hidden sm:inline">{stage.label}</span>
-              <span className="sm:hidden text-xs">{stage.label.slice(0, 3)}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="hidden sm:inline">{stage.label}</span>
+                <span className="sm:hidden text-xs">{stage.label.slice(0, 3)}</span>
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
+                  style={isActive
+                    ? { background: 'rgba(255,255,255,0.25)', color: '#fff' }
+                    : { background: 'rgba(0,0,0,0.06)', color: '#6b7280' }}
+                >
+                  {counts[stage.id]}
+                </span>
+              </div>
               <span
-                className="text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
-                style={isActive
-                  ? { background: 'rgba(255,255,255,0.25)', color: '#fff' }
-                  : { background: 'rgba(0,0,0,0.06)', color: '#6b7280' }}
+                className="hidden sm:block text-[9px] font-medium leading-tight text-center"
+                style={{ opacity: isActive ? 0.8 : 0.5 }}
               >
-                {counts[stage.id]}
+                {stage.desc}
               </span>
             </button>
             {i < stages.length - 1 && (
@@ -1360,6 +1368,13 @@ export function OutreachPage() {
   // Selected contact (desktop right pane / mobile full-screen)
   const [selectedSequence, setSelectedSequence] = useState<OutreachSequence | null>(null);
 
+  // Add-contact inline form state (left panel)
+  const [showAddContact, setShowAddContact]   = useState(false);
+  const [addName,        setAddName]          = useState("");
+  const [addEmail,       setAddEmail]         = useState("");
+  const [addType,        setAddType]          = useState("venue");
+  const [isAdding,       setIsAdding]         = useState(false);
+
   // Templates modal
   const [showTemplates, setShowTemplates] = useState(false);
 
@@ -1417,6 +1432,15 @@ export function OutreachPage() {
 
   const activeList: OutreachSequence[] = stageMap[activeStage];
 
+  // Auto-select first contact when the list gains its first item (async data load)
+  // Tab-change auto-select is handled inline in the PipelineStrip onChange below
+  useEffect(() => {
+    if (!selectedSequence && activeList.length > 0) {
+      setSelectedSequence(activeList[0]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeList.length]);
+
   const handleRefresh = async () => {
     await refreshData();
     if (selectedSequence) {
@@ -1428,6 +1452,34 @@ export function OutreachPage() {
           followUps: (followUpTasks || []).filter(f => f.opportunityId === updated.id),
         } : null);
       }
+    }
+  };
+
+  const handleAddContact = async () => {
+    if (!addName.trim()) return;
+    setIsAdding(true);
+    try {
+      const result = await createOpportunity({
+        name: addName.trim(),
+        type: addType,
+        status: "outreach_ready",
+        source: "manual",
+        contactMethods: addEmail.trim()
+          ? [{ type: "email", value: addEmail.trim(), isPrimary: true }]
+          : [],
+      });
+      if (result.success) {
+        setAddName(""); setAddEmail(""); setAddType("venue");
+        setShowAddContact(false);
+        // Switch to Ready tab so the new contact is visible
+        setActiveStage("ready");
+        await refreshData();
+        toast.success(`${addName.trim()} added to Ready`);
+      } else {
+        toast.error(result.error ?? "Failed to add contact");
+      }
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -1451,7 +1503,12 @@ export function OutreachPage() {
         {/* ── Pipeline strip + Templates ── */}
         <div className="flex items-center gap-3">
           <div className="flex-1 min-w-0">
-            <PipelineStrip counts={counts} active={activeStage} onChange={s => { setActiveStage(s); setSelectedSequence(null); }} />
+            <PipelineStrip counts={counts} active={activeStage} onChange={s => {
+              setActiveStage(s);
+              setShowAddContact(false);
+              // Auto-select first contact in the new tab immediately
+              setSelectedSequence(stageMap[s][0] ?? null);
+            }} />
           </div>
           <button
             onClick={() => setShowTemplates(true)}
@@ -1471,11 +1528,62 @@ export function OutreachPage() {
 
           {/* Left pane — contact list */}
           <div className="w-[350px] shrink-0 border-r border-white/30 flex flex-col">
-            <div className="px-4 py-3 border-b border-white/20 shrink-0">
+            {/* Header row */}
+            <div className="px-4 py-3 border-b border-white/20 shrink-0 flex items-center justify-between gap-2">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                {activeList.length} message{activeList.length !== 1 ? 's' : ''} sent
+                {activeList.length} contact{activeList.length !== 1 ? 's' : ''}
               </p>
+              <button
+                onClick={() => setShowAddContact(v => !v)}
+                className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors"
+                style={showAddContact
+                  ? { background: `rgba(124,110,247,0.12)`, color: ACCENT }
+                  : { color: ACCENT }}
+              >
+                {showAddContact ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                {showAddContact ? "Cancel" : "Add contact"}
+              </button>
             </div>
+
+            {/* Inline add-contact form */}
+            {showAddContact && (
+              <div className="px-4 py-3 border-b border-white/20 shrink-0 space-y-2">
+                <input
+                  value={addName}
+                  onChange={e => setAddName(e.target.value)}
+                  placeholder="Name *"
+                  className="w-full text-sm rounded-xl px-3 py-2 border border-white/50 bg-white/60 outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground/50"
+                />
+                <input
+                  value={addEmail}
+                  onChange={e => setAddEmail(e.target.value)}
+                  placeholder="Email"
+                  type="email"
+                  className="w-full text-sm rounded-xl px-3 py-2 border border-white/50 bg-white/60 outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground/50"
+                />
+                <select
+                  value={addType}
+                  onChange={e => setAddType(e.target.value)}
+                  className="w-full text-sm rounded-xl px-3 py-2 border border-white/50 bg-white/60 outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 text-foreground"
+                >
+                  <option value="venue">Venue</option>
+                  <option value="wedding_planner">Wedding Planner</option>
+                  <option value="event_organiser">Event Organiser</option>
+                  <option value="agency">Agency</option>
+                  <option value="brand">Brand</option>
+                  <option value="other">Other</option>
+                </select>
+                <button
+                  onClick={handleAddContact}
+                  disabled={!addName.trim() || isAdding}
+                  className="w-full rounded-xl py-2 text-sm font-bold text-white disabled:opacity-40 flex items-center justify-center gap-1.5"
+                  style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
+                >
+                  {isAdding ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Adding…</> : "Add to Ready"}
+                </button>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto">
               {activeList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full p-6 text-center">
