@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         type:            body.type || "venue",
         location:        body.location || null,
         description:     body.description || null,
-        why_good_fit:    body.whyGoodFit || null,
+        why_good_fit:    body.whyGoodFit || "",
         status:          body.status || "new",
         priority,
         tags:            body.tags || [],
