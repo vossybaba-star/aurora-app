@@ -9,7 +9,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   discover: { title: "Discover",      subtitle: "Search and discover new opportunities" },
   outreach: { title: "Outreach",      subtitle: "Your messages and follow-ups" },
   saved:    { title: "Relationships", subtitle: "Your saved contacts and leads" },
-  profile:  { title: "Account",       subtitle: "Manage your profile and settings" },
+  profile:  { title: "Settings",      subtitle: "Your profile and preferences" },
 };
 
 export function DashboardHeader() {
