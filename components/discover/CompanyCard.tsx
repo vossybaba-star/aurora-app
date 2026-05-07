@@ -11,8 +11,8 @@ import {
   UserRound,
 } from "lucide-react";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
-import { useVenueEnrichment }  from "@/hooks/useVenueEnrichment";
-import type { VenueEnrichmentResult } from "@/hooks/useVenueEnrichment";
+import { useCompanyEnrichment } from "@/hooks/useCompanyEnrichment";
+import type { CompanyScoreResult } from "@/hooks/useCompanyEnrichment";
 
 /* ─── Constants ───────────────────────────────────────────────── */
 const ACCENT  = "#7c6ef7";
@@ -28,9 +28,9 @@ function initials(name: string): string {
 }
 
 function scoreBadge(score: number) {
-  if (score >= 70) return { label: "Strong lead",    bg: "rgba(22,163,74,0.12)",  color: "#16a34a" };
-  if (score >= 40) return { label: "Moderate",       bg: "rgba(234,179,8,0.12)",  color: "#ca8a04" };
-  return              { label: "Speculative",         bg: "rgba(107,114,128,0.1)", color: "#6b7280" };
+  if (score >= 70) return { label: "Strong lead", bg: "rgba(22,163,74,0.12)",  color: "#16a34a" };
+  if (score >= 40) return { label: "Good lead",   bg: "rgba(234,179,8,0.12)",  color: "#ca8a04" };
+  return              { label: "Weak lead",        bg: "rgba(107,114,128,0.1)", color: "#6b7280" };
 }
 
 /* ─── AvatarPill ──────────────────────────────────────────────── */
@@ -119,33 +119,45 @@ function ContactsSkeleton() {
   );
 }
 
-/* ─── VenueAnalysisPanel (minimal inline version) ─────────────── */
-function InlineAnalysisPanel({ result, accent }: { result: VenueEnrichmentResult; accent: string }) {
-  const ai    = result.ai_analysis;
-  const score = result.signal_score;
-  const badge = scoreBadge(score);
+/* ─── InlineAnalysisPanel ─────────────────────────────────────── */
+function InlineAnalysisPanel({ result, accent }: { result: CompanyScoreResult; accent: string }) {
+  const badge = scoreBadge(result.score);
 
   return (
     <div className="space-y-2 text-xs">
+      {/* Score + label */}
       <div className="flex items-center gap-2">
-        <span className="font-bold text-sm" style={{ color: badge.color }}>{score}/100</span>
+        <span className="font-bold text-sm" style={{ color: badge.color }}>{result.score}/100</span>
         <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold"
-              style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
+              style={{ background: badge.bg, color: badge.color }}>{result.score_label}</span>
       </div>
-      {ai.why_good_lead && (
-        <p className="text-muted-foreground leading-relaxed">{ai.why_good_lead}</p>
+
+      {/* Why good — bullet list */}
+      {result.why_good.length > 0 && (
+        <ul className="space-y-0.5 text-muted-foreground leading-relaxed list-none">
+          {result.why_good.map((point, i) => (
+            <li key={i} className="flex items-start gap-1.5">
+              <span style={{ color: badge.color }} className="mt-0.5 shrink-0">•</span>
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
       )}
-      {ai.why_bad_lead && (
+
+      {/* Caution */}
+      {result.caution && (
         <p className="text-[10px] font-medium px-2 py-1.5 rounded-lg"
            style={{ background: "rgba(234,179,8,0.08)", color: "#b45309", borderLeft: "2px solid #fcd34d" }}>
-          {ai.why_bad_lead}
+          {result.caution}
         </p>
       )}
-      {ai.recommended_angle && (
+
+      {/* Suggested angle */}
+      {result.suggested_angle && (
         <div className="px-2 py-1.5 rounded-lg"
-             style={{ background: `rgba(124,110,247,0.06)`, borderLeft: `2px solid ${accent}40` }}>
+             style={{ background: "rgba(124,110,247,0.06)", borderLeft: `2px solid ${accent}40` }}>
           <p className="text-[10px] font-semibold mb-0.5" style={{ color: accent }}>Suggested angle</p>
-          <p className="text-muted-foreground">{ai.recommended_angle}</p>
+          <p className="text-muted-foreground">{result.suggested_angle}</p>
         </div>
       )}
     </div>
@@ -156,14 +168,21 @@ function InlineAnalysisPanel({ result, accent }: { result: VenueEnrichmentResult
    CompanyCard — Apollo-sourced lead card for MUA / startup personas
 ═══════════════════════════════════════════════════════════════ */
 export interface CompanyCardProps {
-  company:   ApolloCompany;
-  persona:   "makeup_artist" | "startup_founder";
-  isSaved:   boolean;
-  onSaved:   (companyId: string) => void;
-  onToast:   (message: string, icon?: "sparkles" | "check") => void;
+  company:             ApolloCompany;
+  persona:             "makeup_artist" | "startup_founder";
+  isSaved:             boolean;
+  onSaved:             (companyId: string) => void;
+  onToast:             (message: string, icon?: "sparkles" | "check") => void;
+  userProfession:      string;
+  userAbout:           string;
+  userSpecialityTags:  string[];
+  userLocation:        string;
 }
 
-export function CompanyCard({ company, persona, isSaved, onSaved, onToast }: CompanyCardProps) {
+export function CompanyCard({
+  company, persona, isSaved, onSaved, onToast,
+  userProfession, userAbout, userSpecialityTags, userLocation,
+}: CompanyCardProps) {
 
   /* ── Contacts state ─────────────────────────────────────────── */
   const [people,          setPeople]          = useState<ApolloPerson[]>([]);
@@ -174,7 +193,7 @@ export function CompanyCard({ company, persona, isSaved, onSaved, onToast }: Com
 
   /* ── Enrichment / expand state ──────────────────────────────── */
   const [isExpanded, setIsExpanded]  = useState(false);
-  const { enrichVenue, enriching, result } = useVenueEnrichment();
+  const { enrichCompany, enriching, result } = useCompanyEnrichment();
 
   /* ── Load contacts on mount ─────────────────────────────────── */
   useEffect(() => {
@@ -204,8 +223,16 @@ export function CompanyCard({ company, persona, isSaved, onSaved, onToast }: Com
 
   /* ── Enrichment on expand ───────────────────────────────────── */
   useEffect(() => {
-    if (isExpanded && !result && !enriching && company.website_url) {
-      enrichVenue(company.id, company.website_url, company.name);
+    if (isExpanded && !result && !enriching) {
+      enrichCompany(
+        company.id,
+        company,
+        people,
+        userProfession,
+        userAbout,
+        userSpecialityTags,
+        userLocation,
+      );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExpanded]);
@@ -243,8 +270,8 @@ export function CompanyCard({ company, persona, isSaved, onSaved, onToast }: Com
   }, [company, persona, saved, onSaved, onToast, connectingId]);
 
   /* ── Derived ────────────────────────────────────────────────── */
-  const domain  = company.primary_domain ?? (company.website_url ? new URL(company.website_url).hostname.replace(/^www\./, "") : null);
-  const hasScore = result?.signal_score != null;
+  const domain   = company.primary_domain ?? (company.website_url ? new URL(company.website_url).hostname.replace(/^www\./, "") : null);
+  const hasScore = result?.score != null;
 
   return (
     <div
@@ -266,11 +293,11 @@ export function CompanyCard({ company, persona, isSaved, onSaved, onToast }: Com
               </p>
               {/* Score badge — shown once enrichment completes */}
               {hasScore && (() => {
-                const b = scoreBadge(result!.signal_score);
+                const b = scoreBadge(result!.score);
                 return (
                   <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md"
                         style={{ background: b.bg, color: b.color }}>
-                    {result!.signal_score}/100
+                    {result!.score}/100
                   </span>
                 );
               })()}
@@ -400,9 +427,6 @@ export function CompanyCard({ company, persona, isSaved, onSaved, onToast }: Com
           )}
           {result && !enriching && (
             <InlineAnalysisPanel result={result} accent={ACCENT} />
-          )}
-          {!enriching && !result && !company.website_url && (
-            <p className="text-[11px] text-muted-foreground">No website URL — enrichment unavailable.</p>
           )}
         </div>
       )}

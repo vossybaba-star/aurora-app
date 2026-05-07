@@ -603,6 +603,10 @@ export function DiscoverPage() {
                           isSaved={savedApolloIds.has(company.id)}
                           onSaved={handleApolloSaved}
                           onToast={showToast}
+                          userProfession={profile?.businessType ?? ""}
+                          userAbout={profile?.pitch ?? ""}
+                          userSpecialityTags={profile?.specialityTags ?? []}
+                          userLocation={profile?.location ?? ""}
                         />
                       ))}
                     </div>
