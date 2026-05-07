@@ -20,6 +20,23 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { extractEmailRegex, extractContactFormRegex } from "@/lib/venues/extractContact";
 
+// ─── Shared Instagram handle extractor ───────────────────────────────────────
+
+const IG_NON_HANDLES = new Set([
+  "p", "reel", "reels", "stories", "explore", "accounts",
+  "tv", "ar", "about", "legal", "privacy", "help", "direct",
+]);
+
+function extractIgHandleFromText(text: string): string | null {
+  const match = text.match(
+    /instagram\.com\/([a-zA-Z0-9][a-zA-Z0-9_.]{1,29})(?:[\s/?#"')\]]|$)/
+  );
+  if (!match) return null;
+  const candidate = match[1].replace(/\.$/, "");
+  if (IG_NON_HANDLES.has(candidate.toLowerCase())) return null;
+  return `@${candidate}`;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AiAnalysis {
@@ -191,7 +208,7 @@ export async function POST(req: Request) {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Stage 1: Firecrawl website scrape via REST API (non-fatal)
+  // Stage 1a: Firecrawl website scrape (non-fatal)
   // ──────────────────────────────────────────────────────────────────────────
   const websiteToScrape = website_url || opportunity?.website;
   let websiteMarkdown = "";
@@ -217,26 +234,56 @@ export async function POST(req: Request) {
         if (fcData.success && fcData.data?.markdown) {
           websiteMarkdown = (fcData.data.markdown as string).slice(0, 8000);
           firecrawlSuccess = true;
-
-          // ── Extract Instagram handle from scraped markdown ──────────────
-          // Match instagram.com/handle (skip common non-handle path segments)
-          const igMatch = websiteMarkdown.match(
-            /instagram\.com\/([a-zA-Z0-9][a-zA-Z0-9_.]{1,29})(?:[\s/?#"')\]]|$)/
-          );
-          if (igMatch) {
-            const candidate = igMatch[1].replace(/\.$/, ""); // strip trailing dot
-            const NON_HANDLES = new Set([
-              "p", "reel", "reels", "stories", "explore",
-              "accounts", "tv", "ar", "about", "legal",
-            ]);
-            if (!NON_HANDLES.has(candidate.toLowerCase())) {
-              instagramHandle = `@${candidate}`;
-            }
-          }
+          instagramHandle = extractIgHandleFromText(websiteMarkdown);
         }
       }
     } catch (err) {
       console.warn("[enrich-venue] Firecrawl scrape failed (non-fatal):", err);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Stage 1b: Firecrawl web search fallback for Instagram
+  // Many venues embed social icons via JavaScript — the homepage scrape misses
+  // them. A targeted web search reliably surfaces the Instagram profile URL.
+  // ──────────────────────────────────────────────────────────────────────────
+  if (!instagramHandle && place_name && process.env.FIRECRAWL_API_KEY) {
+    try {
+      const searchRes = await fetch("https://api.firecrawl.dev/v1/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+        },
+        body: JSON.stringify({
+          query:  `"${place_name}" instagram`,
+          limit:  5,
+          lang:   "en",
+          // Only return URLs + snippets — no need for full markdown here
+          scrapeOptions: { formats: [] },
+        }),
+      });
+
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const results: Array<{ url?: string; description?: string }> =
+          searchData.data ?? [];
+
+        for (const r of results) {
+          // 1. Check if the result URL itself is the Instagram profile
+          if (r.url) {
+            const fromUrl = extractIgHandleFromText(r.url);
+            if (fromUrl) { instagramHandle = fromUrl; break; }
+          }
+          // 2. Check the snippet text for an instagram.com link
+          if (r.description) {
+            const fromSnippet = extractIgHandleFromText(r.description);
+            if (fromSnippet) { instagramHandle = fromSnippet; break; }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[enrich-venue] Firecrawl search fallback failed (non-fatal):", err);
     }
   }
 

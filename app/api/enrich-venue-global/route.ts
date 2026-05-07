@@ -28,6 +28,48 @@ import {
   buildContactExtractionPrompt,
 } from "@/lib/venues/extractContact";
 
+// ─── Instagram search fallback ────────────────────────────────────────────────
+
+async function searchInstagramHandle(venueName: string): Promise<string | null> {
+  if (!process.env.FIRECRAWL_API_KEY) return null;
+  try {
+    const res = await fetch("https://api.firecrawl.dev/v1/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization:  `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+      },
+      body: JSON.stringify({
+        query:         `"${venueName}" instagram`,
+        limit:         5,
+        lang:          "en",
+        scrapeOptions: { formats: [] },
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const results: Array<{ url?: string; description?: string }> = data.data ?? [];
+
+    const NON_HANDLES = new Set([
+      "p", "reel", "reels", "stories", "explore", "accounts",
+      "tv", "ar", "about", "legal", "privacy", "help", "direct",
+    ]);
+
+    for (const r of results) {
+      for (const text of [r.url ?? "", r.description ?? ""]) {
+        const match = text.match(
+          /instagram\.com\/([a-zA-Z0-9][a-zA-Z0-9_.]{1,29})(?:[\s/?#"')\]]|$)/
+        );
+        if (match) {
+          const candidate = match[1].replace(/\.$/, "");
+          if (!NON_HANDLES.has(candidate.toLowerCase())) return `@${candidate}`;
+        }
+      }
+    }
+  } catch { /* non-fatal */ }
+  return null;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface VenueInput {
@@ -146,9 +188,12 @@ export async function POST(req: Request) {
   }
 
   // ── Regex extraction ──────────────────────────────────────────────────────
-  const { handle: igHandle, url: igUrl }     = extractInstagramRegex(websiteMarkdown);
+  const { handle: igHandleRegex, url: igUrl } = extractInstagramRegex(websiteMarkdown);
   const { email: emailAddr, type: emailType } = extractEmailRegex(websiteMarkdown);
   const { url: formUrl }                      = extractContactFormRegex(websiteMarkdown, website ?? undefined);
+
+  // ── Instagram search fallback (if regex found nothing) ───────────────────
+  const igHandle = igHandleRegex ?? await searchInstagramHandle(name);
 
   // ── Claude gap-fill (only for missing fields) ─────────────────────────────
   let claudeContact: Record<string, string | boolean | null> = {};
@@ -232,9 +277,9 @@ Return ONLY this JSON:
 
   // ── Resolve final contact values ──────────────────────────────────────────
   const finalInstagramHandle = igHandle ?? (claudeContact.instagram_handle as string | null) ?? null;
-  const finalInstagramUrl    = igUrl    ?? (finalInstagramHandle
-    ? `https://www.instagram.com/${finalInstagramHandle.replace("@", "")}/`
-    : null);
+  const finalInstagramUrl    = finalInstagramHandle
+    ? (igUrl ?? `https://www.instagram.com/${finalInstagramHandle.replace("@", "")}/`)
+    : null;
 
   const finalEmail     = emailAddr ?? (claudeContact.contact_email     as string | null) ?? null;
   const finalEmailType = emailType ?? (claudeContact.contact_email_type as string | null) ?? null;
