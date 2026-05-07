@@ -61,8 +61,11 @@ function getPersona(businessType: string | undefined): Persona {
   ) return "photographer";
   if (
     bt.includes("makeup") || bt.includes("make-up") ||
-    bt.includes("mua") || bt.includes("beauty artist") ||
-    bt.includes("hair artist") || bt.includes("hair stylist")
+    bt.includes("mua") || bt.includes("beauty") ||
+    bt.includes("beauty artist") || bt.includes("hair artist") ||
+    bt.includes("hair stylist") || bt.includes("hair & makeup") ||
+    bt.includes("bridal") || bt.includes("glam") ||
+    bt.includes("artist") && (bt.includes("hair") || bt.includes("beauty") || bt.includes("make"))
   ) return "mua";
   if (
     bt.includes("founder") || bt.includes("startup") ||
@@ -232,18 +235,28 @@ export function DiscoverPage() {
         const res = await fetch("/api/apollo/companies", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ persona: apolloPersona, location: profile?.location }),
+          // No location filter — beauty/fashion brands are global and Apollo's
+          // location format is strict; filtering by location returns 0 results
+          // for most stored profile location strings.
+          body:    JSON.stringify({ persona: apolloPersona }),
         });
-        if (res.ok && !cancelled) {
-          const data = await res.json();
-          setApolloCompanies(data.companies ?? []);
+        if (!cancelled) {
+          if (res.ok) {
+            const data = await res.json();
+            setApolloCompanies(data.companies ?? []);
+          } else {
+            console.error("[apollo] companies fetch failed:", res.status, await res.text());
+          }
         }
-      } catch { /* non-fatal */ }
-      finally { if (!cancelled) setIsLoadingApollo(false); }
+      } catch (err) {
+        console.error("[apollo] companies fetch error:", err);
+      } finally {
+        if (!cancelled) setIsLoadingApollo(false);
+      }
     };
     load();
     return () => { cancelled = true; };
-  }, [profile?.businessType, profile?.location]);
+  }, [profile?.businessType]);
 
   // Infinite scroll
   useEffect(() => {
