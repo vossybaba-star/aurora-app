@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
   if (!opp) return NextResponse.json({ error: "Opportunity not found" }, { status: 404 });
 
-  // Check for existing contact: by opportunity_id first, then by email
+  // Check for existing contact: opportunity_id → email → name (case-insensitive)
   let existingId: string | null = null;
 
   const { data: byOpp } = await supabase
@@ -59,6 +59,16 @@ export async function POST(req: Request) {
       .eq("email", opp.contact_email)
       .maybeSingle();
     if (byEmail) existingId = byEmail.id;
+  }
+
+  if (!existingId) {
+    const { data: byName } = await supabase
+      .from("contacts")
+      .select("id")
+      .eq("user_id", user.id)
+      .ilike("name", opp.name.trim())
+      .maybeSingle();
+    if (byName) existingId = byName.id;
   }
 
   if (existingId) {
