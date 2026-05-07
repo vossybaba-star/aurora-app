@@ -3,12 +3,10 @@
 /**
  * components/aurora/relationships-page.tsx
  *
- * Three-column Relationships CRM:
- *   Left   – filter tabs + contact list
- *   Centre – contact detail panel (5 sections)
- *   Right  – nurture sequence viewer / CSV import
- *
- * Design: glass morphism, ACCENT #7c6ef7, consistent with outreach-page
+ * Relationships CRM — light glassmorphism, matching app design system:
+ *  - glass-card class (white frosted), text-[#131b2e], text-muted-foreground
+ *  - ACCENT #7c6ef7 for interactive highlights only
+ *  - Consistent with outreach-page / profile-page patterns
  */
 
 import {
@@ -32,62 +30,46 @@ import {
   Sparkles,
   ChevronRight,
   X,
-  CheckCircle2,
   Clock,
   MessageSquare,
   Zap,
-  Send,
-  FileText,
   AlertCircle,
   Copy,
   Check,
   ExternalLink,
   Tag,
-  Pencil,
+  Search,
 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ACCENT  = "#7c6ef7";
 const ACCENT2 = "#9585f9";
-
-const GLASS = {
-  background:           "rgba(255,255,255,0.04)",
-  border:               "1px solid rgba(255,255,255,0.08)",
-  backdropFilter:       "blur(20px)",
-  WebkitBackdropFilter: "blur(20px)",
-} as const;
-
-const GLASS_STRONG = {
-  background:           "rgba(255,255,255,0.06)",
-  border:               "1px solid rgba(255,255,255,0.10)",
-  backdropFilter:       "blur(24px)",
-  WebkitBackdropFilter: "blur(24px)",
-} as const;
+const DARK    = "#131b2e";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Contact {
-  id:                string;
-  name:              string;
-  email:             string | null;
-  phone:             string | null;
-  instagram_handle:  string | null;
-  website:           string | null;
-  relationship_type: string;
-  source:            string | null;
-  status:            string;
-  last_contacted_at: string | null;
-  next_action:       string | null;
-  next_action_due:   string | null;
-  tags:              string[];
-  ai_notes:          string | null;
+  id:                  string;
+  name:                string;
+  email:               string | null;
+  phone:               string | null;
+  instagram_handle:    string | null;
+  website:             string | null;
+  relationship_type:   string;
+  source:              string | null;
+  status:              string;
+  last_contacted_at:   string | null;
+  next_action:         string | null;
+  next_action_due:     string | null;
+  tags:                string[];
+  ai_notes:            string | null;
   ai_notes_updated_at: string | null;
-  booking_platform:  string | null;
-  opportunity_id:    string | null;
-  venue_id:          string | null;
-  created_at:        string;
-  updated_at:        string;
+  booking_platform:    string | null;
+  opportunity_id:      string | null;
+  venue_id:            string | null;
+  created_at:          string;
+  updated_at:          string;
 }
 
 interface Note {
@@ -116,7 +98,7 @@ function relTypeLabel(t: string) {
   const map: Record<string, string> = {
     venue_customer: "Client",
     past_client:    "Past Client",
-    venue_target:   "Target Venue",
+    venue_target:   "Target",
     lead:           "Lead",
     partner:        "Partner",
   };
@@ -151,7 +133,27 @@ function formatDate(dateStr: string) {
   });
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Shared input style ───────────────────────────────────────────────────────
+
+const INPUT_CLS =
+  "w-full rounded-xl px-3 py-2.5 text-sm bg-white/60 border border-white/60 " +
+  "focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground";
+
+// ─── RelType badge ────────────────────────────────────────────────────────────
+
+function RelBadge({ type }: { type: string }) {
+  const color = relTypeColor(type);
+  return (
+    <span
+      className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+      style={{ background: `${color}18`, color, border: `1px solid ${color}30` }}
+    >
+      {relTypeLabel(type)}
+    </span>
+  );
+}
+
+// ─── Contact Avatar ───────────────────────────────────────────────────────────
 
 function ContactAvatar({ name, size = 36 }: { name: string; size?: number }) {
   const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -159,7 +161,7 @@ function ContactAvatar({ name, size = 36 }: { name: string; size?: number }) {
     <div
       className="rounded-full flex items-center justify-center font-bold text-white shrink-0"
       style={{
-        width: size, height: size, fontSize: size * 0.35,
+        width: size, height: size, fontSize: size * 0.36,
         background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT2})`,
       }}
     >
@@ -168,28 +170,13 @@ function ContactAvatar({ name, size = 36 }: { name: string; size?: number }) {
   );
 }
 
-function Badge({ label, color }: { label: string; color?: string }) {
-  return (
-    <span
-      className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-      style={{
-        background: `${color ?? ACCENT}22`,
-        color:      color ?? ACCENT,
-        border:     `1px solid ${color ?? ACCENT}33`,
-      }}
-    >
-      {label}
-    </span>
-  );
-}
-
 // ─── CSV Import Panel ─────────────────────────────────────────────────────────
 
 function CsvImportPanel({ onImported }: { onImported: () => void }) {
-  const [file,     setFile]    = useState<File | null>(null);
-  const [relType,  setRelType] = useState("past_client");
-  const [loading,  setLoading] = useState(false);
-  const [result,   setResult]  = useState<{ imported: number; skipped: number; errors: string[]; fresha_detected: boolean } | null>(null);
+  const [file,    setFile]    = useState<File | null>(null);
+  const [relType, setRelType] = useState("past_client");
+  const [loading, setLoading] = useState(false);
+  const [result,  setResult]  = useState<{ imported: number; skipped: number; errors: string[]; fresha_detected: boolean } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleImport = async () => {
@@ -203,7 +190,7 @@ function CsvImportPanel({ onImported }: { onImported: () => void }) {
       const res  = await fetch("/api/contacts/import-csv", { method: "POST", body: form });
       const data = await res.json();
       setResult(data);
-      if (data.imported > 0) onImported();
+      if (data.imported > 0) { setFile(null); onImported(); }
     } catch {
       setResult({ imported: 0, skipped: 0, errors: ["Upload failed"], fresha_detected: false });
     } finally {
@@ -212,26 +199,19 @@ function CsvImportPanel({ onImported }: { onImported: () => void }) {
   };
 
   return (
-    <div className="rounded-2xl p-4 space-y-3" style={GLASS}>
-      <div className="flex items-center gap-2 mb-1">
-        <Upload className="w-4 h-4" style={{ color: ACCENT }} />
-        <p className="text-sm font-semibold text-white">Import CSV</p>
-      </div>
-
-      <p className="text-[11px] text-white/40 leading-relaxed">
-        Supports generic CSVs and Fresha client exports. Deduplicates by email.
+    <div className="space-y-3">
+      <p className="text-[11px] text-muted-foreground leading-relaxed">
+        Supports generic CSVs and Fresha exports. Deduplicates by email.
       </p>
 
-      {/* Relationship type */}
       <div>
-        <label className="text-[10px] font-semibold uppercase tracking-wide text-white/40 mb-1 block">
+        <label className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1 block">
           Relationship type
         </label>
         <select
           value={relType}
           onChange={e => setRelType(e.target.value)}
-          className="w-full rounded-xl px-3 py-2 text-xs text-white outline-none"
-          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+          className={INPUT_CLS}
         >
           <option value="past_client">Past Client</option>
           <option value="venue_customer">Venue Client</option>
@@ -241,15 +221,13 @@ function CsvImportPanel({ onImported }: { onImported: () => void }) {
         </select>
       </div>
 
-      {/* File picker */}
       <div
         onClick={() => inputRef.current?.click()}
-        className="rounded-xl p-3 text-center cursor-pointer transition-all hover:border-[#7c6ef7]/40"
-        style={{ border: "1.5px dashed rgba(255,255,255,0.12)" }}
+        className="rounded-xl p-4 text-center cursor-pointer transition-all hover:border-[#7c6ef7]/40 border-2 border-dashed border-muted-foreground/20"
       >
-        <Upload className="w-5 h-5 text-white/30 mx-auto mb-1" />
-        <p className="text-[11px] text-white/40">
-          {file ? file.name : "Click to choose a .csv file"}
+        <Upload className="w-5 h-5 text-muted-foreground/40 mx-auto mb-1" />
+        <p className="text-xs text-muted-foreground">
+          {file ? <span className="font-semibold" style={{ color: ACCENT }}>{file.name}</span> : "Click to choose a .csv file"}
         </p>
         <input
           ref={inputRef}
@@ -263,25 +241,24 @@ function CsvImportPanel({ onImported }: { onImported: () => void }) {
       <button
         onClick={handleImport}
         disabled={!file || loading}
-        className="w-full rounded-xl py-2.5 text-xs font-bold text-white transition-all disabled:opacity-40"
+        className="w-full rounded-xl py-2.5 text-sm font-bold text-white transition-all disabled:opacity-40"
         style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT2})` }}
       >
         {loading ? "Importing…" : "Import Contacts"}
       </button>
 
       {result && (
-        <div
-          className="rounded-xl p-3 space-y-1"
-          style={{ background: result.imported > 0 ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)" }}
-        >
+        <div className={`rounded-xl p-3 space-y-1 ${result.imported > 0 ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
           {result.fresha_detected && (
-            <p className="text-[10px] font-bold text-emerald-400 mb-1">✓ Fresha export detected</p>
+            <p className="text-[10px] font-bold text-emerald-600 mb-1">✓ Fresha export detected</p>
           )}
-          <p className="text-[11px] text-white/70">
-            ✓ {result.imported} imported &nbsp;·&nbsp; {result.skipped} skipped (duplicates)
+          <p className="text-xs text-muted-foreground">
+            <span className="font-semibold text-emerald-600">{result.imported} imported</span>
+            {" · "}
+            {result.skipped} duplicates skipped
           </p>
           {result.errors.map((e, i) => (
-            <p key={i} className="text-[10px] text-red-400">{e}</p>
+            <p key={i} className="text-[10px] text-red-500">{e}</p>
           ))}
         </div>
       )}
@@ -292,23 +269,22 @@ function CsvImportPanel({ onImported }: { onImported: () => void }) {
 // ─── Nurture Sequence Panel ───────────────────────────────────────────────────
 
 function NurturePanel({ contact }: { contact: Contact }) {
-  const [sequence,   setSequence]  = useState<NurtureSequenceData | null>(null);
+  const [sequence,   setSequence]   = useState<NurtureSequenceData | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
   const [expanded,   setExpanded]   = useState<number | null>(null);
 
   const generate = async () => {
     if (!contact.email) {
-      setError("This contact needs an email address before you can create a nurture sequence.");
+      setError("Add an email address to this contact before creating a nurture sequence.");
       return;
     }
     setGenerating(true);
     setError(null);
     try {
       const res  = await fetch("/api/contacts/generate-nurture", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ contact_id: contact.id }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contact_id: contact.id }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Generation failed"); return; }
@@ -322,28 +298,33 @@ function NurturePanel({ contact }: { contact: Contact }) {
 
   if (!sequence) {
     return (
-      <div className="rounded-2xl p-4 space-y-3" style={GLASS}>
-        <div className="flex items-center gap-2 mb-1">
-          <Zap className="w-4 h-4" style={{ color: ACCENT }} />
-          <p className="text-sm font-semibold text-white">Nurture Sequence</p>
-        </div>
-        <p className="text-[11px] text-white/40 leading-relaxed">
-          Generate a personalised 3-email re-engagement sequence for {contact.name}.
-          Emails are scheduled 7 and 14 days apart.
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Generate a personalised 3-email re-engagement sequence for <strong>{contact.name}</strong>.
+          Steps send automatically 7 and 14 days apart once activated.
         </p>
-        {error && (
-          <div className="rounded-xl px-3 py-2" style={{ background: "rgba(239,68,68,0.08)" }}>
-            <p className="text-[11px] text-red-400">{error}</p>
+
+        {!contact.email && (
+          <div className="rounded-xl px-3 py-2.5 flex items-start gap-2 bg-amber-50 border border-amber-200">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700">Email address required to send nurture emails.</p>
           </div>
         )}
+
+        {error && (
+          <div className="rounded-xl px-3 py-2.5 bg-red-50 border border-red-200">
+            <p className="text-xs text-red-600">{error}</p>
+          </div>
+        )}
+
         <button
           onClick={generate}
           disabled={generating}
-          className="w-full rounded-xl py-2.5 text-xs font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full rounded-xl py-2.5 text-sm font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT2})` }}
         >
           {generating ? (
-            <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating…</>
+            <><span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Generating…</>
           ) : (
             <><Sparkles className="w-3.5 h-3.5" />Generate with AI</>
           )}
@@ -353,33 +334,29 @@ function NurturePanel({ contact }: { contact: Contact }) {
   }
 
   const steps = [
-    { label: "Email 1", subtitle: "Send now",              ...sequence.email1 },
-    { label: "Email 2", subtitle: formatDate(sequence.step2_send_at), ...sequence.email2 },
-    { label: "Email 3", subtitle: formatDate(sequence.step3_send_at), ...sequence.email3 },
+    { label: "Email 1 · Send now",                              ...sequence.email1 },
+    { label: `Email 2 · ${formatDate(sequence.step2_send_at)}`, ...sequence.email2 },
+    { label: `Email 3 · ${formatDate(sequence.step3_send_at)}`, ...sequence.email3 },
   ];
 
   return (
-    <div className="rounded-2xl p-4 space-y-2" style={GLASS}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4" style={{ color: ACCENT }} />
-          <p className="text-sm font-semibold text-white">Nurture Sequence</p>
-        </div>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs font-semibold" style={{ color: DARK }}>3-email sequence ready</p>
         <button
           onClick={generate}
           disabled={generating}
-          className="text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-all disabled:opacity-40"
-          style={{ color: ACCENT, background: `${ACCENT}15` }}
+          className="text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all disabled:opacity-40"
+          style={{ color: ACCENT, background: `${ACCENT}12` }}
         >
-          {generating ? "Regenerating…" : "Regenerate"}
+          {generating ? "…" : "Regenerate"}
         </button>
       </div>
 
       {steps.map((step, i) => (
         <div
           key={i}
-          className="rounded-xl overflow-hidden cursor-pointer"
-          style={GLASS_STRONG}
+          className="glass-card rounded-xl overflow-hidden cursor-pointer border border-white/60"
           onClick={() => setExpanded(expanded === i ? null : i)}
         >
           <div className="flex items-center gap-3 px-3 py-2.5">
@@ -390,17 +367,17 @@ function NurturePanel({ contact }: { contact: Contact }) {
               {i + 1}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate">{step.subject}</p>
-              <p className="text-[10px] text-white/40">{step.subtitle}</p>
+              <p className="text-xs font-semibold truncate" style={{ color: DARK }}>{step.subject}</p>
+              <p className="text-[10px] text-muted-foreground">{step.label}</p>
             </div>
             <ChevronRight
-              className="w-3.5 h-3.5 text-white/30 transition-transform shrink-0"
-              style={{ transform: expanded === i ? "rotate(90deg)" : "rotate(0deg)" }}
+              className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0 transition-transform"
+              style={{ transform: expanded === i ? "rotate(90deg)" : "none" }}
             />
           </div>
           {expanded === i && (
-            <div className="px-3 pb-3 pt-1 border-t border-white/05">
-              <p className="text-[11px] text-white/60 leading-relaxed whitespace-pre-wrap">{step.body}</p>
+            <div className="px-3 pb-3 pt-1 border-t border-white/40">
+              <p className="text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap">{step.body}</p>
             </div>
           )}
         </div>
@@ -416,17 +393,17 @@ function ContactDetail({
   onClose,
   onUpdated,
 }: {
-  contact: Contact;
-  onClose: () => void;
+  contact:   Contact;
+  onClose:   () => void;
   onUpdated: () => void;
 }) {
-  const [notes,       setNotes]       = useState<Note[]>([]);
-  const [noteBody,    setNoteBody]    = useState("");
-  const [addingNote,  setAddingNote]  = useState(false);
-  const [suggestion,  setSuggestion]  = useState<string | null>(contact.ai_notes);
-  const [loadingSug,  setLoadingSug]  = useState(false);
-  const [copied,      setCopied]      = useState(false);
-  const [activeTab,   setActiveTab]   = useState<"overview" | "notes" | "nurture">("overview");
+  const [notes,      setNotes]      = useState<Note[]>([]);
+  const [noteBody,   setNoteBody]   = useState("");
+  const [addingNote, setAddingNote] = useState(false);
+  const [suggestion, setSuggestion] = useState<string | null>(contact.ai_notes);
+  const [loadingSug, setLoadingSug] = useState(false);
+  const [copied,     setCopied]     = useState(false);
+  const [activeTab,  setActiveTab]  = useState<"overview" | "notes" | "nurture">("overview");
 
   const copyEmail = () => {
     if (!contact.email) return;
@@ -451,9 +428,8 @@ function ContactDetail({
     setAddingNote(true);
     try {
       await fetch("/api/contacts/notes", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ contact_id: contact.id, body: noteBody.trim() }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contact_id: contact.id, body: noteBody.trim() }),
       });
       setNoteBody("");
       await loadNotes();
@@ -467,9 +443,8 @@ function ContactDetail({
     setLoadingSug(true);
     try {
       const res  = await fetch("/api/contacts/suggest-reengage", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ contact_id: contact.id }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contact_id: contact.id }),
       });
       const data = await res.json();
       setSuggestion(data.suggestion ?? null);
@@ -478,81 +453,85 @@ function ContactDetail({
     }
   };
 
-  const tabs = [
+  const TABS = [
     { id: "overview" as const, label: "Overview",  icon: UserCheck },
     { id: "notes"    as const, label: "Notes",      icon: MessageSquare },
     { id: "nurture"  as const, label: "Nurture",    icon: Zap },
   ];
 
   return (
-    <div className="h-full flex flex-col" style={{ minHeight: 0 }}>
-      {/* Header */}
-      <div className="flex items-start gap-3 p-5 pb-3">
-        <ContactAvatar name={contact.name} size={44} />
-        <div className="flex-1 min-w-0">
-          <h2 className="text-base font-bold text-white truncate">{contact.name}</h2>
-          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-            <Badge label={relTypeLabel(contact.relationship_type)} color={relTypeColor(contact.relationship_type)} />
-            {contact.booking_platform === "fresha" && (
-              <Badge label="Fresha" color="#10b981" />
-            )}
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* ── Header ── */}
+      <div className="shrink-0 px-5 pt-5 pb-3 border-b border-white/40">
+        <div className="flex items-start gap-3">
+          <ContactAvatar name={contact.name} size={44} />
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-bold truncate" style={{ color: DARK }}>{contact.name}</h2>
+            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+              <RelBadge type={contact.relationship_type} />
+              {contact.booking_platform === "fresha" && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Fresha</span>
+              )}
+            </div>
           </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-black/05 transition-colors shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-        <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-white/40 hover:text-white/70 transition-colors shrink-0" style={{ background: "rgba(255,255,255,0.06)" }}>
-          <X className="w-3.5 h-3.5" />
-        </button>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mt-3">
+          {TABS.map(tab => {
+            const Icon   = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                style={active
+                  ? { background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT2})`, color: "white" }
+                  : { color: "var(--muted-foreground)" }
+                }
+              >
+                <Icon className="w-3 h-3" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 px-4 pb-3">
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all"
-              style={active
-                ? { background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT2})`, color: "white" }
-                : { background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.45)" }
-              }
-            >
-              <Icon className="w-3 h-3" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* ── Scrollable body ── */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ scrollbarWidth: "none" }}>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3" style={{ scrollbarWidth: "none" }}>
-
-        {/* ── OVERVIEW tab ── */}
+        {/* OVERVIEW */}
         {activeTab === "overview" && (
           <>
             {/* Contact methods */}
-            <div className="rounded-2xl p-4 space-y-2.5" style={GLASS}>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-white/40 mb-2">Contact</p>
+            <div className="glass-card rounded-2xl p-4 border border-white/60 space-y-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Contact</p>
 
               {contact.email && (
                 <div className="flex items-center gap-2.5 group">
                   <Mail className="w-3.5 h-3.5 shrink-0" style={{ color: ACCENT }} />
-                  <a href={`mailto:${contact.email}`} className="text-xs text-white/80 hover:text-white transition-colors truncate flex-1">
+                  <a href={`mailto:${contact.email}`} className="text-sm text-muted-foreground hover:text-foreground transition-colors truncate flex-1">
                     {contact.email}
                   </a>
-                  <button onClick={copyEmail} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-white/40" />}
+                  <button onClick={copyEmail} className="opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Copy email">
+                    {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-muted-foreground/50" />}
                   </button>
                 </div>
               )}
 
               {contact.phone && (
                 <div className="flex items-center gap-2.5">
-                  <Phone className="w-3.5 h-3.5 shrink-0 text-white/40" />
-                  <a href={`tel:${contact.phone}`} className="text-xs text-white/80 hover:text-white transition-colors">
-                    {contact.phone}
-                  </a>
+                  <Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground/50" />
+                  <a href={`tel:${contact.phone}`} className="text-sm text-muted-foreground hover:text-foreground transition-colors">{contact.phone}</a>
                 </div>
               )}
 
@@ -560,73 +539,68 @@ function ContactDetail({
                 <div className="flex items-center gap-2.5">
                   <Instagram className="w-3.5 h-3.5 shrink-0 text-pink-400" />
                   <a
-                    href={`https://instagram.com/${contact.instagram_handle.replace("@","")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-white/80 hover:text-white transition-colors"
+                    href={`https://instagram.com/${contact.instagram_handle.replace("@", "")}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {contact.instagram_handle}
                   </a>
+                  <ExternalLink className="w-3 h-3 text-muted-foreground/30 shrink-0" />
                 </div>
               )}
 
               {contact.website && (
                 <div className="flex items-center gap-2.5">
-                  <Globe className="w-3.5 h-3.5 shrink-0 text-white/40" />
+                  <Globe className="w-3.5 h-3.5 shrink-0 text-muted-foreground/50" />
                   <a
                     href={contact.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-white/80 hover:text-white transition-colors truncate"
+                    target="_blank" rel="noopener noreferrer"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors truncate"
                   >
                     {contact.website.replace(/^https?:\/\//, "")}
                   </a>
-                  <ExternalLink className="w-3 h-3 text-white/30 shrink-0" />
                 </div>
               )}
 
               {!contact.email && !contact.phone && !contact.instagram_handle && !contact.website && (
-                <p className="text-xs text-white/30 italic">No contact details</p>
+                <p className="text-sm text-muted-foreground italic">No contact details recorded.</p>
               )}
             </div>
 
             {/* Engagement */}
-            <div className="rounded-2xl p-4 space-y-2.5" style={GLASS}>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-white/40 mb-2">Engagement</p>
+            <div className="glass-card rounded-2xl p-4 border border-white/60 space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Engagement</p>
+
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl p-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
-                  <Clock className="w-3.5 h-3.5 text-white/30 mx-auto mb-1" />
-                  <p className="text-[10px] text-white/40">Last contact</p>
-                  <p className="text-xs font-semibold text-white/80">{timeAgo(contact.last_contacted_at)}</p>
+                <div className="rounded-xl p-2.5 text-center bg-white/40 border border-white/50">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground/40 mx-auto mb-1" />
+                  <p className="text-[10px] text-muted-foreground">Last contact</p>
+                  <p className="text-sm font-bold" style={{ color: DARK }}>{timeAgo(contact.last_contacted_at)}</p>
                 </div>
-                <div className="rounded-xl p-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
-                  <Tag className="w-3.5 h-3.5 text-white/30 mx-auto mb-1" />
-                  <p className="text-[10px] text-white/40">Source</p>
-                  <p className="text-xs font-semibold text-white/80 capitalize">{contact.source?.replace(/_/g, " ") ?? "—"}</p>
+                <div className="rounded-xl p-2.5 text-center bg-white/40 border border-white/50">
+                  <Tag className="w-3.5 h-3.5 text-muted-foreground/40 mx-auto mb-1" />
+                  <p className="text-[10px] text-muted-foreground">Source</p>
+                  <p className="text-sm font-bold capitalize" style={{ color: DARK }}>{contact.source?.replace(/_/g, " ") ?? "—"}</p>
                 </div>
               </div>
 
               {contact.next_action && (
-                <div className="rounded-xl px-3 py-2.5 flex items-start gap-2" style={{ background: `${ACCENT}12` }}>
+                <div className="rounded-xl px-3 py-2.5 flex items-start gap-2" style={{ background: `${ACCENT}0d`, border: `1px solid ${ACCENT}25` }}>
                   <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: ACCENT }} />
                   <div>
-                    <p className="text-[10px] font-bold text-white/50">Next action</p>
-                    <p className="text-xs text-white/80">{contact.next_action}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground">Next action</p>
+                    <p className="text-xs font-medium" style={{ color: DARK }}>{contact.next_action}</p>
                     {contact.next_action_due && (
-                      <p className="text-[10px] text-white/40 mt-0.5">{formatDate(contact.next_action_due)}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{formatDate(contact.next_action_due)}</p>
                     )}
                   </div>
                 </div>
               )}
 
               {contact.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-1">
+                <div className="flex flex-wrap gap-1">
                   {contact.tags.map(tag => (
-                    <span
-                      key={tag}
-                      className="px-2 py-0.5 rounded-full text-[10px] font-medium"
-                      style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}
-                    >
+                    <span key={tag} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/60 border border-white/60 text-muted-foreground">
                       {tag}
                     </span>
                   ))}
@@ -634,69 +608,63 @@ function ContactDetail({
               )}
             </div>
 
-            {/* AI re-engagement suggestion */}
-            <div className="rounded-2xl p-4 space-y-2.5" style={GLASS}>
+            {/* AI suggestion */}
+            <div className="glass-card rounded-2xl p-4 border border-white/60 space-y-2.5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" style={{ color: ACCENT }} />
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-white/40">AI Suggestion</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">AI Re-engagement Idea</p>
                 </div>
                 <button
                   onClick={getSuggestion}
                   disabled={loadingSug}
-                  className="text-[10px] font-semibold px-2 py-1 rounded-lg transition-all disabled:opacity-40"
-                  style={{ color: ACCENT, background: `${ACCENT}15` }}
+                  className="text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all disabled:opacity-40"
+                  style={{ color: ACCENT, background: `${ACCENT}12` }}
                 >
                   {loadingSug ? "…" : suggestion ? "Refresh" : "Generate"}
                 </button>
               </div>
-              {suggestion ? (
-                <p className="text-[11px] text-white/60 leading-relaxed">{suggestion}</p>
-              ) : (
-                <p className="text-[11px] text-white/30 italic">
-                  Click Generate for a re-engagement idea tailored to {contact.name}.
-                </p>
-              )}
+              {suggestion
+                ? <p className="text-sm text-muted-foreground leading-relaxed">{suggestion}</p>
+                : <p className="text-sm text-muted-foreground/60 italic">Click Generate for a personalised re-engagement idea.</p>
+              }
             </div>
           </>
         )}
 
-        {/* ── NOTES tab ── */}
+        {/* NOTES */}
         {activeTab === "notes" && (
           <>
-            {/* Add note */}
-            <div className="rounded-2xl p-3 space-y-2" style={GLASS}>
+            <div className="space-y-2">
               <textarea
                 value={noteBody}
                 onChange={e => setNoteBody(e.target.value)}
                 placeholder="Add a note…"
                 rows={3}
-                className="w-full rounded-xl px-3 py-2.5 text-xs text-white placeholder-white/30 outline-none resize-none"
-                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+                className={`${INPUT_CLS} resize-none`}
               />
               <button
                 onClick={submitNote}
                 disabled={!noteBody.trim() || addingNote}
-                className="w-full rounded-xl py-2 text-xs font-bold text-white disabled:opacity-40 flex items-center justify-center gap-1.5"
+                className="w-full rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-40 flex items-center justify-center gap-1.5"
                 style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT2})` }}
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3.5 h-3.5" />
                 {addingNote ? "Saving…" : "Add Note"}
               </button>
             </div>
 
-            {/* Note list */}
             {notes.length === 0 ? (
-              <div className="text-center py-8">
-                <MessageSquare className="w-8 h-8 text-white/10 mx-auto mb-2" />
-                <p className="text-xs text-white/30">No notes yet</p>
+              <div className="text-center py-10">
+                <MessageSquare className="w-8 h-8 text-muted-foreground/20 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">No notes yet</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {notes.map(note => (
-                  <div key={note.id} className="rounded-xl p-3" style={GLASS}>
-                    <p className="text-xs text-white/70 leading-relaxed">{note.body}</p>
-                    <p className="text-[10px] text-white/30 mt-1.5">{formatDate(note.created_at)}</p>
+                  <div key={note.id} className="glass-card rounded-xl p-3 border border-white/60">
+                    <p className="text-sm text-muted-foreground leading-relaxed">{note.body}</p>
+                    <p className="text-[10px] text-muted-foreground/50 mt-1.5">{formatDate(note.created_at)}</p>
                   </div>
                 ))}
               </div>
@@ -704,18 +672,16 @@ function ContactDetail({
           </>
         )}
 
-        {/* ── NURTURE tab ── */}
-        {activeTab === "nurture" && (
-          <NurturePanel contact={contact} />
-        )}
+        {/* NURTURE */}
+        {activeTab === "nurture" && <NurturePanel contact={contact} />}
       </div>
     </div>
   );
 }
 
-// ─── Contact List Item ────────────────────────────────────────────────────────
+// ─── Contact List Row ─────────────────────────────────────────────────────────
 
-function ContactListItem({
+function ContactRow({
   contact,
   selected,
   onClick,
@@ -727,60 +693,64 @@ function ContactListItem({
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all"
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150"
       style={selected
-        ? { background: `${ACCENT}18`, border: `1px solid ${ACCENT}33` }
-        : { background: "transparent", border: "1px solid transparent" }
+        ? { background: `${ACCENT}12`, border: `1px solid ${ACCENT}30` }
+        : { border: "1px solid transparent" }
       }
     >
       <ContactAvatar name={contact.name} size={34} />
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-white truncate">{contact.name}</p>
-        <p className="text-[10px] text-white/40 truncate">
-          {contact.email ?? contact.instagram_handle ?? contact.relationship_type}
+        <p className="text-sm font-semibold truncate" style={{ color: DARK }}>{contact.name}</p>
+        <p className="text-[11px] text-muted-foreground truncate">
+          {contact.email ?? contact.instagram_handle ?? relTypeLabel(contact.relationship_type)}
         </p>
       </div>
-      <div className="text-right shrink-0">
-        <span
-          className="block w-1.5 h-1.5 rounded-full mx-auto"
+      <div className="shrink-0 text-right space-y-1">
+        <div
+          className="w-1.5 h-1.5 rounded-full ml-auto"
           style={{ background: relTypeColor(contact.relationship_type) }}
         />
-        <p className="text-[9px] text-white/30 mt-1">{timeAgo(contact.last_contacted_at)}</p>
+        <p className="text-[9px] text-muted-foreground/60">{timeAgo(contact.last_contacted_at)}</p>
       </div>
     </button>
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Filter tabs ──────────────────────────────────────────────────────────────
 
-const FILTER_TABS = [
+const FILTERS = [
   { id: "all",            label: "All",         icon: Users },
-  { id: "venue_customer", label: "Clients",      icon: Building2 },
-  { id: "past_client",    label: "Past Clients", icon: UserCheck },
-  { id: "venue_target",   label: "Targets",      icon: Target },
+  { id: "venue_customer", label: "Clients",     icon: Building2 },
+  { id: "past_client",    label: "Past",        icon: UserCheck },
+  { id: "venue_target",   label: "Targets",     icon: Target },
 ];
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export function RelationshipsPage() {
   const [contacts,      setContacts]      = useState<Contact[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [filterType,    setFilterType]    = useState("all");
   const [selected,      setSelected]      = useState<Contact | null>(null);
-  const [showImport,    setShowImport]    = useState(false);
-  const [showAddManual, setShowAddManual] = useState(false);
   const [search,        setSearch]        = useState("");
 
-  // Manual add form
+  // Add contact form
+  const [showAdd,  setShowAdd]  = useState(false);
   const [newName,  setNewName]  = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newType,  setNewType]  = useState("lead");
   const [adding,   setAdding]   = useState(false);
 
-  // Auto-populate once per session from existing opportunities
+  // Import panel (shown inline on desktop right col)
+  const [showImport, setShowImport] = useState(false);
+
+  // Auto-populate from opportunities on first visit
   useEffect(() => {
-    const key = "aurora_contacts_populated";
+    const key = "aurora_contacts_populated_v1";
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
-    fetch("/api/contacts/auto-populate", { method: "POST" }).catch(() => {/* non-fatal */});
+    fetch("/api/contacts/auto-populate", { method: "POST" }).catch(() => {});
   }, []);
 
   const loadContacts = useCallback(async () => {
@@ -796,19 +766,16 @@ export function RelationshipsPage() {
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
 
-  const handleAddManual = async () => {
+  const handleAddContact = async () => {
     if (!newName.trim()) return;
     setAdding(true);
     try {
       await fetch("/api/contacts/list", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ name: newName, email: newEmail || null, relationship_type: newType }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName, email: newEmail || null, relationship_type: newType }),
       });
-      setNewName("");
-      setNewEmail("");
-      setNewType("lead");
-      setShowAddManual(false);
+      setNewName(""); setNewEmail(""); setNewType("lead");
+      setShowAdd(false);
       await loadContacts();
     } finally {
       setAdding(false);
@@ -820,40 +787,45 @@ export function RelationshipsPage() {
     const q = search.toLowerCase();
     return (
       c.name.toLowerCase().includes(q) ||
-      c.email?.toLowerCase().includes(q) ||
-      c.instagram_handle?.toLowerCase().includes(q)
+      (c.email ?? "").toLowerCase().includes(q) ||
+      (c.instagram_handle ?? "").toLowerCase().includes(q)
     );
   });
 
-  const counts = FILTER_TABS.reduce((acc, t) => {
-    acc[t.id] = t.id === "all"
-      ? contacts.length
-      : contacts.filter(c => c.relationship_type === t.id).length;
+  const counts = FILTERS.reduce((acc, f) => {
+    acc[f.id] = f.id === "all" ? contacts.length : contacts.filter(c => c.relationship_type === f.id).length;
     return acc;
   }, {} as Record<string, number>);
 
+  const stats = {
+    total:   contacts.length,
+    clients: contacts.filter(c => c.relationship_type === "venue_customer" || c.relationship_type === "past_client").length,
+    targets: contacts.filter(c => c.relationship_type === "venue_target").length,
+    noEmail: contacts.filter(c => !c.email).length,
+  };
+
   return (
-    <div className="h-full">
-      {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-5">
+    <div className="flex flex-col gap-5">
+
+      {/* ── Page header ── */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">Relationships</h1>
-          <p className="text-xs text-white/40 mt-0.5">
+          <h1 className="text-xl font-bold" style={{ color: DARK }}>Relationships</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {contacts.length} contact{contacts.length !== 1 ? "s" : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { setShowImport(!showImport); setShowAddManual(false); }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
-            style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.08)" }}
+            onClick={() => { setShowImport(v => !v); setShowAdd(false); }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-black/05 transition-all border border-white/60 glass-card"
           >
             <Upload className="w-3.5 h-3.5" />
             <span className="hidden sm:block">Import CSV</span>
           </button>
           <button
-            onClick={() => { setShowAddManual(!showAddManual); setShowImport(false); }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white transition-all"
+            onClick={() => { setShowAdd(v => !v); setShowImport(false); }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-white transition-all"
             style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT2})` }}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -862,42 +834,18 @@ export function RelationshipsPage() {
         </div>
       </div>
 
-      {/* ── Add / Import panels ──────────────────────────────────────────────── */}
-      {showImport && (
-        <div className="mb-4 max-w-md">
-          <CsvImportPanel onImported={() => { setShowImport(false); loadContacts(); }} />
-        </div>
-      )}
-
-      {showAddManual && (
-        <div className="mb-4 max-w-md rounded-2xl p-4 space-y-3" style={GLASS}>
+      {/* ── Add contact form ── */}
+      {showAdd && (
+        <div className="glass-card rounded-2xl p-5 border border-white/60 max-w-sm space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-white">Add Contact</p>
-            <button onClick={() => setShowAddManual(false)}>
-              <X className="w-3.5 h-3.5 text-white/40" />
+            <p className="text-sm font-bold" style={{ color: DARK }}>New Contact</p>
+            <button onClick={() => setShowAdd(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
             </button>
           </div>
-          <input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="Name *"
-            className="w-full rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 outline-none"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
-          />
-          <input
-            value={newEmail}
-            onChange={e => setNewEmail(e.target.value)}
-            placeholder="Email"
-            type="email"
-            className="w-full rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 outline-none"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
-          />
-          <select
-            value={newType}
-            onChange={e => setNewType(e.target.value)}
-            className="w-full rounded-xl px-3 py-2 text-xs text-white outline-none"
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
-          >
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name *" className={INPUT_CLS} />
+          <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Email" type="email" className={INPUT_CLS} />
+          <select value={newType} onChange={e => setNewType(e.target.value)} className={INPUT_CLS}>
             <option value="lead">Lead</option>
             <option value="venue_target">Target Venue</option>
             <option value="venue_customer">Venue Client</option>
@@ -905,9 +853,9 @@ export function RelationshipsPage() {
             <option value="partner">Partner</option>
           </select>
           <button
-            onClick={handleAddManual}
+            onClick={handleAddContact}
             disabled={!newName.trim() || adding}
-            className="w-full rounded-xl py-2.5 text-xs font-bold text-white disabled:opacity-40"
+            className="w-full rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-40"
             style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT2})` }}
           >
             {adding ? "Saving…" : "Add Contact"}
@@ -915,51 +863,50 @@ export function RelationshipsPage() {
         </div>
       )}
 
-      {/* ── Three-column layout ──────────────────────────────────────────────── */}
-      <div className="flex gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+      {/* ── Three-column layout ── */}
+      <div className="flex gap-4" style={{ minHeight: 520 }}>
 
-        {/* ── LEFT: Contact list ─────────────────────────────────────────────── */}
+        {/* LEFT — contact list */}
         <div
-          className={`flex flex-col rounded-2xl overflow-hidden transition-all duration-300 ${selected ? "hidden lg:flex lg:w-72 xl:w-80" : "flex w-full lg:w-72 xl:w-80"}`}
-          style={GLASS}
+          className={`flex flex-col glass-card rounded-2xl border border-white/60 overflow-hidden transition-all duration-300
+            ${selected ? "hidden lg:flex lg:w-72 xl:w-80 shrink-0" : "flex w-full lg:w-72 xl:w-80 shrink-0"}`}
         >
-          {/* Filter tabs */}
-          <div className="p-3 border-b border-white/06 space-y-2">
+          {/* Search + filters */}
+          <div className="shrink-0 p-3 border-b border-white/40 space-y-2">
             <div className="relative">
+              <Search className="w-3.5 h-3.5 text-muted-foreground/50 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search contacts…"
-                className="w-full rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 outline-none pl-8"
-                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+                className={`${INPUT_CLS} pl-8 text-sm`}
               />
-              <Users className="w-3.5 h-3.5 text-white/30 absolute left-2.5 top-1/2 -translate-y-1/2" />
             </div>
             <div className="flex gap-1 flex-wrap">
-              {FILTER_TABS.map(tab => {
-                const Icon = tab.icon;
-                const active = filterType === tab.id;
+              {FILTERS.map(f => {
+                const Icon   = f.icon;
+                const active = filterType === f.id;
                 return (
                   <button
-                    key={tab.id}
-                    onClick={() => setFilterType(tab.id)}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                    key={f.id}
+                    onClick={() => setFilterType(f.id)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold transition-all"
                     style={active
-                      ? { background: `${ACCENT}20`, color: ACCENT }
-                      : { background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.35)" }
+                      ? { background: `${ACCENT}15`, color: ACCENT }
+                      : { color: "var(--muted-foreground)" }
                     }
                   >
-                    <Icon className="w-2.5 h-2.5" />
-                    {tab.label}
-                    {counts[tab.id] > 0 && (
+                    <Icon className="w-3 h-3" />
+                    {f.label}
+                    {counts[f.id] > 0 && (
                       <span
-                        className="ml-0.5 px-1 rounded-full text-[9px]"
+                        className="ml-0.5 min-w-[16px] px-1 rounded-full text-[9px] font-bold"
                         style={active
-                          ? { background: `${ACCENT}30`, color: ACCENT }
-                          : { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }
+                          ? { background: `${ACCENT}20`, color: ACCENT }
+                          : { background: "rgba(0,0,0,0.06)", color: "var(--muted-foreground)" }
                         }
                       >
-                        {counts[tab.id]}
+                        {counts[f.id]}
                       </span>
                     )}
                   </button>
@@ -968,24 +915,28 @@ export function RelationshipsPage() {
             </div>
           </div>
 
-          {/* Contact list */}
+          {/* List */}
           <div className="flex-1 overflow-y-auto p-2 space-y-0.5" style={{ scrollbarWidth: "none" }}>
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+              <div className="flex items-center justify-center py-16">
+                <div className="w-5 h-5 border-2 border-muted-foreground/20 border-t-muted-foreground/60 rounded-full animate-spin" />
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-12 px-4">
-                <Users className="w-10 h-10 text-white/10 mx-auto mb-3" />
-                <p className="text-xs font-semibold text-white/30">No contacts yet</p>
-                <p className="text-[11px] text-white/20 mt-1">
-                  Import a CSV or add contacts manually.
-                  <br />Contacts also appear automatically when you close a deal.
+                <Users className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
+                <p className="text-sm font-semibold text-muted-foreground">
+                  {search ? "No contacts match" : "No contacts yet"}
+                </p>
+                <p className="text-xs text-muted-foreground/60 mt-1">
+                  {search
+                    ? "Try a different search"
+                    : "Import a CSV or add a contact above.\nContacts appear automatically when you close a deal."
+                  }
                 </p>
               </div>
             ) : (
               filtered.map(c => (
-                <ContactListItem
+                <ContactRow
                   key={c.id}
                   contact={c}
                   selected={selected?.id === c.id}
@@ -996,12 +947,9 @@ export function RelationshipsPage() {
           </div>
         </div>
 
-        {/* ── CENTRE: Contact detail ─────────────────────────────────────────── */}
+        {/* CENTRE — detail */}
         {selected ? (
-          <div
-            className="flex-1 rounded-2xl overflow-hidden"
-            style={GLASS}
-          >
+          <div className="flex-1 glass-card rounded-2xl border border-white/60 overflow-hidden">
             <ContactDetail
               contact={selected}
               onClose={() => setSelected(null)}
@@ -1009,44 +957,61 @@ export function RelationshipsPage() {
             />
           </div>
         ) : (
-          <div
-            className="hidden lg:flex flex-1 rounded-2xl items-center justify-center"
-            style={GLASS}
-          >
+          <div className="hidden lg:flex flex-1 glass-card rounded-2xl border border-white/60 items-center justify-center">
             <div className="text-center">
-              <UserCheck className="w-12 h-12 text-white/10 mx-auto mb-3" />
-              <p className="text-sm font-semibold text-white/20">Select a contact</p>
-              <p className="text-xs text-white/15 mt-1">Click any contact to view details</p>
+              <UserCheck className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-muted-foreground">Select a contact</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Click any contact to view details</p>
             </div>
           </div>
         )}
 
-        {/* ── RIGHT: Tools panel (desktop only) ─────────────────────────────── */}
+        {/* RIGHT — stats + import (desktop, no contact selected) */}
         {!selected && (
-          <div className="hidden xl:flex flex-col gap-3 w-72 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-            {/* Stats summary */}
-            <div className="rounded-2xl p-4 space-y-3" style={GLASS}>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-white/40">Overview</p>
+          <div className="hidden xl:flex flex-col gap-3 w-64 shrink-0">
+            {/* Stats */}
+            <div className="glass-card rounded-2xl p-4 border border-white/60">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Overview</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { label: "Total",   value: contacts.length,                                          color: ACCENT },
-                  { label: "Clients", value: contacts.filter(c => c.relationship_type === "venue_customer" || c.relationship_type === "past_client").length, color: "#10b981" },
-                  { label: "Targets", value: contacts.filter(c => c.relationship_type === "venue_target").length, color: "#f59e0b" },
-                  { label: "No Email", value: contacts.filter(c => !c.email).length,                  color: "#6b7280" },
-                ].map(stat => (
-                  <div key={stat.label} className="rounded-xl p-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
-                    <p className="text-lg font-bold" style={{ color: stat.color }}>{stat.value}</p>
-                    <p className="text-[10px] text-white/40">{stat.label}</p>
+                  { label: "Total",    value: stats.total,   color: ACCENT },
+                  { label: "Clients",  value: stats.clients, color: "#10b981" },
+                  { label: "Targets",  value: stats.targets, color: "#f59e0b" },
+                  { label: "No email", value: stats.noEmail, color: "#6b7280" },
+                ].map(s => (
+                  <div key={s.label} className="rounded-xl p-3 text-center bg-white/40 border border-white/50">
+                    <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Quick CSV import */}
-            <CsvImportPanel onImported={loadContacts} />
+            {/* Import CSV */}
+            <div className="glass-card rounded-2xl p-4 border border-white/60">
+              <div className="flex items-center gap-2 mb-3">
+                <Upload className="w-4 h-4" style={{ color: ACCENT }} />
+                <p className="text-sm font-semibold" style={{ color: DARK }}>Import CSV</p>
+              </div>
+              <CsvImportPanel onImported={loadContacts} />
+            </div>
           </div>
         )}
       </div>
+
+      {/* Mobile import panel (shown below list when triggered) */}
+      {showImport && (
+        <div className="glass-card rounded-2xl p-5 border border-white/60 xl:hidden">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Upload className="w-4 h-4" style={{ color: ACCENT }} />
+              <p className="text-sm font-semibold" style={{ color: DARK }}>Import CSV</p>
+            </div>
+            <button onClick={() => setShowImport(false)}><X className="w-4 h-4 text-muted-foreground" /></button>
+          </div>
+          <CsvImportPanel onImported={() => { setShowImport(false); loadContacts(); }} />
+        </div>
+      )}
     </div>
   );
 }
