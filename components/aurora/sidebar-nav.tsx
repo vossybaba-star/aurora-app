@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   Compass,
   Send,
-  Heart,
+  Users,
   User,
   Sparkles,
   LogOut,
@@ -23,7 +23,7 @@ const navItems = [
   { id: "home",     label: "Overview",      icon: LayoutDashboard, description: "Your dashboard" },
   { id: "discover", label: "Find Leads",    icon: Compass,          description: "Discover opportunities" },
   { id: "outreach", label: "Outreach",      icon: Send,             description: "Campaigns & messages" },
-  { id: "saved",    label: "Relationships", icon: Heart,            description: "Saved contacts" },
+  { id: "relationships", label: "Relationships", icon: Users, description: "Contacts & nurture" },
   { id: "profile",  label: "Account",       icon: User,             description: "Profile & settings" },
 ];
 

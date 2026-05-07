@@ -1,16 +1,17 @@
 "use client";
 
 import { useAurora } from "./aurora-app";
-import { LayoutDashboard, Compass, Send, User } from "lucide-react";
+import { LayoutDashboard, Compass, Send, Users, User } from "lucide-react";
 
 const ACCENT  = "#7c6ef7";
 const ACCENT2 = "#9585f9";
 
 const navItems = [
-  { id: "home",     label: "Home",       icon: LayoutDashboard },
-  { id: "discover", label: "Find Leads", icon: Compass },
-  { id: "outreach", label: "Outreach",   icon: Send },
-  { id: "profile",  label: "Account",    icon: User },
+  { id: "home",          label: "Home",       icon: LayoutDashboard },
+  { id: "discover",      label: "Find Leads", icon: Compass },
+  { id: "outreach",      label: "Outreach",   icon: Send },
+  { id: "relationships", label: "People",     icon: Users },
+  { id: "profile",       label: "Account",    icon: User },
 ];
 
 export function BottomNav() {

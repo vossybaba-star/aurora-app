@@ -7,6 +7,7 @@ import { DashboardHome } from "./dashboard-home";
 import { OutreachPage } from "./outreach-page";
 import { DiscoverPage } from "./discover-page";
 import { SavedPage } from "./saved-page";
+import { RelationshipsPage } from "./relationships-page";
 import { ProfilePage } from "./profile-page";
 import { BottomNav } from "./bottom-nav";
 import { Spinner } from "@/components/ui/spinner";
@@ -34,6 +35,7 @@ export function Dashboard() {
       case "opportunities":
       case "outreach":     return <OutreachPage />;
       case "saved":        return <SavedPage />;
+      case "relationships": return <RelationshipsPage />;
       case "profile":      return <ProfilePage />;
       default:             return <DashboardHome />;
     }

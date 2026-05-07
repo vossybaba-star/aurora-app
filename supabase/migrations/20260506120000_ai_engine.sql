@@ -237,13 +237,27 @@ ALTER TABLE lead_enrichment_log  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE template_performance ENABLE ROW LEVEL SECURITY;
 
 -- Each user can only read and write their own enrichment audit rows
-CREATE POLICY IF NOT EXISTS "Users see own enrichment logs"
-  ON lead_enrichment_log
-  FOR ALL
-  USING (auth.uid() = user_id);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'lead_enrichment_log'
+    AND   policyname = 'Users see own enrichment logs'
+  ) THEN
+    CREATE POLICY "Users see own enrichment logs"
+      ON lead_enrichment_log FOR ALL
+      USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- Each user can only read and write their own template performance rows
-CREATE POLICY IF NOT EXISTS "Users see own template performance"
-  ON template_performance
-  FOR ALL
-  USING (auth.uid() = user_id);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'template_performance'
+    AND   policyname = 'Users see own template performance'
+  ) THEN
+    CREATE POLICY "Users see own template performance"
+      ON template_performance FOR ALL
+      USING (auth.uid() = user_id);
+  END IF;
+END $$;
