@@ -122,14 +122,14 @@ export async function POST(req: Request) {
   }
 
   // ── 2. Parse body ─────────────────────────────────────────────────────────
-  let body: { google_place_id?: string; website_url?: string; place_name?: string };
+  let body: { google_place_id?: string; website_url?: string; place_name?: string; skip_ai?: boolean };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { google_place_id, website_url, place_name } = body;
+  const { google_place_id, website_url, place_name, skip_ai } = body;
   if (!google_place_id) {
     return NextResponse.json({ error: "google_place_id is required" }, { status: 400 });
   }
@@ -141,7 +141,7 @@ export async function POST(req: Request) {
     .select(
       "id, last_enriched_at, ai_analysis, signal_score, score_breakdown, " +
       "google_editorial_summary, full_reviews, rating, rating_count, " +
-      "network_contacted_count, website"
+      "network_contacted_count, website, instagram_handle"
     )
     .eq("google_place_id", google_place_id)
     .eq("user_id", user.id)
@@ -233,6 +233,16 @@ export async function POST(req: Request) {
     } catch (err) {
       console.warn("[enrich-venue] Firecrawl scrape failed (non-fatal):", err);
     }
+  }
+
+  // ── skip_ai mode: return Instagram handle only, no Claude analysis ──────────
+  // Used by the Discover page to populate Instagram handles on tiles without
+  // running a full (expensive) Claude analysis.
+  if (skip_ai) {
+    return NextResponse.json({
+      status:           "instagram_only",
+      instagram_handle: instagramHandle,
+    });
   }
 
   // ──────────────────────────────────────────────────────────────────────────

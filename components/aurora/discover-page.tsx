@@ -37,6 +37,10 @@ import type { VenueEnrichmentResult } from "@/hooks/useVenueEnrichment";
 const ACCENT  = "#7c6ef7";
 const ACCENT2 = "#9585f9";
 
+// Module-level cache: placeIds we've already attempted Instagram lookup for.
+// Persists across re-renders so navigating back doesn't re-fire.
+const igFetchedIds = new Set<string>();
+
 type ViewMode = "grid" | "map";
 
 function getSearchPrompts(businessType: string | undefined): string[] {
@@ -124,6 +128,7 @@ export function DiscoverPage() {
   const [nearbyLocation, setNearbyLocation] = useState("");
   const [toast, setToast] = useState<ToastState | null>(null);
   const [lastTextQuery, setLastTextQuery] = useState<string | null>(null);
+  const [igMap, setIgMap] = useState<Map<string, string>>(new Map());
   const toastCounter = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -160,6 +165,8 @@ export function DiscoverPage() {
           setNearbyLocation(data.location || "");
           setNextPageToken(data.nextPageToken || null);
           setLastTextQuery(data.textQuery || null);
+          // Background: fetch Instagram handles for visible tiles
+          fetchInstagramBatch(data.places).catch(() => {});
         }
       } catch (e) {
         console.error("Failed to load venues:", e);
@@ -247,6 +254,7 @@ export function DiscoverPage() {
         setSearchResults(data.places);
         setNextPageToken(data.nextPageToken || null);
         setLastTextQuery(data.textQuery || null);
+        fetchInstagramBatch(data.places).catch(() => {});
       }
     } catch {
       console.error("Search failed");
@@ -260,6 +268,42 @@ export function DiscoverPage() {
     setSavedIds((prev) => new Set([...prev, placeId]));
     refreshData().catch(() => {});
   }, [refreshData]);
+
+  // Background Instagram handle fetch — Firecrawl only, no Claude (skip_ai=true).
+  // Processes 3 venues at a time; uses module-level igFetchedIds to avoid duplicates.
+  const fetchInstagramBatch = useCallback(async (places: Place[]) => {
+    const unfetched = places.filter(
+      (p) => p.website && !igFetchedIds.has(p.id) && !savedInstagramMap.has(p.id)
+    );
+    // Cap at 12 to limit Firecrawl spend per page load
+    const todo = unfetched.slice(0, 12);
+    for (let i = 0; i < todo.length; i += 3) {
+      const batch = todo.slice(i, i + 3);
+      await Promise.allSettled(
+        batch.map(async (venue) => {
+          igFetchedIds.add(venue.id);
+          try {
+            const res = await fetch("/api/enrich-venue", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                google_place_id: venue.id,
+                website_url:     venue.website,
+                place_name:      venue.name,
+                skip_ai:         true,
+              }),
+            });
+            if (res.ok) {
+              const d = await res.json();
+              if (d.instagram_handle) {
+                setIgMap((prev) => new Map([...prev, [venue.id, d.instagram_handle]]));
+              }
+            }
+          } catch { /* non-fatal */ }
+        })
+      );
+    }
+  }, [savedInstagramMap]);
 
   const showToast = useCallback((message: string, icon: ToastState["icon"] = "sparkles") => {
     const id = ++toastCounter.current;
@@ -412,6 +456,7 @@ export function DiscoverPage() {
                     place={place}
                     isSaved={savedIds.has(place.id)}
                     savedInstagram={savedInstagramMap.get(place.id) ?? null}
+                    igHandle={igMap.get(place.id) ?? null}
                     onSaved={handleSaved}
                     onToast={showToast}
                     selectedType={selectedType}
@@ -477,6 +522,7 @@ export function DiscoverPage() {
                   place={place}
                   isSaved={savedIds.has(place.id)}
                   savedInstagram={savedInstagramMap.get(place.id) ?? null}
+                  igHandle={igMap.get(place.id) ?? null}
                   onSaved={handleSaved}
                   onToast={showToast}
                   selectedType={selectedType}
@@ -520,6 +566,7 @@ export function DiscoverPage() {
                 place={place}
                 isSaved={savedIds.has(place.id)}
                 savedInstagram={savedInstagramMap.get(place.id) ?? null}
+                igHandle={igMap.get(place.id) ?? null}
                 onSaved={handleSaved}
                 onToast={showToast}
                 selectedType={selectedType}
@@ -555,6 +602,7 @@ interface DiscoverCardProps {
   place:          Place;
   isSaved:        boolean;
   savedInstagram: string | null;
+  igHandle?:      string | null;
   onSaved:        (placeId: string) => void;
   onToast:        (message: string, icon?: "sparkles" | "check") => void;
   selectedType:   string;
@@ -563,7 +611,7 @@ interface DiscoverCardProps {
 }
 
 function DiscoverCard({
-  place, isSaved, savedInstagram, onSaved, onToast, selectedType,
+  place, isSaved, savedInstagram, igHandle, onSaved, onToast, selectedType,
   isExpanded = false, onToggle,
 }: DiscoverCardProps) {
   const photoUrl = place.photoReference
@@ -572,12 +620,14 @@ function DiscoverCard({
 
   const [isSaving, setIsSaving]       = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError]     = useState<string | null>(null);
 
   const { enrichVenue, enriching, result, error } = useVenueEnrichment();
 
-  // Instagram: prefer the saved DB value; fall back to what enrichment found
+  // Instagram: saved DB value > background tile fetch > full enrichment result
   const instagramHandle =
     savedInstagram ||
+    igHandle ||
     result?.instagram_handle ||
     null;
 
@@ -637,8 +687,9 @@ function DiscoverCard({
       setSaveSuccess(true);
       onSaved(place.id);
       onToast("Added to Outreach — Aurora is writing your email sequence", "sparkles");
-    } catch {
-      // Silent: reset so user can retry
+    } catch (err) {
+      console.error("[DiscoverCard] Save failed:", err);
+      setSaveError("Couldn't save — tap to retry");
       setIsSaving(false);
     }
   };
@@ -762,7 +813,7 @@ function DiscoverCard({
         )}
 
         {/* Save button — pinned at bottom */}
-        <div className="mt-auto pt-2">
+        <div className="mt-auto pt-2 space-y-1">
           {isSaved || saveSuccess ? (
             <div className="w-full py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1.5"
                  style={{ color: ACCENT, background: `${ACCENT}12` }}>
@@ -779,9 +830,12 @@ function DiscoverCard({
               {isSaving ? (
                 <><Loader2 className="w-3.5 h-3.5 animate-spin" />Adding to Outreach…</>
               ) : (
-                <><Heart className="w-3.5 h-3.5" />Save to Pipeline</>
+                <><Heart className="w-3.5 h-3.5" />{saveError ? "Retry" : "Save to Pipeline"}</>
               )}
             </button>
+          )}
+          {saveError && !isSaved && !saveSuccess && (
+            <p className="text-[10px] text-red-500 text-center">{saveError}</p>
           )}
         </div>
       </div>
@@ -942,13 +996,14 @@ interface DiscoverCardCompactProps {
   place:          Place;
   isSaved:        boolean;
   savedInstagram: string | null;
+  igHandle?:      string | null;
   onSaved:        (placeId: string) => void;
   onToast:        (message: string, icon?: "sparkles" | "check") => void;
   selectedType:   string;
 }
 
 function DiscoverCardCompact({
-  place, isSaved, savedInstagram, onSaved, onToast, selectedType,
+  place, isSaved, savedInstagram, igHandle, onSaved, onToast, selectedType,
 }: DiscoverCardCompactProps) {
   const photoUrl = place.photoReference
     ? `/api/places/photo?ref=${encodeURIComponent(place.photoReference)}&maxWidth=200`
@@ -994,11 +1049,13 @@ function DiscoverCardCompact({
       setSaveSuccess(true);
       onSaved(place.id);
       onToast("Added to Outreach — Aurora is writing your email sequence", "sparkles");
-    } catch {
+    } catch (err) {
+      console.error("[DiscoverCardCompact] Save failed:", err);
       setIsSaving(false);
     }
   };
 
+  const instagramHandle = savedInstagram || igHandle || null;
   const saved = isSaved || saveSuccess;
 
   return (
@@ -1028,9 +1085,9 @@ function DiscoverCardCompact({
             <span className="text-[10px] font-semibold text-muted-foreground">{place.rating.toFixed(1)}</span>
           </div>
         )}
-        {savedInstagram && (
+        {instagramHandle && (
           <p className="text-[10px] font-medium truncate" style={{ color: "#e1306c" }}>
-            {savedInstagram}
+            {instagramHandle}
           </p>
         )}
       </div>
