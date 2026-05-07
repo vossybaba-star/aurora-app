@@ -255,6 +255,10 @@ export function CompanyCard({
           liked:         true,
           contact_name:  `${person.first_name} ${person.last_name}`.trim(),
           contact_title: person.title ?? undefined,
+          contact_email: person.email ?? undefined,
+          // Store the Aurora Score suggested_angle in why_good_fit so the
+          // email generation prompt can use it as the opening hook.
+          whyGoodFit:    result?.suggested_angle ?? undefined,
         }),
       });
       if (res.ok) {

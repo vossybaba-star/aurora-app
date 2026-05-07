@@ -90,6 +90,9 @@ export interface Opportunity {
   // Enrichment data
   enrichmentStatus?: EnrichmentStatus;
   contactForm?: ContactFormInfo;
+  // Apollo contact fields
+  contactName?: string;
+  contactTitle?: string;
   // Tier 1 contact intelligence
   instagramHandle?: string;
   instagramUrl?: string;

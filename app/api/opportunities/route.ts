@@ -67,6 +67,10 @@ export async function POST(request: Request) {
         rating:          body.rating || null,
         rating_count:    body.ratingCount || null,
         photo_reference: body.photoReference || null,
+        // Apollo contact fields
+        contact_name:    body.contact_name  || null,
+        contact_title:   body.contact_title || null,
+        contact_email:   body.contact_email || null,
         // Mark as pending so the enrichment pipeline fills in AI fields
         enrichment_status: "pending",
       })

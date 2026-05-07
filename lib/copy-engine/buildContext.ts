@@ -34,7 +34,22 @@ export async function buildCopyContext(opportunityId: string, userId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const opp = opportunity as any;
 
+  const isApollo = opp.source === "apollo";
+
+  // For Apollo records, contact_name/title come from the top-level columns.
+  // For venue records, fall back to what Claude extracted into ai_analysis.
+  const contactName  = opp.contact_name  ?? analysis.contact_name  ?? null;
+  const contactTitle = opp.contact_title ?? null;
+
+  // For Apollo records, the suggested angle was stored in why_good_fit when
+  // the opportunity was created from CompanyCard. For venue records, it comes
+  // from the ai_analysis JSON written by enrich-venue.
+  const recommendedAngle = isApollo
+    ? (opp.why_good_fit || null)
+    : (analysis.recommended_angle ?? null);
+
   return {
+    source: (opp.source ?? "manual") as string,
     sender: {
       name:            prof.full_name ?? prof.business_name ?? prof.businessName ?? "your team",
       business_name:   prof.business_name ?? null,
@@ -61,13 +76,14 @@ export async function buildCopyContext(opportunityId: string, userId: string) {
       review_count:               opp.review_count_total ?? opp.rating_count ?? null,
       price_level:                opp.price_level ?? null,
       google_summary:             opp.google_editorial_summary ?? null,
-      contact_name:               analysis.contact_name ?? null,
-      contact_email:              analysis.contact_email ?? null,
+      contact_name:               contactName,
+      contact_title:              contactTitle,
+      contact_email:              opp.contact_email ?? analysis.contact_email ?? null,
       wedding_relevance:          analysis.wedding_relevance ?? 0,
       cultural_relevance:         analysis.cultural_relevance ?? 0,
       has_exclusive_photographer: analysis.has_exclusive_photographer ?? false,
       key_phrases:                analysis.key_phrases_for_email ?? [],
-      recommended_angle:          analysis.recommended_angle ?? null,
+      recommended_angle:          recommendedAngle,
       caution_note:               analysis.why_bad_lead ?? null,
       venue_vibe:                 analysis.venue_vibe_tags?.join(", ") ?? null,
       why_good_lead:              analysis.why_good_lead ?? null,

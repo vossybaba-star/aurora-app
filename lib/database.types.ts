@@ -47,6 +47,9 @@ export interface DbOpportunity {
   contact_form_label: string | null;
   contact_form_confidence: string | null;
   enrichment_status: string | null;
+  // Apollo contact fields
+  contact_name: string | null;
+  contact_title: string | null;
   // Tier 1 contact intelligence
   instagram_handle: string | null;
   instagram_url: string | null;
@@ -194,6 +197,9 @@ export function dbOpportunityToOpportunity(db: DbOpportunity, contactMethods: Db
       label: db.contact_form_label || 'Contact Form',
       confidence: (db.contact_form_confidence as 'high' | 'medium' | 'low') || 'low',
     } : undefined,
+    // Apollo contact fields
+    contactName:       db.contact_name          || undefined,
+    contactTitle:      db.contact_title         || undefined,
     // Tier 1 contact intelligence
     instagramHandle:   db.instagram_handle      || undefined,
     instagramUrl:      db.instagram_url         || undefined,

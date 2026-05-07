@@ -54,9 +54,18 @@ UK ENGLISH ALWAYS:
 // ─── Initial email prompt ─────────────────────────────────────────────────────
 
 export function buildInitialEmailPrompt(ctx: CopyContext): string {
-  const greeting = ctx.recipient.contact_name
-    ? `Hi ${ctx.recipient.contact_name},`
-    : "Hi there,";
+  const isApollo     = ctx.source === "apollo";
+  const contactName  = ctx.recipient.contact_name;
+  const contactTitle = ctx.recipient.contact_title ?? null;
+
+  // For Apollo records address the individual by first name.
+  // For venue records, use full contact name if known, or "there".
+  const firstName = contactName ? contactName.split(" ")[0] : null;
+  const greeting  = isApollo && firstName
+    ? `Hi ${firstName},`
+    : contactName
+      ? `Hi ${contactName},`
+      : "Hi there,";
 
   const specialityLine =
     ctx.sender.speciality_tags.length > 0
@@ -87,7 +96,19 @@ export function buildInitialEmailPrompt(ctx: CopyContext): string {
     : ctx.signal_score >= 40 ? "moderate fit"
     : "speculative lead";
 
-  return `Write a cold outreach email from a ${ctx.sender.profession} to a venue.
+  // Apollo-specific contact reference line
+  const apolloContactLine = isApollo && firstName && contactTitle
+    ? `- Contact: ${firstName} ${contactName!.split(" ").slice(1).join(" ")} — ${contactTitle} at ${ctx.recipient.venue_name}`
+    : isApollo && firstName
+      ? `- Contact: ${contactName} at ${ctx.recipient.venue_name}`
+      : "";
+
+  // Apollo vs venue opening hook instruction
+  const openingInstruction = isApollo && firstName
+    ? `- FIRST sentence: lead with the suggested angle — reference ${firstName}'s role${contactTitle ? ` (${contactTitle})` : ""} at ${ctx.recipient.venue_name} naturally. Do NOT open with "I came across your profile" or "I wanted to reach out"`
+    : `- FIRST sentence after the greeting: lead with the suggested angle above — do NOT open with a generic "I wanted to reach out" or "I came across your venue"\n- The hook must feel like the sender noticed something genuine and specific about ${ctx.recipient.venue_name}`;
+
+  return `Write a cold outreach email from a ${ctx.sender.profession} to ${isApollo ? "a specific contact at a company" : "a venue"}.
 
 SENDER PROFILE:
 - Name: ${ctx.sender.name}
@@ -102,22 +123,23 @@ ${voiceLine ? voiceLine : ""}- Past clients: ${ctx.sender.past_clients.join(", "
 - Portfolio: ${ctx.sender.portfolio_url ?? ctx.sender.website ?? "Not provided"}
 
 LEAD INTELLIGENCE:
-- Venue name: ${ctx.recipient.venue_name}
+${apolloContactLine ? apolloContactLine + "\n" : ""}- Company/venue name: ${ctx.recipient.venue_name}
 - Location: ${ctx.recipient.address ?? "Not specified"}
 - Aurora Score: ${ctx.signal_score}/100 (${scoreTier})
-- Google rating: ${ctx.recipient.rating != null ? `${ctx.recipient.rating}/5 (${ctx.recipient.review_count} reviews)` : "Not available"}
+${!isApollo ? `- Google rating: ${ctx.recipient.rating != null ? `${ctx.recipient.rating}/5 (${ctx.recipient.review_count} reviews)` : "Not available"}
 - Venue vibe: ${ctx.recipient.venue_vibe ?? "Not analysed yet"}
-- Google summary: ${ctx.recipient.google_summary ?? "None"}
-${keyPhrase ? `- Specific venue detail to reference: "${keyPhrase}"` : ""}
+- Google summary: ${ctx.recipient.google_summary ?? "None"}` : ""}
+${keyPhrase ? `- Specific detail to reference: "${keyPhrase}"` : ""}
 ${angle ? `- Suggested angle (USE THIS AS THE OPENING HOOK — the first sentence after the greeting must be built around this): ${angle}` : ""}
 ${caution ? `- Caution note: ${caution} — be mindful of this; do not reference it directly but let it quietly inform your framing` : ""}
 ${culturalNote}
 
 INSTRUCTIONS:
 - Start with: ${greeting}
-- FIRST sentence after the greeting: lead with the suggested angle above — do NOT open with a generic "I wanted to reach out" or "I came across your venue"
-- The hook must feel like the sender noticed something genuine and specific about ${ctx.recipient.venue_name}
-- In 2-3 sentences: who the sender is, their specialities (${specialityLine}), and why this venue specifically suits their work
+${openingInstruction}
+${isApollo && firstName
+  ? `- In 2-3 sentences: briefly introduce who the sender is, their specialities (${specialityLine}), and why ${ctx.recipient.venue_name} specifically is interesting to them`
+  : `- In 2-3 sentences: who the sender is, their specialities (${specialityLine}), and why this venue specifically suits their work`}
 - The voice must match the "About them" text above — not a sales template, not corporate-speak
 ${pastClientsLine ? `- Naturally work in: "${pastClientsLine}"` : ""}
 - One soft ask: "Would you be open to a quick chat?" or similar — never pushy
@@ -133,7 +155,7 @@ Return ONLY valid JSON — no markdown fences, no preamble, no extra text:
   "subject_alternatives": ["<option 2>", "<option 3>"],
   "body": "<the full email body including greeting and sign-off>",
   "word_count": <integer>,
-  "personalisation_score": <0-100 integer — how specific this is to this venue vs a generic venue>
+  "personalisation_score": <0-100 integer — how specific this is to this contact/venue vs a generic template>
 }`;
 }
 
@@ -156,7 +178,15 @@ export function buildFollowUpPrompt(
   const angle           = angles[Math.min(followUpNumber - 1, 2)];
   const previousSubject = previousEmails[0]?.subject ?? `Photography for ${ctx.recipient.venue_name}`;
 
-  return `Write follow-up email #${followUpNumber} in an outreach sequence from ${ctx.sender.name} to ${ctx.recipient.venue_name}.
+  const isApolloFollowUp = ctx.source === "apollo";
+  const followUpFirstName = ctx.recipient.contact_name
+    ? ctx.recipient.contact_name.split(" ")[0]
+    : null;
+  const followUpTarget = isApolloFollowUp && followUpFirstName
+    ? `${followUpFirstName} at ${ctx.recipient.venue_name}`
+    : ctx.recipient.venue_name;
+
+  return `Write follow-up email #${followUpNumber} in an outreach sequence from ${ctx.sender.name} to ${followUpTarget}.
 
 PREVIOUS EMAILS SENT:
 ${previousEmails
