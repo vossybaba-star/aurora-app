@@ -293,19 +293,27 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
    Main Dashboard Home
 ═══════════════════════════════════════════════ */
 export function DashboardHome() {
-  const { setActiveTab, profile, opportunities, refreshData } = useAurora();
+  const { setActiveTab, profile, opportunities, refreshData, goToProfileSection } = useAurora();
 
   const [selectedOpp,          setSelectedOpp]          = useState<Opportunity | null>(null);
   const [viewingOpp,            setViewingOpp]            = useState<Opportunity | null>(null);
   const [showAll,               setShowAll]               = useState(false);
   const [isOutreachDialogOpen,  setIsOutreachDialogOpen]  = useState(false);
   const [greeting,              setGreeting]              = useState("Welcome");
+  const [emailConnected,        setEmailConnected]        = useState<boolean | null>(null);
 
   useEffect(() => {
     const h = new Date().getHours();
     if (h < 12)      setGreeting("Good morning");
     else if (h < 17) setGreeting("Good afternoon");
     else             setGreeting("Good evening");
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/email/status")
+      .then(r => r.json())
+      .then(d => setEmailConnected(d.connected))
+      .catch(() => setEmailConnected(false));
   }, []);
 
   const now       = Date.now();
@@ -425,6 +433,37 @@ export function DashboardHome() {
             Daily Insight
           </span>
         </div>
+
+        {/* ── Connect email banner — shown only when email is not connected ── */}
+        {emailConnected === false && (
+          <div
+            className="flex items-center justify-between gap-4 rounded-2xl px-5 py-4 mb-4 border border-[#c4bbfd]/40"
+            style={{
+              background: "linear-gradient(135deg, rgba(124,110,247,0.10) 0%, rgba(149,133,249,0.06) 100%)",
+            }}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
+                style={{ background: "linear-gradient(135deg,#7c6ef7,#9585f9)" }}
+              >
+                <Mail className="w-4 h-4 text-white" />
+              </div>
+              <p className="text-sm text-muted-foreground leading-snug">
+                <span className="font-bold" style={{ color: "#131b2e" }}>Connect your inbox</span>{" "}
+                to start sending directly from Aurora — no copy-paste needed.
+              </p>
+            </div>
+            <button
+              onClick={() => goToProfileSection("email")}
+              className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+              style={{ background: "linear-gradient(135deg,#7c6ef7,#9585f9)" }}
+            >
+              Connect email
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Metric cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

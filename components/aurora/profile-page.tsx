@@ -898,9 +898,9 @@ function SidebarCard({
 ═══════════════════════════════════════════════ */
 export function ProfilePage() {
   const router = useRouter();
-  const { profile, setProfile } = useAurora();
+  const { profile, setProfile, profileSection } = useAurora();
   const [isPending, startTransition] = useTransition();
-  const [activeSection, setActiveSection] = useState<Section>("my-profile");
+  const [activeSection, setActiveSection] = useState<Section>(profileSection as Section ?? "my-profile");
 
   if (!profile) {
     return (

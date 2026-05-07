@@ -26,7 +26,9 @@ interface AuroraContextType {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   profileNavKey: number;
+  profileSection: string;
   goToProfileHome: () => void;
+  goToProfileSection: (section: string) => void;
   refreshData: (silent?: boolean) => Promise<void>;
   isLoading: boolean;
 }
@@ -55,10 +57,19 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [activeTab, setActiveTab] = useState("home");
   const [profileNavKey, setProfileNavKey] = useState(0);
+  const [profileSection, setProfileSection] = useState("my-profile");
   const [isLoading, setIsLoading] = useState(false);
 
   // Navigate to Account > My Profile, forcing a fresh mount even if already on the tab
   const goToProfileHome = () => {
+    setProfileSection("my-profile");
+    setActiveTab("profile");
+    setProfileNavKey(k => k + 1);
+  };
+
+  // Navigate to a specific section within the profile/settings page
+  const goToProfileSection = (section: string) => {
+    setProfileSection(section);
     setActiveTab("profile");
     setProfileNavKey(k => k + 1);
   };
@@ -145,7 +156,9 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
         activeTab,
         setActiveTab,
         profileNavKey,
+        profileSection,
         goToProfileHome,
+        goToProfileSection,
         refreshData,
         isLoading,
       }}
