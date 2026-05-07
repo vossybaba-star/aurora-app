@@ -10,6 +10,7 @@ import { SavedPage } from "./saved-page";
 import { RelationshipsPage } from "./relationships-page";
 import { ProfilePage } from "./profile-page";
 import { BottomNav } from "./bottom-nav";
+import { FirstRunWizard } from "./first-run-wizard";
 import { Spinner } from "@/components/ui/spinner";
 
 export function Dashboard() {
@@ -43,6 +44,8 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen flex">
+      {/* First-run wizard — renders as a fixed overlay, self-manages visibility via localStorage */}
+      <FirstRunWizard />
 
       {/* ── Sidebar: icon-only at md (60px), full at lg (220px) ── */}
       <div className="hidden md:block">
