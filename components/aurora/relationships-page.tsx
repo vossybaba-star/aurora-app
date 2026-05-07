@@ -817,7 +817,7 @@ export function RelationshipsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { setShowImport(v => !v); setShowAdd(false); }}
+            onClick={() => { setShowImport(true); setShowAdd(false); }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-black/05 transition-all border border-white/60 glass-card"
           >
             <Upload className="w-3.5 h-3.5" />
@@ -863,7 +863,7 @@ export function RelationshipsPage() {
         </div>
       )}
 
-      {/* ── Three-column layout ── */}
+      {/* ── Two-column layout ── */}
       <div className="flex gap-4" style={{ minHeight: 520 }}>
 
         {/* LEFT — contact list */}
@@ -947,7 +947,7 @@ export function RelationshipsPage() {
           </div>
         </div>
 
-        {/* CENTRE — detail */}
+        {/* RIGHT — contact detail or empty state */}
         {selected ? (
           <div className="flex-1 glass-card rounded-2xl border border-white/60 overflow-hidden">
             <ContactDetail
@@ -957,59 +957,67 @@ export function RelationshipsPage() {
             />
           </div>
         ) : (
-          <div className="hidden lg:flex flex-1 glass-card rounded-2xl border border-white/60 items-center justify-center">
+          <div className="hidden lg:flex flex-1 flex-col glass-card rounded-2xl border border-white/60 items-center justify-center gap-6 p-8">
+            {/* Empty state */}
             <div className="text-center">
-              <UserCheck className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
-              <p className="text-sm font-semibold text-muted-foreground">Select a contact</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">Click any contact to view details</p>
-            </div>
-          </div>
-        )}
-
-        {/* RIGHT — stats + import (desktop, no contact selected) */}
-        {!selected && (
-          <div className="hidden xl:flex flex-col gap-3 w-64 shrink-0">
-            {/* Stats */}
-            <div className="glass-card rounded-2xl p-4 border border-white/60">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Overview</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Total",    value: stats.total,   color: ACCENT },
-                  { label: "Clients",  value: stats.clients, color: "#10b981" },
-                  { label: "New contacts", value: stats.targets, color: "#f59e0b" },
-                  { label: "No email", value: stats.noEmail, color: "#6b7280" },
-                ].map(s => (
-                  <div key={s.label} className="rounded-xl p-3 text-center bg-white/40 border border-white/50">
-                    <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
-                  </div>
-                ))}
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm"
+                style={{ background: `rgba(124,110,247,0.08)` }}
+              >
+                <UserCheck className="w-7 h-7" style={{ color: `${ACCENT}80` }} />
               </div>
+              <p className="text-base font-bold" style={{ color: DARK }}>Select a contact to view their details</p>
+              <p className="text-xs text-muted-foreground mt-1">Click any name in the list on the left</p>
             </div>
 
-            {/* Import CSV */}
-            <div className="glass-card rounded-2xl p-4 border border-white/60">
-              <div className="flex items-center gap-2 mb-3">
-                <Upload className="w-4 h-4" style={{ color: ACCENT }} />
-                <p className="text-sm font-semibold" style={{ color: DARK }}>Import CSV</p>
-              </div>
-              <CsvImportPanel onImported={loadContacts} />
+            {/* Stats row */}
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              {[
+                { label: "Total",        value: stats.total,   color: ACCENT     },
+                { label: "Clients",      value: stats.clients, color: "#10b981"  },
+                { label: "New contacts", value: stats.targets, color: "#f59e0b"  },
+                { label: "No email",     value: stats.noEmail, color: "#6b7280"  },
+              ].map(s => (
+                <div key={s.label} className="rounded-2xl px-5 py-3 text-center bg-white/50 border border-white/50 min-w-[80px]">
+                  <p className="text-xl font-extrabold leading-none" style={{ color: s.color }}>{s.value}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{s.label}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Mobile import panel (shown below list when triggered) */}
+      {/* ── Import CSV modal ── */}
       {showImport && (
-        <div className="glass-card rounded-2xl p-5 border border-white/60 xl:hidden">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Upload className="w-4 h-4" style={{ color: ACCENT }} />
-              <p className="text-sm font-semibold" style={{ color: DARK }}>Import CSV</p>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+          onClick={() => setShowImport(false)}
+        >
+          <div
+            className="glass-card rounded-2xl p-6 border border-white/60 w-full max-w-md shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center"
+                  style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
+                >
+                  <Upload className="w-4 h-4 text-white" />
+                </div>
+                <p className="text-sm font-bold" style={{ color: DARK }}>Import CSV</p>
+              </div>
+              <button
+                onClick={() => setShowImport(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-black/05 transition-colors text-muted-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <button onClick={() => setShowImport(false)}><X className="w-4 h-4 text-muted-foreground" /></button>
+            <CsvImportPanel onImported={() => { setShowImport(false); loadContacts(); }} />
           </div>
-          <CsvImportPanel onImported={() => { setShowImport(false); loadContacts(); }} />
         </div>
       )}
     </div>
