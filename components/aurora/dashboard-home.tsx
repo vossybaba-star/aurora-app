@@ -413,7 +413,7 @@ export function DashboardHome() {
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               {hasAnything
-                ? `${overdueOpps.length + readyToSend.length} ${(overdueOpps.length + readyToSend.length) === 1 ? "action" : "actions"} waiting for you today`
+                ? `${followUpsDue} follow-up${followUpsDue !== 1 ? 's' : ''} due, ${readyToContact} venue${readyToContact !== 1 ? 's' : ''} ready to contact`
                 : "You're all caught up — ready to find new leads"}
             </p>
           </div>
@@ -432,7 +432,7 @@ export function DashboardHome() {
             label="Sent this week"
             value={sentThisWeek}
             trend={sentTrend}
-            sub={sentLastWeek > 0 ? `vs ${sentLastWeek} last week` : "No data yet"}
+            sub={sentLastWeek > 0 ? `vs ${sentLastWeek} last week` : "Your first reply is one send away"}
           />
           <MetricCard
             label="Response rate"
@@ -440,7 +440,7 @@ export function DashboardHome() {
             sub={
               totalReplied > 0
                 ? `${totalReplied} ${totalReplied === 1 ? "reply" : "replies"} received`
-                : "No replies yet"
+                : "Replies will show here"
             }
           />
           <MetricCard

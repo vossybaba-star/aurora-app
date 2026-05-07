@@ -6,8 +6,8 @@ import { Spinner } from "@/components/ui/spinner";
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   home:     { title: "Overview",      subtitle: "Your outreach at a glance" },
-  discover: { title: "Find Leads",    subtitle: "Search and discover new opportunities" },
-  outreach: { title: "Outreach",      subtitle: "Manage your campaigns and messages" },
+  discover: { title: "Discover",      subtitle: "Search and discover new opportunities" },
+  outreach: { title: "Outreach",      subtitle: "Your messages and follow-ups" },
   saved:    { title: "Relationships", subtitle: "Your saved contacts and leads" },
   profile:  { title: "Account",       subtitle: "Manage your profile and settings" },
 };

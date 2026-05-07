@@ -20,7 +20,7 @@ const ACCENT2 = "#9585f9";
 
 const navItems = [
   { id: "home",     label: "Overview",      icon: LayoutDashboard, description: "Your dashboard" },
-  { id: "discover", label: "Find Leads",    icon: Compass,          description: "Discover opportunities" },
+  { id: "discover", label: "Discover",      icon: Compass,          description: "Discover opportunities" },
   { id: "outreach", label: "Outreach",      icon: Send,             description: "Campaigns & messages" },
   { id: "relationships", label: "Relationships", icon: Users, description: "Contacts & nurture" },
   { id: "profile",  label: "Settings",      icon: Settings,         description: "Profile & settings" },

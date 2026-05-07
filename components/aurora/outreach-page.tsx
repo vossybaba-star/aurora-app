@@ -1467,7 +1467,7 @@ export function OutreachPage() {
           <div className="w-[350px] shrink-0 border-r border-white/30 flex flex-col">
             <div className="px-4 py-3 border-b border-white/20 shrink-0">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                {activeStage.charAt(0).toUpperCase() + activeStage.slice(1)} · {activeList.length} contact{activeList.length !== 1 ? 's' : ''}
+                {activeList.length} message{activeList.length !== 1 ? 's' : ''} sent
               </p>
             </div>
             <div className="flex-1 overflow-y-auto">

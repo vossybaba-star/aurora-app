@@ -723,7 +723,7 @@ const FILTERS = [
   { id: "all",            label: "All",         icon: Users },
   { id: "venue_customer", label: "Clients",     icon: Building2 },
   { id: "past_client",    label: "Past",        icon: UserCheck },
-  { id: "venue_target",   label: "Targets",     icon: Target },
+  { id: "venue_target",   label: "New contacts", icon: Target },
 ];
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -976,7 +976,7 @@ export function RelationshipsPage() {
                 {[
                   { label: "Total",    value: stats.total,   color: ACCENT },
                   { label: "Clients",  value: stats.clients, color: "#10b981" },
-                  { label: "Targets",  value: stats.targets, color: "#f59e0b" },
+                  { label: "New contacts", value: stats.targets, color: "#f59e0b" },
                   { label: "No email", value: stats.noEmail, color: "#6b7280" },
                 ].map(s => (
                   <div key={s.label} className="rounded-xl p-3 text-center bg-white/40 border border-white/50">

@@ -836,7 +836,7 @@ function DiscoverCard({
               {isSaving ? (
                 <><Loader2 className="w-3.5 h-3.5 animate-spin" />Adding to Outreach…</>
               ) : (
-                <><Heart className="w-3.5 h-3.5" />{saveError ? "Retry" : "Save to Pipeline"}</>
+                <><Heart className="w-3.5 h-3.5" />{saveError ? "Retry" : "Save to Outreach"}</>
               )}
             </button>
           )}
