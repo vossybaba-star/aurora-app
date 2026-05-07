@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Use service role for webhook/tracking (no user context)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 // 1x1 transparent GIF
 const TRACKING_PIXEL = Buffer.from(
   "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
@@ -19,17 +13,25 @@ export async function GET(
 ) {
   const { id } = await params;
 
+  // Instantiate inside handler — never at module level (Vercel Fluid compute safety)
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   try {
-    // Update the sent email record
+    // Mark opened_at and status (only if not already opened)
     await supabase
       .from("sent_emails")
       .update({
         opened_at: new Date().toISOString(),
-        open_count: supabase.rpc("increment_open_count", { email_id: id }),
         status: "opened",
       })
       .eq("id", id)
-      .is("opened_at", null); // Only update if not already opened
+      .is("opened_at", null);
+
+    // Increment open_count via RPC (separate call — rpc() returns a Promise, not a value)
+    await supabase.rpc("increment_open_count", { email_id: id });
   } catch (error) {
     console.error("Track open error:", error);
   }

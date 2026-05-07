@@ -39,7 +39,8 @@ function isFresha(headers: string[]): boolean {
 // ─── JWT unsubscribe token ────────────────────────────────────────────────────
 
 async function makeUnsubToken(contactId: string): Promise<string> {
-  const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? "fallback-secret");
+  if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET env var is not set");
+  const secret = new TextEncoder().encode(process.env.JWT_SECRET);
   return new SignJWT({ sub: contactId, purpose: "unsubscribe" })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("365d")

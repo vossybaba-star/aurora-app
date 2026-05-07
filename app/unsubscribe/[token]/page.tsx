@@ -16,7 +16,8 @@ interface Props {
 
 async function handleUnsubscribe(token: string): Promise<{ name: string | null; error: string | null }> {
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET ?? "fallback-secret");
+    if (!process.env.JWT_SECRET) return { name: null, error: "Server misconfiguration." };
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
 
     if (payload.purpose !== "unsubscribe" || !payload.sub) {

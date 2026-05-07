@@ -87,20 +87,19 @@ interface VenueInput {
 // ─── POST handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
-  // ── Auth: accept internal caller OR valid cron secret ────────────────────
+  // ── Auth: require INTERNAL_API_SECRET or CRON_SECRET ─────────────────────
+  // isSelf (Host-header check) was removed — Host headers are caller-controlled
+  // and trivially spoofable. Always require an explicit secret.
   const authHeader = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  const isInternal = authHeader === `Bearer ${process.env.INTERNAL_API_SECRET}`;
-  const isCron     = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const isInternal = process.env.INTERNAL_API_SECRET
+    ? authHeader === `Bearer ${process.env.INTERNAL_API_SECRET}`
+    : false;
+  const isCron = process.env.CRON_SECRET
+    ? authHeader === `Bearer ${process.env.CRON_SECRET}`
+    : false;
 
   if (!isInternal && !isCron) {
-    // Also allow requests coming from within the same Vercel deployment
-    const host = req.headers.get("host") ?? "";
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-    const isSelf = appUrl.includes(host) || host.includes("localhost");
-    if (!isSelf) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // ── Parse body ────────────────────────────────────────────────────────────

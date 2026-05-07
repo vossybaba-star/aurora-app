@@ -4,14 +4,21 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(request: Request) {
   try {
     const { opportunityId } = await request.json();
-    
+
     const supabase = await createClient();
-    
-    // Get the opportunity
+
+    // ── Auth check ────────────────────────────────────────────────────────────
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get the opportunity — scoped to this user only
     const { data: opp, error: oppError } = await supabase
       .from("opportunities")
       .select("*")
       .eq("id", opportunityId)
+      .eq("user_id", user.id)
       .single();
     
     if (oppError || !opp) {

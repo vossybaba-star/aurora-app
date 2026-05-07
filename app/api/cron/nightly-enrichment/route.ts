@@ -17,13 +17,15 @@ import { createServiceClient } from "@/lib/supabase/service";
 const BATCH_LIMIT = 50;
 
 export async function GET(req: Request) {
-  // ── Verify cron secret ────────────────────────────────────────────────────
+  // ── Verify cron secret — always required, no fallback ───────────────────
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!cronSecret) {
+    console.error("[nightly-enrichment] CRON_SECRET env var is not set");
+    return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
+  }
+  const auth = req.headers.get("authorization");
+  if (auth !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const service = createServiceClient();
