@@ -8,10 +8,9 @@ import {
   Compass,
   Send,
   Users,
-  User,
+  Settings,
   Sparkles,
   LogOut,
-  Settings,
   Zap,
 } from "lucide-react";
 
@@ -24,11 +23,11 @@ const navItems = [
   { id: "discover", label: "Find Leads",    icon: Compass,          description: "Discover opportunities" },
   { id: "outreach", label: "Outreach",      icon: Send,             description: "Campaigns & messages" },
   { id: "relationships", label: "Relationships", icon: Users, description: "Contacts & nurture" },
-  { id: "profile",  label: "Account",       icon: User,             description: "Profile & settings" },
+  { id: "profile",  label: "Settings",      icon: Settings,         description: "Profile & settings" },
 ];
 
 export function SidebarNav() {
-  const { activeTab, setActiveTab, goToProfileHome, profile, opportunities } = useAurora();
+  const { activeTab, setActiveTab, profile, opportunities } = useAurora();
   const [isPending, startTransition] = useTransition();
 
   const stats = {
@@ -218,35 +217,6 @@ export function SidebarNav() {
 
       {/* ── Bottom actions ──────────────────────── */}
       <div className="px-1.5 lg:px-3 pb-4 pt-2 border-t border-white/30 space-y-0.5">
-
-        {/* Settings */}
-        <div className="relative group">
-          <button
-            className="w-full flex items-center justify-center lg:justify-start gap-3
-                       lg:px-3 py-2 rounded-xl text-muted-foreground
-                       hover:bg-white/25 hover:text-foreground transition-all"
-            onClick={goToProfileHome}
-          >
-            <Settings className="w-4 h-4 shrink-0" />
-            <span className="hidden lg:block text-sm font-medium">Settings</span>
-          </button>
-          {/* Tablet tooltip */}
-          <div
-            aria-hidden="true"
-            className="hidden md:flex lg:hidden
-                       absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 z-50
-                       items-center px-3 py-2 rounded-xl
-                       text-xs font-bold text-white whitespace-nowrap
-                       pointer-events-none shadow-xl
-                       opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0
-                       transition-all duration-150"
-            style={{ background: "#1a1a2e" }}
-          >
-            <span className="absolute right-full top-1/2 -translate-y-1/2 block w-0 h-0"
-                  style={{ borderTop:"5px solid transparent", borderBottom:"5px solid transparent", borderRight:"5px solid #1a1a2e" }} />
-            Settings
-          </div>
-        </div>
 
         {/* Sign out */}
         <div className="relative group">
