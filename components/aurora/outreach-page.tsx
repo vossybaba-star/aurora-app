@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef, useCallback } from "react";
+import { useState, useTransition, useEffect, useRef, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -239,6 +239,8 @@ function ContactRow({
 /* ════════════════════════════════════════════════
    Pane Detail (desktop right pane)
 ════════════════════════════════════════════════ */
+const CONFETTI_COLORS = ['#7c6ef7', '#9585f9', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#22c55e', '#f97316'];
+
 function PaneDetail({
   sequence, onRefresh, onDeselect,
 }: {
@@ -247,6 +249,7 @@ function PaneDetail({
   onDeselect: () => void;
 }) {
   const { opportunity, messages, followUps } = sequence;
+  const { setActiveTab } = useAurora();
   const [isPending, startTransition] = useTransition();
   const [sequenceSteps, setSequenceSteps] = useState<SequenceStep[]>([]);
   const [isLoadingSteps, setIsLoadingSteps] = useState(true);
@@ -263,6 +266,32 @@ function PaneDetail({
   const [isPolling, setIsPolling] = useState(false);
   const [generationTookTooLong, setGenerationTookTooLong] = useState(false);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [wonModal, setWonModal] = useState<{ leadName: string } | null>(null);
+
+  const confettiPieces = useMemo(() =>
+    Array.from({ length: 28 }, (_, i) => ({
+      id: i,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      left: `${2 + (i * 3.5) % 96}%`,
+      delay: `${(i * 0.045).toFixed(2)}s`,
+      isCircle: i % 3 !== 0,
+      size: i % 5 === 0 ? 10 : 7,
+    })),
+  []);
+
+  const handleWon = useCallback(async () => {
+    startTransition(async () => {
+      await updateOpportunity(opportunity.id, { status: 'closed' });
+      // Fire-and-forget the upsert — non-fatal if it fails
+      fetch('/api/contacts/upsert-won', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ opportunity_id: opportunity.id }),
+      }).catch(() => {/* silent */});
+      await onRefresh();
+      setWonModal({ leadName: opportunity.name });
+    });
+  }, [opportunity.id, opportunity.name, onRefresh, startTransition]);
 
   const photo = thumbUrl(opportunity.photoReference, 600);
   const badge = statusBadge(opportunity.status);
@@ -472,6 +501,7 @@ function PaneDetail({
   const isInitialSend = nextSendable?.step_number === 1;
 
   return (
+    <>
     <div className="flex flex-col h-full relative">
 
       {/* ── Inline edit overlay ── */}
@@ -786,11 +816,7 @@ function PaneDetail({
           {/* Mark as won */}
           {opportunity.status !== 'closed' && (
             <button
-              onClick={() => startTransition(async () => {
-                await updateOpportunity(opportunity.id, { status: 'closed' });
-                await onRefresh();
-                toast.success('Marked as won! 🎉');
-              })}
+              onClick={handleWon}
               disabled={isPending}
               className="flex items-center gap-1.5 px-3 h-10 rounded-xl font-semibold text-xs border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all disabled:opacity-50"
             >
@@ -801,6 +827,93 @@ function PaneDetail({
         </div>
       </div>
     </div>
+
+    {/* ── Won celebration modal ── */}
+    {wonModal && (
+      <>
+        <style>{`
+          @keyframes confettiFall {
+            0%   { transform: translateY(-8px) rotate(0deg);   opacity: 1; }
+            80%  { opacity: 1; }
+            100% { transform: translateY(300px) rotate(540deg); opacity: 0; }
+          }
+          @keyframes wonModalIn {
+            0%   { opacity: 0; transform: scale(0.88) translateY(12px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+          }
+        `}</style>
+
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(19,27,46,0.55)', backdropFilter: 'blur(4px)' }}
+        >
+          {/* Confetti layer */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {confettiPieces.map(p => (
+              <div
+                key={p.id}
+                style={{
+                  position:        'absolute',
+                  top:             0,
+                  left:            p.left,
+                  width:           `${p.size}px`,
+                  height:          `${p.size}px`,
+                  backgroundColor: p.color,
+                  borderRadius:    p.isCircle ? '50%' : '2px',
+                  animation:       `confettiFall 1.4s ease-in ${p.delay} forwards`,
+                  opacity:         0,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Modal card */}
+          <div
+            className="relative mx-4 w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl"
+            style={{
+              background:  'rgba(255,255,255,0.97)',
+              animation:   'wonModalIn 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards',
+            }}
+          >
+            {/* Trophy icon */}
+            <div
+              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
+              style={{ background: 'linear-gradient(135deg,#f59e0b,#fbbf24)', boxShadow: '0 8px 24px rgba(245,158,11,0.35)' }}
+            >
+              <Trophy className="h-8 w-8 text-white" />
+            </div>
+
+            <h2 className="mb-2 text-xl font-extrabold" style={{ color: '#131b2e' }}>
+              Brilliant!
+            </h2>
+            <p className="mb-1 text-base font-semibold" style={{ color: '#131b2e' }}>
+              {wonModal.leadName} is now a client. 🎉
+            </p>
+            <p className="mb-8 text-sm text-muted-foreground">
+              They&apos;ve been added to your Relationships as a Client.
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => { setWonModal(null); setActiveTab('relationships'); }}
+                className="h-12 w-full rounded-xl font-bold text-sm text-white transition-all active:scale-[0.98]"
+                style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 4px 14px rgba(124,110,247,0.35)` }}
+              >
+                View in Relationships
+              </button>
+              <button
+                onClick={() => setWonModal(null)}
+                className="h-11 w-full rounded-xl border border-muted/40 bg-white font-semibold text-sm text-muted-foreground transition-all hover:bg-muted/10 active:scale-[0.98]"
+              >
+                Back to Outreach
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    )}
+    </>
   );
 }
 

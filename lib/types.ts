@@ -17,6 +17,9 @@ export interface UserProfile {
   phone?: string;
   tone: Tone;
   opportunitiesPerWeek: number;
+  specialityTags: string[];
+  workRadius: string;
+  voiceSample?: string;
   createdAt: string;
   updatedAt: string;
 }

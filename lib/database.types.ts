@@ -15,6 +15,9 @@ export interface DbProfile {
   tone: string | null;
   opportunities_per_week: number | null;
   onboarding_completed: boolean;
+  speciality_tags: string[] | null;
+  work_radius: string | null;
+  voice_sample: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -157,6 +160,9 @@ export function dbProfileToProfile(db: DbProfile): UserProfile {
     phone: db.phone || undefined,
     tone: (db.tone as Tone) || 'professional',
     opportunitiesPerWeek: db.opportunities_per_week || 5,
+    specialityTags: db.speciality_tags || [],
+    workRadius: db.work_radius || '',
+    voiceSample: db.voice_sample || undefined,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   };

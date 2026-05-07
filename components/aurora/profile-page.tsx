@@ -195,12 +195,17 @@ function SectionCard({ children, className = "" }: { children: React.ReactNode; 
 }
 
 /* ─── Field row ─────────────────────────────── */
-function FieldRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function FieldRow({ label, hint, incomplete, children }: { label: string; hint?: string; incomplete?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
       <div>
         <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{label}</label>
         {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
+        {incomplete && (
+          <p className="text-[10px] mt-0.5 font-medium" style={{ color: ACCENT }}>
+            Aurora uses this to personalise your outreach — the more detail the better.
+          </p>
+        )}
       </div>
       {children}
     </div>
@@ -254,9 +259,11 @@ function MyProfileSection({
   const [bizName,     setBizName]     = useState(profile.businessName || "");
   const [profession,  setProfession]  = useState(profile.businessType || "");
   const [location,    setLocation]    = useState(profile.location || "");
-  const [workRadius,  setWorkRadius]  = useState("");
+  const [workRadius,  setWorkRadius]  = useState(profile.workRadius || "");
   const [pitch,       setPitch]       = useState(profile.pitch || "");
-  const [tags,        setTags]        = useState<string[]>([]);
+  const [voiceSample, setVoiceSample] = useState(profile.voiceSample || "");
+  const [voiceSaved,  setVoiceSaved]  = useState(!!(profile.voiceSample));
+  const [tags,        setTags]        = useState<string[]>(profile.specialityTags || []);
   const [positioning, setPositioning] = useState("");
   const [portfolioUrl, setPortfolioUrl] = useState(profile.website || "");
   const [instagram,   setInstagram]   = useState(profile.instagram || "");
@@ -305,6 +312,9 @@ function MyProfileSection({
       pitch,
       website: portfolioUrl,
       instagram,
+      workRadius,
+      specialityTags: tags,
+      voiceSample,
     });
   };
 
@@ -364,14 +374,14 @@ function MyProfileSection({
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Identity</p>
         <div className="space-y-4">
-          <FieldRow label="Business name">
+          <FieldRow label="Business name" incomplete={!bizName}>
             <GlassInput value={bizName} onChange={setBizName} placeholder="e.g., Luna & Light Photography" />
           </FieldRow>
-          <FieldRow label="Profession / type">
+          <FieldRow label="Profession / type" incomplete={!profession}>
             <GlassInput value={profession} onChange={setProfession} placeholder="e.g., Wedding Photographer" />
           </FieldRow>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FieldRow label="Based in">
+            <FieldRow label="Based in" incomplete={!location}>
               <PlacesAutocomplete
                 value={location}
                 onChange={setLocation}
@@ -380,7 +390,7 @@ function MyProfileSection({
                            focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-full"
               />
             </FieldRow>
-            <FieldRow label="Work radius" hint="Aurora uses this when finding leads">
+            <FieldRow label="Work radius" incomplete={!workRadius}>
               <GlassInput value={workRadius} onChange={setWorkRadius} placeholder="e.g., 50 miles, UK-wide" />
             </FieldRow>
           </div>
@@ -390,7 +400,13 @@ function MyProfileSection({
       {/* ── About you ── */}
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">About you</p>
-        <p className="text-[11px] text-muted-foreground mb-3">Write in your own voice — Aurora uses this in emails</p>
+        <p className="text-[11px] text-muted-foreground">Write in your own voice — Aurora uses this in emails</p>
+        {pitch.length < 30 && (
+          <p className="text-[10px] font-medium mt-0.5 mb-3" style={{ color: ACCENT }}>
+            Aurora uses this to personalise your outreach — the more detail the better.
+          </p>
+        )}
+        {pitch.length >= 30 && <div className="mb-3" />}
         <textarea
           value={pitch}
           onChange={e => setPitch(e.target.value)}
@@ -401,9 +417,65 @@ function MyProfileSection({
         />
       </SectionCard>
 
+      {/* ── My writing voice ── */}
+      <SectionCard>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">My writing voice</p>
+        <p className="text-[11px] text-muted-foreground mb-3">
+          Paste 1–2 emails you've previously sent to clients. Aurora will learn your tone and use it when drafting outreach.
+        </p>
+
+        {voiceSaved && !!voiceSample.trim() && (
+          <div className="flex items-center justify-between mb-3 px-3 py-2 rounded-xl"
+               style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)" }}>
+            <p className="text-[11px] font-semibold" style={{ color: "#16a34a" }}>
+              Voice saved — Aurora will use this when drafting your emails
+            </p>
+            <button
+              onClick={() => setVoiceSaved(false)}
+              className="text-[11px] font-bold underline ml-3 shrink-0"
+              style={{ color: ACCENT }}
+            >
+              Update
+            </button>
+          </div>
+        )}
+
+        {(!voiceSaved || !voiceSample.trim()) && (
+          <>
+            <textarea
+              value={voiceSample}
+              onChange={e => { setVoiceSample(e.target.value); setVoiceSaved(false); }}
+              placeholder={"Paste an email you've sent before…\n\nHi [Name],\n\nI came across your venue and loved…"}
+              rows={6}
+              className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
+                         focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground mb-3"
+            />
+            <button
+              onClick={() => {
+                if (!voiceSample.trim()) return;
+                onSave({ voiceSample });
+                setVoiceSaved(true);
+              }}
+              disabled={!voiceSample.trim() || isPending}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white
+                         disabled:opacity-40 transition-opacity hover:opacity-90"
+              style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
+            >
+              Save my voice
+            </button>
+          </>
+        )}
+      </SectionCard>
+
       {/* ── Speciality tags ── */}
       <SectionCard>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Speciality tags</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Speciality tags</p>
+        {tags.length === 0 && (
+          <p className="text-[10px] font-medium mt-0.5 mb-3" style={{ color: ACCENT }}>
+            Aurora uses this to personalise your outreach — the more detail the better.
+          </p>
+        )}
+        {tags.length > 0 && <div className="mb-3" />}
         <PillInput
           pills={tags}
           onAdd={v => setTags(t => [...t, v])}
@@ -913,10 +985,11 @@ export function ProfilePage() {
   /* ── Completion metric ── */
   const completionItems = [
     { done: !!profile.businessName },
+    { done: !!profile.businessType },
     { done: !!profile.location },
-    { done: !!profile.pitch },
-    { done: profile.opportunityTypes.length > 0 },
-    { done: !!profile.website || !!profile.instagram },
+    { done: (profile.pitch?.length ?? 0) >= 30 },
+    { done: (profile.specialityTags?.length ?? 0) >= 1 },
+    { done: !!profile.workRadius },
   ];
   const completedCount    = completionItems.filter(i => i.done).length;
   const completionPercent = Math.round((completedCount / completionItems.length) * 100);

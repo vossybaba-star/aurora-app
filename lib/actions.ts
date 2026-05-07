@@ -68,6 +68,9 @@ export async function updateProfile(profileData: Partial<{
   tone: Tone;
   opportunitiesPerWeek: number;
   onboardingCompleted: boolean;
+  specialityTags: string[];
+  workRadius: string;
+  voiceSample: string;
 }>): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
   const user = await getCurrentUser();
@@ -88,6 +91,9 @@ export async function updateProfile(profileData: Partial<{
       tone: profileData.tone,
       opportunities_per_week: profileData.opportunitiesPerWeek,
       onboarding_completed: profileData.onboardingCompleted,
+      speciality_tags: profileData.specialityTags,
+      work_radius: profileData.workRadius,
+      voice_sample: profileData.voiceSample,
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);

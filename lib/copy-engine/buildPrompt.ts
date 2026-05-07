@@ -70,41 +70,58 @@ export function buildInitialEmailPrompt(ctx: CopyContext): string {
 
   const keyPhrase = ctx.recipient.key_phrases[0] ?? null;
   const angle     = ctx.recipient.recommended_angle ?? null;
+  const caution   = ctx.recipient.caution_note ?? null;
 
   const culturalNote =
     ctx.recipient.cultural_relevance > 60
       ? "- HIGH cultural relevance — this venue is likely a fit for Black/African/diaspora weddings. Weight this in the email if it feels natural and genuine."
       : "";
 
-  return `Write a cold outreach email from a photographer to a venue.
+  const voiceLine = ctx.sender.voice_sample
+    ? `- Writing voice examples (MATCH this tone, vocabulary, sentence length and formality level — the output must feel like the same person wrote it):\n  """\n  ${ctx.sender.voice_sample}\n  """`
+    : null;
 
-SENDER:
+  // Score tier gives the model a calibration signal
+  const scoreTier =
+    ctx.signal_score >= 70 ? "strong fit"
+    : ctx.signal_score >= 40 ? "moderate fit"
+    : "speculative lead";
+
+  return `Write a cold outreach email from a ${ctx.sender.profession} to a venue.
+
+SENDER PROFILE:
 - Name: ${ctx.sender.name}
 - Profession: ${ctx.sender.profession}
-- Speciality: ${specialityLine}
+- Specialities: ${specialityLine}
 - Positioning: ${ctx.sender.positioning}
 - Location: ${ctx.sender.location ?? "UK"}
-- Pitch: "${ctx.sender.pitch || "Professional photographer specialising in weddings and events"}"
-- Past clients: ${ctx.sender.past_clients.join(", ") || "None listed yet"}
+- About them (write in THIS voice — match the tone, vocabulary and energy of this text):
+  "${ctx.sender.pitch || `Professional ${ctx.sender.profession} specialising in ${specialityLine}`}"
+${voiceLine ? voiceLine : ""}- Past clients: ${ctx.sender.past_clients.join(", ") || "None listed yet"}
 - Tone preference: ${ctx.sender.tone}
 - Portfolio: ${ctx.sender.portfolio_url ?? ctx.sender.website ?? "Not provided"}
 
-RECIPIENT VENUE:
-- Name: ${ctx.recipient.venue_name}
+LEAD INTELLIGENCE:
+- Venue name: ${ctx.recipient.venue_name}
 - Location: ${ctx.recipient.address ?? "Not specified"}
+- Aurora Score: ${ctx.signal_score}/100 (${scoreTier})
 - Google rating: ${ctx.recipient.rating != null ? `${ctx.recipient.rating}/5 (${ctx.recipient.review_count} reviews)` : "Not available"}
 - Venue vibe: ${ctx.recipient.venue_vibe ?? "Not analysed yet"}
 - Google summary: ${ctx.recipient.google_summary ?? "None"}
-${keyPhrase ? `- Specific detail to reference: "${keyPhrase}"` : ""}
-${angle ? `- Recommended opening angle: ${angle}` : ""}
+${keyPhrase ? `- Specific venue detail to reference: "${keyPhrase}"` : ""}
+${angle ? `- Suggested angle (USE THIS AS THE OPENING HOOK — the first sentence after the greeting must be built around this): ${angle}` : ""}
+${caution ? `- Caution note: ${caution} — be mindful of this; do not reference it directly but let it quietly inform your framing` : ""}
 ${culturalNote}
 
 INSTRUCTIONS:
 - Start with: ${greeting}
-- Open with something specific about ${ctx.recipient.venue_name} — use the recommended angle or specific detail above
-- In 2-3 sentences: who the sender is, their speciality, why this venue specifically
+- FIRST sentence after the greeting: lead with the suggested angle above — do NOT open with a generic "I wanted to reach out" or "I came across your venue"
+- The hook must feel like the sender noticed something genuine and specific about ${ctx.recipient.venue_name}
+- In 2-3 sentences: who the sender is, their specialities (${specialityLine}), and why this venue specifically suits their work
+- The voice must match the "About them" text above — not a sales template, not corporate-speak
 ${pastClientsLine ? `- Naturally work in: "${pastClientsLine}"` : ""}
 - One soft ask: "Would you be open to a quick chat?" or similar — never pushy
+- Never use the word "partnership" anywhere in the email
 - Sign off with the sender's ACTUAL name: ${ctx.sender.name}
 - Maximum 120 words
 - UK English throughout
@@ -151,7 +168,7 @@ ${angle}
 
 SENDER: ${ctx.sender.name}, ${ctx.sender.profession}, specialising in ${ctx.sender.speciality_tags.join(", ") || ctx.sender.profession}
 TONE: ${ctx.sender.tone}
-VENUE: ${ctx.recipient.venue_name}${ctx.recipient.address ? `, ${ctx.recipient.address}` : ""}
+${ctx.sender.voice_sample ? `WRITING VOICE (match this style):\n"""\n${ctx.sender.voice_sample}\n"""\n` : ""}VENUE: ${ctx.recipient.venue_name}${ctx.recipient.address ? `, ${ctx.recipient.address}` : ""}
 
 INSTRUCTIONS:
 - Subject: "Re: ${previousSubject}" (reply in thread)

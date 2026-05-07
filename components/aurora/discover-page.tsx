@@ -47,17 +47,49 @@ const igFetchedIds = new Set<string>();
 
 type ViewMode = "grid" | "map";
 
+type Persona = "photographer" | "mua" | "startup" | "other";
+
+function getPersona(businessType: string | undefined): Persona {
+  const bt = (businessType || "").toLowerCase().trim();
+  if (!bt) return "other";
+  if (
+    bt.includes("photo") || bt.includes("videograph") ||
+    bt.includes("cinemat") || bt.includes("film maker") ||
+    bt.includes("filmmaker")
+  ) return "photographer";
+  if (
+    bt.includes("makeup") || bt.includes("make-up") ||
+    bt.includes("mua") || bt.includes("beauty artist") ||
+    bt.includes("hair artist") || bt.includes("hair stylist")
+  ) return "mua";
+  if (
+    bt.includes("founder") || bt.includes("startup") ||
+    bt.includes("start-up") || bt.includes("entrepreneur") ||
+    bt.includes("saas") || bt.includes("ceo")
+  ) return "startup";
+  return "other";
+}
+
 function getSearchPrompts(businessType: string | undefined): string[] {
-  const bt = (businessType || "").toLowerCase();
-  if (bt.includes("photo") || bt.includes("video")) {
-    return ["Wedding venues", "Luxury hotels", "Event planners", "Brands", "Restaurants", "PR agencies"];
+  switch (getPersona(businessType)) {
+    case "photographer":
+      return ["Wedding venues", "Luxury hotels", "Event planners", "Florists", "Caterers"];
+    case "mua":
+      return ["Brands", "PR agencies", "Fashion agencies", "Bridal boutiques", "Salons"];
+    case "startup":
+      return ["Accelerators", "VCs", "Enterprise companies", "Tech agencies", "Co-working spaces"];
+    default:
+      return ["Wedding venues", "Hotels", "Event planners", "Restaurants", "Corporate", "Agencies"];
   }
-  if (bt.includes("flor")) return ["Wedding planners", "Hotels", "Event venues", "Restaurants", "Corporate events"];
-  if (bt.includes("cater")) return ["Corporate offices", "Wedding venues", "Private events", "Hotels", "Event planners"];
-  if (bt.includes("bak")) return ["Cafes", "Restaurants", "Wedding planners", "Hotels", "Markets"];
-  if (bt.includes("music") || bt.includes("dj")) return ["Wedding venues", "Bars", "Hotels", "Corporate events"];
-  if (bt.includes("makeup") || bt.includes("hair") || bt.includes("beauty")) return ["Wedding planners", "Spas", "Hotels", "Photo studios"];
-  return ["Wedding venues", "Hotels", "Event planners", "Restaurants", "Corporate", "Agencies"];
+}
+
+function getSearchPlaceholder(businessType: string | undefined): string {
+  switch (getPersona(businessType)) {
+    case "photographer": return "Search venues and event suppliers…";
+    case "mua":          return "Search beauty brands and agencies…";
+    case "startup":      return "Search business contacts and companies…";
+    default:             return "Search venues or tap a suggestion…";
+  }
 }
 
 /* ─── Place shape (from API) ────────────────── */
@@ -116,10 +148,12 @@ function ToastNotification({
 
 /* ─── DiscoverPage ───────────────────────────── */
 export function DiscoverPage() {
-  const { profile, opportunities, refreshData, setActiveTab } = useAurora();
+  const { profile, opportunities, refreshData, setActiveTab, goToProfileSection } = useAurora();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
+  const [sortBy, setSortBy] = useState<"score" | "rating" | "newest">("score");
+  const [scoreMap, setScoreMap] = useState<Map<string, number>>(new Map());
   const [isSearching, setIsSearching] = useState(false);
   const [isFinding, setIsFinding] = useState(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
@@ -315,6 +349,33 @@ export function DiscoverPage() {
     setToast({ id, message, icon });
   }, []);
 
+  const handleScoreReady = useCallback((placeId: string, score: number) => {
+    setScoreMap((prev) => {
+      if (prev.get(placeId) === score) return prev;
+      const next = new Map(prev);
+      next.set(placeId, score);
+      return next;
+    });
+  }, []);
+
+  const sortedResults = useMemo(() => {
+    const arr = [...searchResults];
+    if (sortBy === "rating") {
+      arr.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    } else if (sortBy === "newest") {
+      // Preserve insertion order (searchResults is already newest-last from API pagination,
+      // reverse so newest-found comes first)
+      arr.reverse();
+    } else {
+      // Aurora Score: scored cards by descending score, unscored at bottom in original order
+      const scored   = arr.filter((p) => scoreMap.has(p.id));
+      const unscored = arr.filter((p) => !scoreMap.has(p.id));
+      scored.sort((a, b) => (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0));
+      return [...scored, ...unscored];
+    }
+    return arr;
+  }, [searchResults, sortBy, scoreMap]);
+
   const opportunityTypes = ["all", "venue", "event_organiser", "market", "wedding_planner", "agency", "brand", "publication"];
 
   const mapQuery = searchResults.length > 0
@@ -335,7 +396,7 @@ export function DiscoverPage() {
             : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           }
           <Input
-            placeholder="Search venues or tap a suggestion…"
+            placeholder={getSearchPlaceholder(profile?.businessType)}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -376,6 +437,17 @@ export function DiscoverPage() {
                 {typeLabels[type as OpportunityType] || type}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as "score" | "rating" | "newest")}>
+          <SelectTrigger className="w-[150px] shrink-0">
+            <SelectValue placeholder="Sort" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="score">Aurora Score</SelectItem>
+            <SelectItem value="rating">Rating</SelectItem>
+            <SelectItem value="newest">Newest</SelectItem>
           </SelectContent>
         </Select>
 
@@ -421,6 +493,16 @@ export function DiscoverPage() {
         </button>
       </div>
 
+      {!profile?.businessType && (
+        <button
+          onClick={() => goToProfileSection("my-profile")}
+          className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-opacity hover:opacity-80"
+          style={{ background: `${ACCENT}14`, color: ACCENT, border: `1px solid ${ACCENT}30` }}
+        >
+          <span>Tell Aurora what you do →</span>
+        </button>
+      )}
+
       {findResult && (
         <div className={`glass-card rounded-2xl p-3 text-sm font-medium ${findResult.count > 0 ? "border-primary/20 text-primary" : "text-muted-foreground"}`}>
           {findResult.message}
@@ -455,7 +537,7 @@ export function DiscoverPage() {
 
               {/* Responsive card grid: 1 col mobile / 2 col tablet / 3 col desktop */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchResults.map((place) => (
+                {sortedResults.map((place) => (
                   <DiscoverCard
                     key={place.id}
                     place={place}
@@ -471,6 +553,7 @@ export function DiscoverPage() {
                         expandedPlaceId === place.id ? null : place.id
                       )
                     }
+                    onScoreReady={handleScoreReady}
                   />
                 ))}
               </div>
@@ -604,20 +687,21 @@ export function DiscoverPage() {
    Full-width photo (160px) + details + AI analysis
 ════════════════════════════════════════════════ */
 interface DiscoverCardProps {
-  place:          Place;
-  isSaved:        boolean;
-  savedInstagram: string | null;
-  igHandle?:      string | null;
-  onSaved:        (placeId: string) => void;
-  onToast:        (message: string, icon?: "sparkles" | "check") => void;
-  selectedType:   string;
-  isExpanded?:    boolean;
-  onToggle?:      () => void;
+  place:           Place;
+  isSaved:         boolean;
+  savedInstagram:  string | null;
+  igHandle?:       string | null;
+  onSaved:         (placeId: string) => void;
+  onToast:         (message: string, icon?: "sparkles" | "check") => void;
+  selectedType:    string;
+  isExpanded?:     boolean;
+  onToggle?:       () => void;
+  onScoreReady?:   (placeId: string, score: number) => void;
 }
 
 function DiscoverCard({
   place, isSaved, savedInstagram, igHandle, onSaved, onToast, selectedType,
-  isExpanded = false, onToggle,
+  isExpanded = false, onToggle, onScoreReady,
 }: DiscoverCardProps) {
   const photoUrl = place.photoReference
     ? `/api/places/photo?ref=${encodeURIComponent(place.photoReference)}&maxWidth=600`
@@ -643,6 +727,14 @@ function DiscoverCard({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExpanded, place.id]);
+
+  // Report score to parent so the grid can sort by Aurora Score
+  useEffect(() => {
+    if (result?.signal_score != null) {
+      onScoreReady?.(place.id, result.signal_score);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result?.signal_score]);
 
   // ── Save to Pipeline ────────────────────────────────────────────────────────
   const handleSaveClick = async (e: React.MouseEvent) => {

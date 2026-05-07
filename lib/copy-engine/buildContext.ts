@@ -47,6 +47,7 @@ export async function buildCopyContext(opportunityId: string, userId: string) {
         .map((c: any) => (typeof c === "string" ? c : c?.name))
         .filter(Boolean),
       tone:            prof.message_tone ?? prof.tone ?? "professional",
+      voice_sample:    prof.voice_sample ? prof.voice_sample.trim().slice(0, 500) : null,
       location:        prof.location ?? null,
       work_radius:     prof.work_radius ?? prof.location ?? null,
       instagram:       prof.instagram ?? null,
@@ -67,6 +68,7 @@ export async function buildCopyContext(opportunityId: string, userId: string) {
       has_exclusive_photographer: analysis.has_exclusive_photographer ?? false,
       key_phrases:                analysis.key_phrases_for_email ?? [],
       recommended_angle:          analysis.recommended_angle ?? null,
+      caution_note:               analysis.why_bad_lead ?? null,
       venue_vibe:                 analysis.venue_vibe_tags?.join(", ") ?? null,
       why_good_lead:              analysis.why_good_lead ?? null,
       top_review_excerpts:        reviews
