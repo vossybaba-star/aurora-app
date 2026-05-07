@@ -506,36 +506,27 @@ function PaneDetail({
       )}
 
       {/* ── Compact header ── */}
-      <div className="shrink-0 border-b border-white/30">
-        {/* Venue photo strip */}
-        {photo && (
-          <div className="h-28 relative overflow-hidden">
-            <img src={photo} alt={opportunity.name} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-white/80 to-transparent" />
-          </div>
-        )}
-        <div className="px-4 py-3 flex items-center gap-3">
-          {!photo && (
-            <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0"
-                 style={{ background: `linear-gradient(135deg,rgba(124,110,247,0.12),rgba(149,133,249,0.06))` }}>
-              <div className="w-full h-full flex items-center justify-center">
+      <div className="shrink-0 border-b border-white/30 px-4 py-3 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0"
+             style={{ background: `linear-gradient(135deg,rgba(124,110,247,0.12),rgba(149,133,249,0.06))` }}>
+          {photo
+            ? <img src={photo} alt={opportunity.name} className="w-full h-full object-cover" />
+            : <div className="w-full h-full flex items-center justify-center">
                 <MapPin className="w-4 h-4" style={{ color: `${ACCENT}60` }} />
-              </div>
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-extrabold text-sm truncate" style={{ color: '#131b2e' }}>{opportunity.name}</h3>
-            {opportunity.location && (
-              <p className="text-[11px] text-muted-foreground truncate">
-                {opportunity.location.split(',').slice(0, 2).join(',')}
-              </p>
-            )}
-          </div>
-          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                style={{ background: badge.bg, color: badge.color }}>
-            {badge.label}
-          </span>
+              </div>}
         </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-extrabold text-sm truncate" style={{ color: '#131b2e' }}>{opportunity.name}</h3>
+          {opportunity.location && (
+            <p className="text-[11px] text-muted-foreground truncate">
+              {opportunity.location.split(',').slice(0, 2).join(',')}
+            </p>
+          )}
+        </div>
+        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0"
+              style={{ background: badge.bg, color: badge.color }}>
+          {badge.label}
+        </span>
       </div>
 
       {/* ── Scrollable content ── */}
@@ -685,7 +676,7 @@ function PaneDetail({
                           )}
                         </div>
                         {step.subject && <p className="text-xs font-semibold mb-1" style={{ color: '#131b2e' }}>{step.subject}</p>}
-                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{step.body}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-4 leading-relaxed">{step.body}</p>
                       </div>
                     </div>
 
@@ -1873,36 +1864,31 @@ function SequenceDetail({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="relative -mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
-        <div className="aspect-[21/9] bg-muted relative overflow-hidden">
+    <div className="space-y-4">
+      {/* Compact header — no photo */}
+      <div className="flex items-center gap-3">
+        <button onClick={onBack}
+          className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-muted/60 hover:bg-muted transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0"
+             style={{ background: `linear-gradient(135deg,rgba(124,110,247,0.12),rgba(149,133,249,0.06))` }}>
           {photoUrl
             ? <img src={photoUrl} alt={opportunity.name} className="w-full h-full object-cover" />
-            : <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg,rgba(124,110,247,0.20),rgba(149,133,249,0.10))` }}>
-                <MapPin className="w-16 h-16" style={{ color: `${ACCENT}30` }} />
+            : <div className="w-full h-full flex items-center justify-center">
+                <MapPin className="w-4 h-4" style={{ color: `${ACCENT}60` }} />
               </div>}
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-          <button onClick={onBack}
-            className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-background/80 backdrop-blur-sm text-sm font-medium hover:bg-background transition-colors flex items-center gap-1">
-            <ArrowLeft className="w-4 h-4" />Back
-          </button>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">{typeLabels[opportunity.type]}</Badge>
-            <Badge className="text-white border-0"
-                   style={{ background: opportunity.status === 'replied' ? '#22c55e' : opportunity.status === 'follow_up_due' ? '#f97316' : opportunity.status === 'sent' ? '#f59e0b' : ACCENT }}>
-              {statusLabels[opportunity.status]}
-            </Badge>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-bold">{opportunity.name}</h1>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-extrabold text-sm truncate" style={{ color: '#131b2e' }}>{opportunity.name}</h2>
           {opportunity.location && (
-            <p className="text-muted-foreground text-sm flex items-center gap-1 mt-1">
-              <MapPin className="w-3 h-3" />{opportunity.location}
-            </p>
+            <p className="text-[11px] text-muted-foreground truncate">{opportunity.location.split(',').slice(0, 2).join(',')}</p>
           )}
         </div>
+        <Badge className="text-white border-0 shrink-0 text-[10px]"
+               style={{ background: opportunity.status === 'replied' ? '#22c55e' : opportunity.status === 'follow_up_due' ? '#f97316' : opportunity.status === 'sent' ? '#f59e0b' : ACCENT }}>
+          {statusLabels[opportunity.status]}
+        </Badge>
       </div>
 
       {/* Email Sequence */}
@@ -2009,7 +1995,7 @@ function SequenceDetail({
                           )}
                         </div>
                         {step.subject && <p className="text-sm font-medium mb-1">{step.subject}</p>}
-                        <p className="text-sm text-muted-foreground line-clamp-2">{step.body}</p>
+                        <p className="text-sm text-muted-foreground line-clamp-4">{step.body}</p>
                         {!isSent && isFirst && (
                           <Button size="sm" className="mt-3" onClick={() => handleSendStep(step)}>
                             <Send className="w-3 h-3 mr-1" />Send Now
