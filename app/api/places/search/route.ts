@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const location = profile?.location || "London";
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) return NextResponse.json({ error: "Google Places API not configured" }, { status: 500 });
-    const searchQuery = `event venue wedding venue near ${location}`;
+    const textQuery = `event venue wedding venue near ${location}`;
     const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
@@ -32,17 +32,20 @@ export async function GET(request: Request) {
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.types,places.rating,places.userRatingCount,places.businessStatus,places.websiteUri,places.photos,nextPageToken",
       },
-      body: JSON.stringify({ textQuery: searchQuery, pageSize: 20 }),
+      body: JSON.stringify({ textQuery, pageSize: 20 }),
     });
     const data = await response.json();
-    const places = (data.places || []).map((place) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const places = (data.places || []).map((place: any) => ({
       id: place.id, name: place.displayName?.text || "",
       address: place.formattedAddress || "", types: place.types || [],
       rating: place.rating, ratingCount: place.userRatingCount,
       website: place.websiteUri, photoReference: place.photos?.[0]?.name,
       businessStatus: place.businessStatus,
-    })).filter((p) => p.businessStatus !== "CLOSED_PERMANENTLY");
-    return NextResponse.json({ places, location, nextPageToken: data.nextPageToken || null });
+    })).filter((p: any) => p.businessStatus !== "CLOSED_PERMANENTLY");
+    // Return textQuery so the client can replay it verbatim on pagination requests
+    // (Google Places API requires all params to match when using pageToken)
+    return NextResponse.json({ places, location, nextPageToken: data.nextPageToken || null, textQuery });
   } catch { return NextResponse.json({ error: "Failed" }, { status: 500 }); }
 }
 
@@ -56,17 +59,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { query, location, type, pageToken } = await request.json();
+    const { query, location, type, pageToken, textQuery: clientTextQuery } = await request.json();
 
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "Google Places API not configured" }, { status: 500 });
     }
 
-    // Build search query
-    let searchQuery = query || typeToSearchQuery[type] || "event venue";
-    if (location) {
-      searchQuery = `${searchQuery} near ${location}`;
+    // When paginating, Google Places API requires the textQuery to match the original request exactly.
+    // Use the client-supplied textQuery verbatim when a pageToken is present.
+    let googleTextQuery: string;
+    if (pageToken && clientTextQuery) {
+      googleTextQuery = clientTextQuery;
+    } else {
+      googleTextQuery = query || typeToSearchQuery[type] || "event venue";
+      if (location) {
+        googleTextQuery = `${googleTextQuery} near ${location}`;
+      }
     }
 
     // Use Google Places Text Search API (v1)
@@ -80,7 +89,7 @@ export async function POST(request: Request) {
           "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.types,places.rating,places.userRatingCount,places.businessStatus,places.websiteUri,places.photos,nextPageToken",
         },
         body: JSON.stringify({
-          textQuery: searchQuery,
+          textQuery: googleTextQuery,
           pageSize: 20,
           ...(pageToken ? { pageToken } : {}),
         }),
@@ -107,7 +116,7 @@ export async function POST(request: Request) {
       businessStatus: place.businessStatus,
     })).filter((place: any) => place.businessStatus !== "CLOSED_PERMANENTLY");
 
-    return NextResponse.json({ places, nextPageToken: data.nextPageToken || null });
+    return NextResponse.json({ places, nextPageToken: data.nextPageToken || null, textQuery: googleTextQuery });
 
   } catch (error) {
     console.error("[v0] Places search error:", error);

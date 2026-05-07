@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -252,6 +252,9 @@ function PaneDetail({
   const [sendSuccess, setSendSuccess] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [personalisationScore, setPersonalisationScore] = useState<number | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [generationTookTooLong, setGenerationTookTooLong] = useState(false);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const photo = thumbUrl(opportunity.photoReference, 600);
   const badge = statusBadge(opportunity.status);
@@ -262,38 +265,92 @@ function PaneDetail({
       .catch(() => setEmailConnected(false));
   }, []);
 
+  // ── Polling helper — checks every 3 s until steps appear (max 10 tries) ──
+  const startPolling = useCallback((oppId: string) => {
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    setIsPolling(true);
+    setGenerationTookTooLong(false);
+    let count = 0;
+    const MAX = 10;
+    pollTimerRef.current = setInterval(async () => {
+      count++;
+      if (count >= MAX) {
+        clearInterval(pollTimerRef.current!);
+        pollTimerRef.current = null;
+        setIsPolling(false);
+        setGenerationTookTooLong(true);
+        return;
+      }
+      try {
+        const r = await fetch(`/api/sequences?opportunityId=${oppId}`);
+        const d = await r.json();
+        if (d.steps?.length > 0) {
+          clearInterval(pollTimerRef.current!);
+          pollTimerRef.current = null;
+          setIsPolling(false);
+          setSequenceSteps(d.steps);
+        }
+      } catch { /* keep polling */ }
+    }, 3000);
+  }, []);
+
   useEffect(() => {
     setSendSuccess(false);
+    setIsPolling(false);
+    setGenerationTookTooLong(false);
+    if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+
     const load = async () => {
       setIsLoadingSteps(true);
       try {
+        // Step 1: Check if steps already exist (e.g. background pipeline completed)
         const res = await fetch(`/api/sequences?opportunityId=${opportunity.id}`);
         const data = await res.json();
         if (data.steps?.length > 0) {
           setSequenceSteps(data.steps);
-          // Surface personalisation score if the sequence was AI-generated
-          const opp = await fetch(`/api/opportunities?id=${opportunity.id}`).catch(() => null);
-          // (score surfaced on regenerate; initial load just shows steps)
-        } else {
-          // No steps yet — call the Copy Engine to generate AI-personalised sequence
+          return;
+        }
+
+        // Step 2: No steps — attempt synchronous generation
+        let generated = false;
+        try {
           const cr = await fetch('/api/generate-sequence', {
-            method: 'POST',
+            method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ opportunity_id: opportunity.id }),
+            body:    JSON.stringify({ opportunity_id: opportunity.id }),
           });
           const cd = await cr.json();
-          if (cd.status === 'generated' || cd.status === 'cached') {
+          if (cd.status === 'generated') {
             const r2 = await fetch(`/api/sequences?opportunityId=${opportunity.id}`);
             const d2 = await r2.json();
-            if (d2.steps) setSequenceSteps(d2.steps);
-            if (cd.personalisation_score != null) setPersonalisationScore(cd.personalisation_score);
+            if (d2.steps?.length > 0) {
+              setSequenceSteps(d2.steps);
+              if (cd.personalisation_score != null) setPersonalisationScore(cd.personalisation_score);
+              generated = true;
+            }
+          } else if (cd.status === 'cached') {
+            const r2 = await fetch(`/api/sequences?opportunityId=${opportunity.id}`);
+            const d2 = await r2.json();
+            if (d2.steps?.length > 0) {
+              setSequenceSteps(d2.steps);
+              generated = true;
+            }
           }
+        } catch { /* synchronous generation failed — fall through to polling */ }
+
+        // Step 3: Still no steps — start polling (background pipeline may still be running)
+        if (!generated) {
+          startPolling(opportunity.id);
         }
       } catch { /* silent */ }
       finally { setIsLoadingSteps(false); }
     };
     load();
-  }, [opportunity.id]);
+
+    return () => {
+      if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+    };
+  }, [opportunity.id, startPolling]);
 
   const refreshSteps = async () => {
     const r = await fetch(`/api/sequences?opportunityId=${opportunity.id}`);
@@ -539,6 +596,32 @@ function PaneDetail({
           {isLoadingSteps ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : isPolling ? (
+            <div className="px-4 py-5 flex flex-col items-center gap-2.5 text-center">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: ACCENT }} />
+                <span className="text-sm font-semibold" style={{ color: ACCENT }}>
+                  Aurora is writing your email sequence…
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">This usually takes 20–40 seconds. Hang tight.</p>
+            </div>
+          ) : generationTookTooLong ? (
+            <div className="px-4 py-5 flex flex-col items-center gap-3 text-center">
+              <p className="text-sm text-muted-foreground">
+                Generation is taking longer than expected.
+              </p>
+              <button
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
+                className="text-sm font-bold flex items-center gap-1.5"
+                style={{ color: ACCENT }}
+              >
+                {isRegenerating
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                  : <><Sparkles className="w-3.5 h-3.5" /> Regenerate Sequence</>}
+              </button>
             </div>
           ) : sequenceSteps.length === 0 ? (
             <div className="p-6 text-center">
@@ -1572,12 +1655,47 @@ function SequenceDetail({
   const [isSaving, setIsSaving] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [personalisationScore, setPersonalisationScore] = useState<number | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [generationTookTooLong, setGenerationTookTooLong] = useState(false);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const photoUrl = opportunity.photoReference
     ? `/api/places/photo?ref=${encodeURIComponent(opportunity.photoReference)}&maxWidth=800`
     : null;
 
+  const startPolling = useCallback((oppId: string) => {
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    setIsPolling(true);
+    setGenerationTookTooLong(false);
+    let count = 0;
+    const MAX = 10;
+    pollTimerRef.current = setInterval(async () => {
+      count++;
+      if (count >= MAX) {
+        clearInterval(pollTimerRef.current!);
+        pollTimerRef.current = null;
+        setIsPolling(false);
+        setGenerationTookTooLong(true);
+        return;
+      }
+      try {
+        const r = await fetch(`/api/sequences?opportunityId=${oppId}`);
+        const d = await r.json();
+        if (d.steps?.length > 0) {
+          clearInterval(pollTimerRef.current!);
+          pollTimerRef.current = null;
+          setIsPolling(false);
+          setSequenceSteps(d.steps);
+        }
+      } catch { /* keep polling */ }
+    }, 3000);
+  }, []);
+
   useEffect(() => {
+    setIsPolling(false);
+    setGenerationTookTooLong(false);
+    if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+
     const loadSequence = async () => {
       setIsLoadingSteps(true);
       try {
@@ -1585,8 +1703,11 @@ function SequenceDetail({
         const data = await res.json();
         if (data.steps?.length > 0) {
           setSequenceSteps(data.steps);
-        } else {
-          // No steps — call the Copy Engine to generate an AI-personalised sequence
+          return;
+        }
+
+        let generated = false;
+        try {
           const createRes = await fetch('/api/generate-sequence', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1596,15 +1717,24 @@ function SequenceDetail({
           if (createData.status === 'generated' || createData.status === 'cached') {
             const r2 = await fetch(`/api/sequences?opportunityId=${opportunity.id}`);
             const d2 = await r2.json();
-            if (d2.steps) setSequenceSteps(d2.steps);
-            if (createData.personalisation_score != null) setPersonalisationScore(createData.personalisation_score);
+            if (d2.steps?.length > 0) {
+              setSequenceSteps(d2.steps);
+              if (createData.personalisation_score != null) setPersonalisationScore(createData.personalisation_score);
+              generated = true;
+            }
           }
-        }
+        } catch { /* fall through to polling */ }
+
+        if (!generated) startPolling(opportunity.id);
       } catch { /* silent */ }
       finally { setIsLoadingSteps(false); }
     };
     loadSequence();
-  }, [opportunity.id]);
+
+    return () => {
+      if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+    };
+  }, [opportunity.id, startPolling]);
 
   const refreshSteps = async () => {
     const r = await fetch(`/api/sequences?opportunityId=${opportunity.id}`);
@@ -1823,6 +1953,28 @@ function SequenceDetail({
         <CardContent>
           {isLoadingSteps ? (
             <div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+          ) : isPolling ? (
+            <div className="py-8 flex flex-col items-center gap-3 text-center">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: ACCENT }} />
+                <span className="text-sm font-semibold" style={{ color: ACCENT }}>Aurora is writing your email sequence…</span>
+              </div>
+              <p className="text-xs text-muted-foreground">This usually takes 20–40 seconds. Hang tight.</p>
+            </div>
+          ) : generationTookTooLong ? (
+            <div className="py-8 flex flex-col items-center gap-3 text-center">
+              <p className="text-sm text-muted-foreground">Generation is taking longer than expected.</p>
+              <Button
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
+                size="sm"
+                style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
+              >
+                {isRegenerating
+                  ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Generating…</>
+                  : <><Sparkles className="w-3.5 h-3.5 mr-1.5" />Regenerate Sequence</>}
+              </Button>
+            </div>
           ) : sequenceSteps.length === 0 ? (
             <div className="text-center py-6">
               <p className="text-sm text-muted-foreground mb-4">No emails in sequence</p>

@@ -31,12 +31,13 @@ export interface VenueAiAnalysis {
 }
 
 export interface VenueEnrichmentResult {
-  status:          "complete" | "cached";
-  signal_score:    number;
-  score_breakdown: Record<string, number>;
-  ai_analysis:     VenueAiAnalysis;
-  website_crawled?: boolean;
-  duration_ms?:    number;
+  status:            "complete" | "cached";
+  signal_score:      number;
+  score_breakdown:   Record<string, number>;
+  ai_analysis:       VenueAiAnalysis;
+  instagram_handle?: string | null;
+  website_crawled?:  boolean;
+  duration_ms?:      number;
 }
 
 // ─── Module-level session cache ───────────────────────────────────────────────

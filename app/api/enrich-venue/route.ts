@@ -155,10 +155,11 @@ export async function POST(req: Request) {
     const ageMs = Date.now() - new Date(opportunity.last_enriched_at).getTime();
     if (ageMs < 48 * 60 * 60 * 1000) {
       return NextResponse.json({
-        status:          "cached",
-        signal_score:    opportunity.signal_score ?? 0,
-        score_breakdown: opportunity.score_breakdown ?? {},
-        ai_analysis:     opportunity.ai_analysis,
+        status:           "cached",
+        signal_score:     opportunity.signal_score ?? 0,
+        score_breakdown:  opportunity.score_breakdown ?? {},
+        ai_analysis:      opportunity.ai_analysis,
+        instagram_handle: (opportunity as any).instagram_handle ?? null,
       });
     }
   }
@@ -190,6 +191,7 @@ export async function POST(req: Request) {
   const websiteToScrape = website_url || opportunity?.website;
   let websiteMarkdown = "";
   let firecrawlSuccess = false;
+  let instagramHandle: string | null = null;
 
   if (websiteToScrape && process.env.FIRECRAWL_API_KEY) {
     try {
@@ -210,6 +212,22 @@ export async function POST(req: Request) {
         if (fcData.success && fcData.data?.markdown) {
           websiteMarkdown = (fcData.data.markdown as string).slice(0, 8000);
           firecrawlSuccess = true;
+
+          // ── Extract Instagram handle from scraped markdown ──────────────
+          // Match instagram.com/handle (skip common non-handle path segments)
+          const igMatch = websiteMarkdown.match(
+            /instagram\.com\/([a-zA-Z0-9][a-zA-Z0-9_.]{1,29})(?:[\s/?#"')\]]|$)/
+          );
+          if (igMatch) {
+            const candidate = igMatch[1].replace(/\.$/, ""); // strip trailing dot
+            const NON_HANDLES = new Set([
+              "p", "reel", "reels", "stories", "explore",
+              "accounts", "tv", "ar", "about", "legal",
+            ]);
+            if (!NON_HANDLES.has(candidate.toLowerCase())) {
+              instagramHandle = `@${candidate}`;
+            }
+          }
         }
       }
     } catch (err) {
@@ -387,6 +405,9 @@ Return ONLY this JSON (all fields required):
     if (aiAnalysis.contact_name) {
       updatePayload.contact_name = aiAnalysis.contact_name;
     }
+    if (instagramHandle) {
+      updatePayload.instagram_handle = instagramHandle;
+    }
 
     const { error: updateError } = await supabase
       .from("opportunities")
@@ -395,6 +416,25 @@ Return ONLY this JSON (all fields required):
 
     if (updateError) {
       console.error("[enrich-venue] DB update failed:", updateError);
+    }
+
+    // ── Upsert Instagram into contact_methods (idempotent) ─────────────────
+    if (instagramHandle) {
+      const { data: existingIg } = await supabase
+        .from("contact_methods")
+        .select("id")
+        .eq("opportunity_id", opportunity.id)
+        .eq("type", "instagram")
+        .maybeSingle();
+
+      if (!existingIg) {
+        await supabase.from("contact_methods").insert({
+          opportunity_id: opportunity.id,
+          type:           "instagram",
+          value:          instagramHandle,
+          is_primary:     false,
+        });
+      }
     }
 
     // ── Stage 6: Enrichment audit log ──────────────────────────────────────
@@ -433,11 +473,12 @@ Return ONLY this JSON (all fields required):
 
   // ── Return result ─────────────────────────────────────────────────────────
   return NextResponse.json({
-    status:          "complete",
+    status:            "complete",
     signal_score,
     score_breakdown,
-    ai_analysis:     aiAnalysis,
-    website_crawled: firecrawlSuccess,
-    duration_ms:     durationMs,
+    ai_analysis:       aiAnalysis,
+    instagram_handle:  instagramHandle,
+    website_crawled:   firecrawlSuccess,
+    duration_ms:       durationMs,
   });
 }

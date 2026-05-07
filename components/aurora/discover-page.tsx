@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  CheckCircle2,
 } from "lucide-react";
 import { useVenueEnrichment } from "@/hooks/useVenueEnrichment";
 import type { VenueEnrichmentResult } from "@/hooks/useVenueEnrichment";
@@ -37,9 +38,6 @@ const ACCENT  = "#7c6ef7";
 const ACCENT2 = "#9585f9";
 
 type ViewMode = "grid" | "map";
-
-// Module-level Instagram cache — persists across re-renders within session
-const igCache = new Map<string, string | null>();
 
 function getSearchPrompts(businessType: string | undefined): string[] {
   const bt = (businessType || "").toLowerCase();
@@ -66,6 +64,49 @@ interface Place {
   types?: string[];
 }
 
+/* ─── Simple toast ───────────────────────────── */
+interface ToastState {
+  id: number;
+  message: string;
+  icon?: "sparkles" | "check";
+}
+
+function ToastNotification({
+  toast,
+  onDismiss,
+}: {
+  toast: ToastState;
+  onDismiss: () => void;
+}) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 4500);
+    return () => clearTimeout(t);
+  }, [onDismiss]);
+
+  return (
+    <div
+      className="fixed bottom-6 right-4 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl"
+      style={{
+        background:     "rgba(255,255,255,0.95)",
+        backdropFilter: "blur(16px)",
+        border:         "1px solid rgba(124,110,247,0.20)",
+        boxShadow:      `0 8px 32px rgba(124,110,247,0.18)`,
+        maxWidth:       "320px",
+      }}
+    >
+      {toast.icon === "sparkles" ? (
+        <Sparkles className="w-4 h-4 shrink-0" style={{ color: ACCENT }} />
+      ) : (
+        <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+      )}
+      <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>
+        {toast.message}
+      </p>
+    </div>
+  );
+}
+
+/* ─── DiscoverPage ───────────────────────────── */
 export function DiscoverPage() {
   const { profile, opportunities, refreshData, setActiveTab } = useAurora();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -81,11 +122,31 @@ export function DiscoverPage() {
   const [expandedPlaceId, setExpandedPlaceId] = useState<string | null>(null);
   const [findResult, setFindResult] = useState<{ count: number; message: string } | null>(null);
   const [nearbyLocation, setNearbyLocation] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [lastTextQuery, setLastTextQuery] = useState<string | null>(null);
+  const toastCounter = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
+  // Keep savedIds in sync with the global opportunities list
   useEffect(() => {
     const ids = new Set(opportunities.map((o) => o.googlePlaceId).filter(Boolean) as string[]);
     setSavedIds(ids);
+  }, [opportunities]);
+
+  // Build a placeId → instagram-handle map from already-saved opportunities
+  // (contact_methods were populated by find-opportunities or enrich-venue)
+  // Zero API cost — comes straight from global state.
+  const savedInstagramMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const opp of opportunities) {
+      if (!opp.googlePlaceId) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ig = (opp as any).contactMethods?.find(
+        (c: { type: string; value: string }) => c.type === "instagram"
+      );
+      if (ig?.value) map.set(opp.googlePlaceId, ig.value);
+    }
+    return map;
   }, [opportunities]);
 
   useEffect(() => {
@@ -98,6 +159,7 @@ export function DiscoverPage() {
           setSearchResults(data.places);
           setNearbyLocation(data.location || "");
           setNextPageToken(data.nextPageToken || null);
+          setLastTextQuery(data.textQuery || null);
         }
       } catch (e) {
         console.error("Failed to load venues:", e);
@@ -131,7 +193,7 @@ export function DiscoverPage() {
       const res = await fetch("/api/places/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchQuery || undefined, location: profile?.location, pageToken: token }),
+        body: JSON.stringify({ query: searchQuery || undefined, location: profile?.location, pageToken: token, textQuery: lastTextQuery || undefined }),
       });
       const data = await res.json();
       if (data.places && data.places.length > 0) {
@@ -184,6 +246,7 @@ export function DiscoverPage() {
       if (data.places) {
         setSearchResults(data.places);
         setNextPageToken(data.nextPageToken || null);
+        setLastTextQuery(data.textQuery || null);
       }
     } catch {
       console.error("Search failed");
@@ -192,59 +255,16 @@ export function DiscoverPage() {
     }
   };
 
-  const handleSave = async (place: Place) => {
-    try {
-      let contactMethods: { type: string; value: string; isPrimary: boolean }[] = [];
-      if (place.website || place.id) {
-        try {
-          const enrichRes = await fetch("/api/enrich-contact", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ websiteUrl: place.website, placeId: place.id }),
-          });
-          if (enrichRes.ok) {
-            const { contactInfo } = await enrichRes.json();
-            if (contactInfo.emails?.length > 0) {
-              contactInfo.emails.forEach((email: string, i: number) =>
-                contactMethods.push({ type: "email", value: email, isPrimary: i === 0 })
-              );
-            }
-            if (contactInfo.instagram) {
-              igCache.set(place.id, contactInfo.instagram);
-              contactMethods.push({ type: "instagram", value: contactInfo.instagram, isPrimary: contactMethods.length === 0 });
-            }
-            if (contactInfo.phone) contactMethods.push({ type: "phone", value: contactInfo.phone, isPrimary: contactMethods.length === 0 });
-            if (contactInfo.facebook) contactMethods.push({ type: "facebook", value: contactInfo.facebook, isPrimary: false });
-            if (contactInfo.linkedin) contactMethods.push({ type: "linkedin", value: contactInfo.linkedin, isPrimary: false });
-          }
-        } catch { /* skip enrichment */ }
-      }
-      if (place.website && !contactMethods.some((c) => c.type === "website")) {
-        contactMethods.push({ type: "website", value: place.website, isPrimary: contactMethods.length === 0 });
-      }
-      const response = await fetch("/api/opportunities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: place.name,
-          type: selectedType !== "all" ? selectedType : "venue",
-          location: place.address,
-          googlePlaceId: place.id,
-          rating: place.rating,
-          ratingCount: place.ratingCount,
-          photoReference: place.photoReference,
-          website: place.website,
-          source: "manual_search",
-          liked: true,
-          contactMethods,
-        }),
-      });
-      if (response.ok) {
-        setSavedIds((prev) => new Set([...prev, place.id]));
-        await refreshData();
-      }
-    } catch { console.error("Failed to save"); }
-  };
+  // Called by DiscoverCard after a successful save
+  const handleSaved = useCallback((placeId: string) => {
+    setSavedIds((prev) => new Set([...prev, placeId]));
+    refreshData().catch(() => {});
+  }, [refreshData]);
+
+  const showToast = useCallback((message: string, icon: ToastState["icon"] = "sparkles") => {
+    const id = ++toastCounter.current;
+    setToast({ id, message, icon });
+  }, []);
 
   const opportunityTypes = ["all", "venue", "event_organiser", "market", "wedding_planner", "agency", "brand", "publication"];
 
@@ -391,7 +411,10 @@ export function DiscoverPage() {
                     key={place.id}
                     place={place}
                     isSaved={savedIds.has(place.id)}
-                    onSave={() => handleSave(place)}
+                    savedInstagram={savedInstagramMap.get(place.id) ?? null}
+                    onSaved={handleSaved}
+                    onToast={showToast}
+                    selectedType={selectedType}
                     isExpanded={expandedPlaceId === place.id}
                     onToggle={() =>
                       setExpandedPlaceId(
@@ -453,7 +476,10 @@ export function DiscoverPage() {
                   key={place.id}
                   place={place}
                   isSaved={savedIds.has(place.id)}
-                  onSave={() => handleSave(place)}
+                  savedInstagram={savedInstagramMap.get(place.id) ?? null}
+                  onSaved={handleSaved}
+                  onToast={showToast}
+                  selectedType={selectedType}
                 />
               ))}
             </div>
@@ -493,7 +519,10 @@ export function DiscoverPage() {
                 key={place.id}
                 place={place}
                 isSaved={savedIds.has(place.id)}
-                onSave={() => handleSave(place)}
+                savedInstagram={savedInstagramMap.get(place.id) ?? null}
+                onSaved={handleSaved}
+                onToast={showToast}
+                selectedType={selectedType}
                 isExpanded={expandedPlaceId === place.id}
                 onToggle={() =>
                   setExpandedPlaceId(
@@ -505,6 +534,15 @@ export function DiscoverPage() {
           </div>
         </>
       )}
+
+      {/* ── Toast ── */}
+      {toast && (
+        <ToastNotification
+          key={toast.id}
+          toast={toast}
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
@@ -514,48 +552,34 @@ export function DiscoverPage() {
    Full-width photo (160px) + details + AI analysis
 ════════════════════════════════════════════════ */
 interface DiscoverCardProps {
-  place:      Place;
-  isSaved:    boolean;
-  onSave:     () => void;
-  isExpanded?: boolean;
-  onToggle?:  () => void;
+  place:          Place;
+  isSaved:        boolean;
+  savedInstagram: string | null;
+  onSaved:        (placeId: string) => void;
+  onToast:        (message: string, icon?: "sparkles" | "check") => void;
+  selectedType:   string;
+  isExpanded?:    boolean;
+  onToggle?:      () => void;
 }
 
-function DiscoverCard({ place, isSaved, onSave, isExpanded = false, onToggle }: DiscoverCardProps) {
-  const ACCENT = "#7c6ef7";
+function DiscoverCard({
+  place, isSaved, savedInstagram, onSaved, onToast, selectedType,
+  isExpanded = false, onToggle,
+}: DiscoverCardProps) {
   const photoUrl = place.photoReference
     ? `/api/places/photo?ref=${encodeURIComponent(place.photoReference)}&maxWidth=600`
     : null;
 
-  const [instagramHandle, setInstagramHandle] = useState<string | null>(igCache.get(place.id) ?? null);
+  const [isSaving, setIsSaving]       = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
   const { enrichVenue, enriching, result, error } = useVenueEnrichment();
 
-  // Fetch Instagram handle in background (unchanged)
-  useEffect(() => {
-    if (igCache.has(place.id)) {
-      setInstagramHandle(igCache.get(place.id) ?? null);
-      return;
-    }
-    if (!place.website && !place.id) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/enrich-contact", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ websiteUrl: place.website, placeId: place.id }),
-        });
-        if (!res.ok || cancelled) return;
-        const { contactInfo } = await res.json();
-        const ig: string | null = contactInfo?.instagram || null;
-        igCache.set(place.id, ig);
-        if (!cancelled && ig) setInstagramHandle(ig);
-      } catch {
-        if (!cancelled) igCache.set(place.id, null);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [place.id, place.website]);
+  // Instagram: prefer the saved DB value; fall back to what enrichment found
+  const instagramHandle =
+    savedInstagram ||
+    result?.instagram_handle ||
+    null;
 
   // Trigger enrichment when card is expanded for the first time
   useEffect(() => {
@@ -564,6 +588,69 @@ function DiscoverCard({ place, isSaved, onSave, isExpanded = false, onToggle }: 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExpanded, place.id]);
+
+  // ── Save to Pipeline ────────────────────────────────────────────────────────
+  const handleSaveClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSaving || isSaved || saveSuccess) return;
+
+    setIsSaving(true);
+    try {
+      // Save the opportunity (basic fields only — AI data is written by enrich-venue)
+      const res = await fetch("/api/opportunities", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          name:           place.name,
+          type:           selectedType !== "all" ? selectedType : "venue",
+          location:       place.address,
+          googlePlaceId:  place.id,
+          rating:         place.rating,
+          ratingCount:    place.ratingCount,
+          photoReference: place.photoReference,
+          website:        place.website,
+          source:         "manual_search",
+          liked:          true,
+          // Pass signal score so priority is derived correctly
+          signalScore:    result?.signal_score ?? null,
+        }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      const data = await res.json();
+      const opportunityId: string = data.id;
+
+      if (opportunityId) {
+        // Always trigger the enrichment pipeline — it owns the AI write path and
+        // auto-triggers generate-sequence. enrich-venue has a 48hr cache so if
+        // the card was already expanded it will skip re-analysis and just trigger copy gen.
+        fetch("/api/enrich-venue", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({
+            google_place_id: place.id,
+            website_url:     place.website,
+            place_name:      place.name,
+          }),
+        }).catch(() => {});
+      }
+
+      setSaveSuccess(true);
+      onSaved(place.id);
+      onToast("Added to Outreach — Aurora is writing your email sequence", "sparkles");
+    } catch {
+      // Silent: reset so user can retry
+      setIsSaving(false);
+    }
+  };
+
+  // Signal score badge — shown on card image after enrichment
+  const scoreBadge = result
+    ? result.signal_score >= 70
+      ? { label: "⚡ Strong", bg: "#dcfce7", color: "#15803d" }
+      : result.signal_score >= 40
+      ? { label: "◆ Good", bg: "#fef9c3", color: "#a16207" }
+      : null
+    : null;
 
   return (
     <div
@@ -588,7 +675,7 @@ function DiscoverCard({ place, isSaved, onSave, isExpanded = false, onToggle }: 
           </div>
         )}
 
-        {/* Rating badge over photo */}
+        {/* Rating badge */}
         {place.rating && (
           <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-lg text-white text-xs font-semibold"
                style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}>
@@ -600,8 +687,18 @@ function DiscoverCard({ place, isSaved, onSave, isExpanded = false, onToggle }: 
           </div>
         )}
 
-        {/* Saved indicator over photo */}
-        {isSaved && (
+        {/* Signal score badge — shown after enrichment */}
+        {scoreBadge && (
+          <div
+            className="absolute top-2 left-2 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1"
+            style={{ background: scoreBadge.bg, color: scoreBadge.color }}
+          >
+            {scoreBadge.label}
+          </div>
+        )}
+
+        {/* Saved indicator */}
+        {(isSaved || saveSuccess) && (
           <div className="absolute top-2 right-2 px-2 py-0.5 rounded-lg text-white text-[10px] font-bold"
                style={{ background: `${ACCENT}cc`, backdropFilter: "blur(4px)" }}>
             ✓ Saved
@@ -632,14 +729,17 @@ function DiscoverCard({ place, isSaved, onSave, isExpanded = false, onToggle }: 
           </p>
         )}
 
-        {/* Instagram handle */}
+        {/* Instagram handle — from saved contact_methods or enrichment result */}
         {instagramHandle && (
           <button
             className="flex items-center gap-1 text-xs font-medium w-fit transition-opacity hover:opacity-75"
             style={{ color: "#e1306c" }}
             onClick={(e) => {
               e.stopPropagation();
-              window.open(`https://instagram.com/${instagramHandle.replace("@", "")}`, "_blank");
+              window.open(
+                `https://instagram.com/${instagramHandle.replace("@", "")}`,
+                "_blank"
+              );
             }}
           >
             <Instagram className="w-3 h-3" />
@@ -663,20 +763,25 @@ function DiscoverCard({ place, isSaved, onSave, isExpanded = false, onToggle }: 
 
         {/* Save button — pinned at bottom */}
         <div className="mt-auto pt-2">
-          {!isSaved ? (
+          {isSaved || saveSuccess ? (
+            <div className="w-full py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1.5"
+                 style={{ color: ACCENT, background: `${ACCENT}12` }}>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Added to Outreach
+            </div>
+          ) : (
             <button
-              onClick={(e) => { e.stopPropagation(); onSave(); }}
-              className="w-full py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-[0.97] flex items-center justify-center gap-1.5"
+              onClick={handleSaveClick}
+              disabled={isSaving}
+              className="w-full py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-[0.97] flex items-center justify-center gap-1.5 disabled:opacity-70"
               style={{ background: `linear-gradient(135deg,${ACCENT},#9585f9)`, boxShadow: `0 2px 10px ${ACCENT}35` }}
             >
-              <Heart className="w-3.5 h-3.5" />
-              Save to Pipeline
+              {isSaving ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" />Adding to Outreach…</>
+              ) : (
+                <><Heart className="w-3.5 h-3.5" />Save to Pipeline</>
+              )}
             </button>
-          ) : (
-            <div className="w-full py-2 rounded-xl text-xs font-bold text-center"
-                 style={{ color: ACCENT, background: `${ACCENT}12` }}>
-              ✓ Added to Pipeline
-            </div>
           )}
         </div>
       </div>
@@ -833,11 +938,68 @@ function VenueAnalysisPanel({
 /* ════════════════════════════════════════════════
    Compact horizontal card — map view left sidebar
 ════════════════════════════════════════════════ */
-function DiscoverCardCompact({ place, isSaved, onSave }: { place: Place; isSaved: boolean; onSave: () => void }) {
-  const ACCENT = "#7c6ef7";
+interface DiscoverCardCompactProps {
+  place:          Place;
+  isSaved:        boolean;
+  savedInstagram: string | null;
+  onSaved:        (placeId: string) => void;
+  onToast:        (message: string, icon?: "sparkles" | "check") => void;
+  selectedType:   string;
+}
+
+function DiscoverCardCompact({
+  place, isSaved, savedInstagram, onSaved, onToast, selectedType,
+}: DiscoverCardCompactProps) {
   const photoUrl = place.photoReference
     ? `/api/places/photo?ref=${encodeURIComponent(place.photoReference)}&maxWidth=200`
     : null;
+
+  const [isSaving, setIsSaving]       = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSaveClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSaving || isSaved || saveSuccess) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/opportunities", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          name:           place.name,
+          type:           selectedType !== "all" ? selectedType : "venue",
+          location:       place.address,
+          googlePlaceId:  place.id,
+          rating:         place.rating,
+          ratingCount:    place.ratingCount,
+          photoReference: place.photoReference,
+          website:        place.website,
+          source:         "manual_search",
+          liked:          true,
+        }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      const data = await res.json();
+      if (data.id) {
+        fetch("/api/enrich-venue", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({
+            google_place_id: place.id,
+            website_url:     place.website,
+            place_name:      place.name,
+          }),
+        }).catch(() => {});
+      }
+      setSaveSuccess(true);
+      onSaved(place.id);
+      onToast("Added to Outreach — Aurora is writing your email sequence", "sparkles");
+    } catch {
+      setIsSaving(false);
+    }
+  };
+
+  const saved = isSaved || saveSuccess;
 
   return (
     <div className="glass-card glass-card-hover rounded-xl overflow-hidden flex gap-2 p-2" style={{ borderLeft: `3px solid ${ACCENT}` }}>
@@ -866,17 +1028,25 @@ function DiscoverCardCompact({ place, isSaved, onSave }: { place: Place; isSaved
             <span className="text-[10px] font-semibold text-muted-foreground">{place.rating.toFixed(1)}</span>
           </div>
         )}
+        {savedInstagram && (
+          <p className="text-[10px] font-medium truncate" style={{ color: "#e1306c" }}>
+            {savedInstagram}
+          </p>
+        )}
       </div>
 
       {/* Save icon */}
       <button
-        onClick={(e) => { e.stopPropagation(); if (!isSaved) onSave(); }}
-        disabled={isSaved}
+        onClick={handleSaveClick}
+        disabled={saved || isSaving}
         className={`shrink-0 self-center w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-          isSaved ? "text-primary" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+          saved ? "text-primary" : isSaving ? "opacity-50" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
         }`}
       >
-        <Heart className={`w-4 h-4 ${isSaved ? "fill-primary" : ""}`} />
+        {isSaving
+          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          : <Heart className={`w-4 h-4 ${saved ? "fill-primary" : ""}`} />
+        }
       </button>
     </div>
   );
