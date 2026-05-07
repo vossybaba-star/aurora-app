@@ -87,6 +87,17 @@ export interface Opportunity {
   // Enrichment data
   enrichmentStatus?: EnrichmentStatus;
   contactForm?: ContactFormInfo;
+  // Tier 1 contact intelligence
+  instagramHandle?: string;
+  instagramUrl?: string;
+  contactEmail?: string;
+  contactEmailType?: string;     // 'direct' | 'info' | 'booking' | 'wedding' | 'other'
+  contactFormUrl?: string;
+  hasContactForm?: boolean;
+  // Tier 2 personal analysis
+  personalAnalysis?: Record<string, unknown>;
+  personalScore?: number;
+  personalAnalysisStatus?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -166,6 +177,10 @@ export const contactMethodLabels: Record<ContactMethodType, string> = {
   instagram: 'Instagram',
   linkedin: 'LinkedIn',
   phone: 'Phone',
+  website: 'Website',
+  facebook: 'Facebook',
+  twitter: 'Twitter / X',
+  tiktok: 'TikTok',
 };
 
 export const contactMethodIcons: Record<ContactMethodType, string> = {
@@ -174,6 +189,10 @@ export const contactMethodIcons: Record<ContactMethodType, string> = {
   instagram: 'Instagram',
   linkedin: 'Linkedin',
   phone: 'Phone',
+  website: 'Globe',
+  facebook: 'Facebook',
+  twitter: 'ExternalLink',
+  tiktok: 'ExternalLink',
 };
 
 export const toneLabels: Record<Tone, string> = {

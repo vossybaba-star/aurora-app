@@ -719,31 +719,8 @@ function PaneDetail({
           )}
         </div>
 
-        {/* Contact methods */}
-        {opportunity.contactMethods.length > 0 && (
-          <div className="glass-card rounded-2xl p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Contact Methods</p>
-            <div className="flex flex-wrap gap-2">
-              {opportunity.contactMethods.map(cm => {
-                const Icon = getContactIcon(cm.type);
-                return (
-                  <button
-                    key={cm.id}
-                    onClick={() => {
-                      if (cm.type === 'email') window.location.href = `mailto:${cm.value}`;
-                      else if (cm.type === 'phone') window.location.href = `tel:${cm.value}`;
-                      else if (cm.value.startsWith('http')) window.open(cm.value, '_blank');
-                    }}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-muted-foreground bg-white/60 border border-white/70 hover:bg-white/80 transition-all"
-                  >
-                    <Icon className="w-3 h-3 shrink-0" />
-                    <span className="truncate max-w-[120px]">{cm.value}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Contact Intelligence */}
+        <ContactIntelCard opportunity={opportunity} />
 
       </div>{/* end scrollable */}
 
@@ -2030,28 +2007,8 @@ function SequenceDetail({
         </CardContent>
       </Card>
 
-      {/* Contact info */}
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base">Contact Methods</CardTitle></CardHeader>
-        <CardContent>
-          {opportunity.contactMethods.length === 0
-            ? <p className="text-sm text-muted-foreground">No contact methods added</p>
-            : <div className="space-y-2">
-                {opportunity.contactMethods.map(cm => {
-                  const Icon = getContactIcon(cm.type);
-                  return (
-                    <div key={cm.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-2">
-                        <Icon className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">{cm.value}</span>
-                        {cm.isPrimary && <Badge variant="secondary" className="text-xs">Primary</Badge>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>}
-        </CardContent>
-      </Card>
+      {/* Contact Intelligence */}
+      <ContactIntelCard opportunity={opportunity} />
 
       {/* Action */}
       {opportunity.status !== 'replied' && (
@@ -2060,6 +2017,166 @@ function SequenceDetail({
             onClick={() => startTransition(async () => { await updateOpportunity(opportunity.id, { status: 'replied' }); await onRefresh(); toast.success('Marked as replied!'); })}>
             <MessageSquare className="w-5 h-5 mr-2" />Mark as Replied
           </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════
+   Contact Intelligence Card
+════════════════════════════════════════════════ */
+function ContactIntelCard({ opportunity }: { opportunity: Opportunity }) {
+  const [copiedHandle, setCopiedHandle] = useState(false);
+
+  // Collect all contact signals — prefer Tier 1 contact intel, fall back to contactMethods
+  const emailFromMethods = opportunity.contactMethods.find(c => c.type === 'email');
+  const igFromMethods    = opportunity.contactMethods.find(c => c.type === 'instagram');
+  const phoneFromMethods = opportunity.contactMethods.find(c => c.type === 'phone');
+  const websiteFromMethods = opportunity.contactMethods.find(c => c.type === 'website');
+
+  const email     = opportunity.contactEmail || emailFromMethods?.value || null;
+  const emailType = opportunity.contactEmailType || null;
+  const igHandle  = opportunity.instagramHandle || igFromMethods?.value || null;
+  const igUrl     = opportunity.instagramUrl || (igHandle ? `https://www.instagram.com/${igHandle.replace('@', '')}/` : null);
+  const formUrl   = opportunity.contactFormUrl || opportunity.contactForm?.url || null;
+  const hasForm   = opportunity.hasContactForm || !!formUrl;
+  const phone     = phoneFromMethods?.value || null;
+  const website   = opportunity.website || websiteFromMethods?.value || null;
+
+  const hasAny = email || igHandle || formUrl || phone;
+  if (!hasAny && !website) return null;
+
+  const emailTypeBadge: Record<string, { label: string; color: string }> = {
+    booking: { label: 'Booking',  color: '#7c6ef7' },
+    wedding: { label: 'Wedding',  color: '#e879a0' },
+    direct:  { label: 'Direct',   color: '#22c55e' },
+    info:    { label: 'Info',     color: '#f59e0b' },
+    other:   { label: 'General',  color: '#6b7280' },
+  };
+
+  const copyHandle = () => {
+    if (!igHandle) return;
+    navigator.clipboard.writeText(igHandle).catch(() => {});
+    setCopiedHandle(true);
+    setTimeout(() => setCopiedHandle(false), 2000);
+  };
+
+  return (
+    <div className="glass-card rounded-2xl p-4 space-y-3">
+      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contact Intelligence</p>
+
+      {/* Email */}
+      {email && (
+        <div className="flex items-center gap-2 group">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+               style={{ background: 'rgba(124,110,247,0.1)' }}>
+            <Mail className="w-3.5 h-3.5" style={{ color: ACCENT }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <a href={`mailto:${email}`}
+               className="text-sm font-medium truncate block hover:underline"
+               style={{ color: '#131b2e' }}>
+              {email}
+            </a>
+            {emailType && emailTypeBadge[emailType] && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{
+                      background: `${emailTypeBadge[emailType].color}18`,
+                      color: emailTypeBadge[emailType].color,
+                    }}>
+                {emailTypeBadge[emailType].label}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => navigator.clipboard.writeText(email).catch(() => {})}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-white/60"
+          >
+            <Copy className="w-3 h-3 text-muted-foreground" />
+          </button>
+        </div>
+      )}
+
+      {/* Instagram */}
+      {igHandle && (
+        <div className="flex items-center gap-2 group">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+               style={{ background: 'rgba(232,73,160,0.1)' }}>
+            <Instagram className="w-3.5 h-3.5 text-pink-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            {igUrl ? (
+              <a href={igUrl} target="_blank" rel="noopener noreferrer"
+                 className="text-sm font-medium hover:underline block truncate"
+                 style={{ color: '#131b2e' }}>
+                {igHandle}
+              </a>
+            ) : (
+              <span className="text-sm font-medium truncate block" style={{ color: '#131b2e' }}>
+                {igHandle}
+              </span>
+            )}
+            <span className="text-[10px] text-muted-foreground">Tap to open · DM for enquiries</span>
+          </div>
+          <button
+            onClick={copyHandle}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-white/60"
+          >
+            {copiedHandle
+              ? <Check className="w-3 h-3 text-green-500" />
+              : <Copy className="w-3 h-3 text-muted-foreground" />}
+          </button>
+        </div>
+      )}
+
+      {/* Contact form */}
+      {(hasForm && formUrl) && (
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+               style={{ background: 'rgba(245,158,11,0.1)' }}>
+            <FileText className="w-3.5 h-3.5 text-amber-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <a href={formUrl} target="_blank" rel="noopener noreferrer"
+               className="text-sm font-medium hover:underline block truncate"
+               style={{ color: '#131b2e' }}>
+              Contact form
+            </a>
+            <span className="text-[10px] text-muted-foreground">Use for initial enquiry</span>
+          </div>
+          <ExternalLink className="w-3 h-3 text-muted-foreground shrink-0" />
+        </div>
+      )}
+
+      {/* Phone */}
+      {phone && (
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+               style={{ background: 'rgba(34,197,94,0.1)' }}>
+            <Phone className="w-3.5 h-3.5 text-green-500" />
+          </div>
+          <a href={`tel:${phone}`}
+             className="text-sm font-medium hover:underline"
+             style={{ color: '#131b2e' }}>
+            {phone}
+          </a>
+        </div>
+      )}
+
+      {/* Website (only if no email / form found, as a fallback) */}
+      {website && !email && !formUrl && (
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+               style={{ background: 'rgba(100,100,120,0.08)' }}>
+            <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+          </div>
+          <a href={website} target="_blank" rel="noopener noreferrer"
+             className="text-sm font-medium hover:underline truncate block flex-1"
+             style={{ color: '#131b2e' }}>
+            {website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+          </a>
+          <ExternalLink className="w-3 h-3 text-muted-foreground shrink-0" />
         </div>
       )}
     </div>

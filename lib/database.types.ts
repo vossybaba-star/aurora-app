@@ -44,6 +44,16 @@ export interface DbOpportunity {
   contact_form_label: string | null;
   contact_form_confidence: string | null;
   enrichment_status: string | null;
+  // Tier 1 contact intelligence
+  instagram_handle: string | null;
+  instagram_url: string | null;
+  contact_email: string | null;
+  contact_email_type: string | null;
+  has_contact_form: boolean | null;
+  // Tier 2 personal analysis
+  personal_analysis: Record<string, unknown> | null;
+  personal_score: number | null;
+  personal_analysis_status: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -178,6 +188,17 @@ export function dbOpportunityToOpportunity(db: DbOpportunity, contactMethods: Db
       label: db.contact_form_label || 'Contact Form',
       confidence: (db.contact_form_confidence as 'high' | 'medium' | 'low') || 'low',
     } : undefined,
+    // Tier 1 contact intelligence
+    instagramHandle:   db.instagram_handle      || undefined,
+    instagramUrl:      db.instagram_url         || undefined,
+    contactEmail:      db.contact_email         || undefined,
+    contactEmailType:  db.contact_email_type    || undefined,
+    contactFormUrl:    db.contact_form_url       || undefined,
+    hasContactForm:    db.has_contact_form       ?? false,
+    // Tier 2 personal analysis
+    personalAnalysis:        db.personal_analysis         || undefined,
+    personalScore:           db.personal_score            ?? undefined,
+    personalAnalysisStatus:  db.personal_analysis_status  || undefined,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   };

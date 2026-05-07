@@ -48,7 +48,7 @@ export function DashboardHeader() {
           {/* Refresh */}
           <button
             className="w-9 h-9 flex items-center justify-center rounded-xl glass-card border border-white/60 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-            onClick={refreshData}
+            onClick={() => refreshData()}
             disabled={isLoading}
           >
             {isLoading ? <Spinner className="w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}

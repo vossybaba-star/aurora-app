@@ -439,116 +439,52 @@ For each selected opportunity, provide:
 
       createdCount++;
 
-      // Enrich contact info from website
-      let enrichedContacts: any = null;
-      if (placeDetails.website) {
-        try {
-          const baseUrl = process.env.VERCEL_URL 
-            ? `https://${process.env.VERCEL_URL}` 
-            : 'http://localhost:3000';
-          
-          const enrichRes = await fetch(`${baseUrl}/api/enrich-contact`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              websiteUrl: placeDetails.website,
-              placeId: placeDetails.place_id,
-            }),
-          });
-          
-          if (enrichRes.ok) {
-            const enrichData = await enrichRes.json();
-            enrichedContacts = enrichData.contactInfo;
-            console.log("[v0] Enrichment result for", placeDetails.website, ":", JSON.stringify(enrichedContacts, null, 2));
-          } else {
-            console.error("[v0] Enrichment response not OK:", enrichRes.status);
-          }
-        } catch (enrichErr) {
-          console.error("[v0] Enrichment failed:", enrichErr);
-        }
-      }
-
-      // Update opportunity with contact form if found
-      if (enrichedContacts?.contactForm) {
-        await supabase
-          .from("opportunities")
-          .update({
-            contact_form_url: enrichedContacts.contactForm.url,
-            contact_form_label: enrichedContacts.contactForm.label,
-            contact_form_confidence: enrichedContacts.contactForm.confidence,
-          })
-          .eq("id", newOpp.id);
-      }
-
-      // Add contact methods - prioritize enriched data
+      // ── Add phone + website as contact methods (from Google Places) ──────────
       const contactMethods: { opportunity_id: string; type: string; value: string; is_primary: boolean }[] = [];
-      
-      // Add emails from enrichment
-      if (enrichedContacts?.emails?.length > 0) {
-        enrichedContacts.emails.forEach((email: string, i: number) => {
-          contactMethods.push({
-            opportunity_id: newOpp.id,
-            type: "email",
-            value: email,
-            is_primary: i === 0,
-          });
-        });
-      }
-      
-      // Add Instagram from enrichment
-      if (enrichedContacts?.instagram) {
+
+      if (placeDetails.formatted_phone_number) {
         contactMethods.push({
           opportunity_id: newOpp.id,
-          type: "instagram",
-          value: enrichedContacts.instagram,
-          is_primary: contactMethods.length === 0,
-        });
-      }
-      
-      // Add phone (from enrichment or Google Places)
-      const phone = enrichedContacts?.phone || placeDetails.formatted_phone_number;
-      if (phone) {
-        contactMethods.push({
-          opportunity_id: newOpp.id,
-          type: "phone",
-          value: phone,
-          is_primary: contactMethods.length === 0,
-        });
-      }
-      
-      // Add website
-      if (placeDetails.website) {
-        contactMethods.push({
-          opportunity_id: newOpp.id,
-          type: "website",
-          value: placeDetails.website,
-          is_primary: contactMethods.length === 0,
-        });
-      }
-      
-      // Add Facebook from enrichment
-      if (enrichedContacts?.facebook) {
-        contactMethods.push({
-          opportunity_id: newOpp.id,
-          type: "facebook",
-          value: enrichedContacts.facebook,
-          is_primary: false,
-        });
-      }
-      
-      // Add LinkedIn from enrichment
-      if (enrichedContacts?.linkedin) {
-        contactMethods.push({
-          opportunity_id: newOpp.id,
-          type: "linkedin",
-          value: enrichedContacts.linkedin,
-          is_primary: false,
+          type:       "phone",
+          value:      placeDetails.formatted_phone_number,
+          is_primary: true,
         });
       }
 
-      // Insert all contact methods
+      if (placeDetails.website) {
+        contactMethods.push({
+          opportunity_id: newOpp.id,
+          type:       "website",
+          value:      placeDetails.website,
+          is_primary: contactMethods.length === 0,
+        });
+      }
+
       if (contactMethods.length > 0) {
         await supabase.from("contact_methods").insert(contactMethods);
+      }
+
+      // ── Tier 1 pre-enrichment: fire-and-forget (non-blocking) ─────────────
+      // Crawls the venue website and extracts Instagram, email, contact form.
+      // Results land in the `venues` table; the Outreach page picks them up
+      // when the user opens a saved opportunity.
+      if (placeDetails.website || placeDetails.place_id) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+        fetch(`${appUrl}/api/enrich-venue-global`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            google_place_id:   placeDetails.place_id,
+            name:              placeDetails.name,
+            website:           placeDetails.website           ?? null,
+            formatted_address: placeDetails.formatted_address ?? null,
+            phone:             placeDetails.formatted_phone_number ?? null,
+            rating:            placeDetails.rating            ?? null,
+            rating_count:      placeDetails.user_ratings_total ?? null,
+            photo_reference:   placeDetails.photo_reference   ?? null,
+            types:             placeDetails.types             ?? null,
+          }),
+        }).catch(err => console.warn("[find-opportunities] Tier 1 trigger failed:", err));
       }
     }
 
