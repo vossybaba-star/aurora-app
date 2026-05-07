@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     const isEmail = !contactMethod || contactMethod === 'email';
     const isInstagram = contactMethod === 'instagram';
-    const firstName = profile.full_name?.split(' ')[0] || profile.business_name || 'there';
+    const firstName = profile.full_name?.split(' ')[0] || profile.business_name || 'us';
     const toneMap: Record<string, string> = { professional: "professional and polished", friendly: "warm and friendly", premium: "premium and exclusive", casual: "casual and relaxed" };
     const toneDescription = toneMap[profile.tone] || "professional";
     const socialLinks = [profile.website, profile.instagram ? `@${profile.instagram}` : null, profile.linkedin].filter(Boolean);

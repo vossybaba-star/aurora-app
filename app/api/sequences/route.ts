@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   const businessName = profile?.business_name || "our team";
-  const firstName = profile?.full_name?.split(" ")[0] || "Hi";
+  const firstName = profile?.full_name?.split(" ")[0] || profile?.business_name || businessName;
   const serviceType = profile?.business_type || "services";
   const pitch = profile?.pitch || "";
 

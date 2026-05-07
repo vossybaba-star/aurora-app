@@ -330,7 +330,10 @@ export function DiscoverPage() {
       {/* Search input row */}
       <div className="flex items-center gap-2">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          {isSearching
+            ? <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+            : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          }
           <Input
             placeholder="Search venues or tap a suggestion…"
             value={searchQuery}
@@ -339,9 +342,6 @@ export function DiscoverPage() {
             className="pl-10"
           />
         </div>
-        <Button variant="outline" size="icon" onClick={() => handleSearch()} disabled={isSearching || !searchQuery.trim()}>
-          {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-        </Button>
       </div>
 
       {/* Suggestion chips */}

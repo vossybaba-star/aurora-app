@@ -13,7 +13,7 @@ import { BottomNav } from "./bottom-nav";
 import { Spinner } from "@/components/ui/spinner";
 
 export function Dashboard() {
-  const { activeTab, isLoading } = useAurora();
+  const { activeTab, profileNavKey, isLoading } = useAurora();
 
   const renderContent = () => {
     if (isLoading) {
@@ -36,7 +36,7 @@ export function Dashboard() {
       case "outreach":     return <OutreachPage />;
       case "saved":        return <SavedPage />;
       case "relationships": return <RelationshipsPage />;
-      case "profile":      return <ProfilePage />;
+      case "profile":      return <ProfilePage key={profileNavKey} />;
       default:             return <DashboardHome />;
     }
   };

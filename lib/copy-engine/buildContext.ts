@@ -36,7 +36,7 @@ export async function buildCopyContext(opportunityId: string, userId: string) {
 
   return {
     sender: {
-      name:            prof.full_name ?? prof.business_name ?? "there",
+      name:            prof.full_name ?? prof.business_name ?? prof.businessName ?? "your team",
       business_name:   prof.business_name ?? null,
       profession:      prof.business_type ?? "photographer",
       speciality_tags: prof.speciality_tags ?? [],

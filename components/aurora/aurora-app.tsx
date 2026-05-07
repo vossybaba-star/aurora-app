@@ -25,6 +25,8 @@ interface AuroraContextType {
   setOnboardingStep: (step: number) => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  profileNavKey: number;
+  goToProfileHome: () => void;
   refreshData: (silent?: boolean) => Promise<void>;
   isLoading: boolean;
 }
@@ -52,7 +54,14 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
   const [followUpTasks, setFollowUpTasks] = useState<FollowUpTask[]>([]);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [activeTab, setActiveTab] = useState("home");
+  const [profileNavKey, setProfileNavKey] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Navigate to Account > My Profile, forcing a fresh mount even if already on the tab
+  const goToProfileHome = () => {
+    setActiveTab("profile");
+    setProfileNavKey(k => k + 1);
+  };
 
   const refreshData = async (silent = false) => {
     if (!userId) return;
@@ -135,6 +144,8 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
         setOnboardingStep,
         activeTab,
         setActiveTab,
+        profileNavKey,
+        goToProfileHome,
         refreshData,
         isLoading,
       }}

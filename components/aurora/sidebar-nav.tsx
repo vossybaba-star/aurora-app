@@ -28,7 +28,7 @@ const navItems = [
 ];
 
 export function SidebarNav() {
-  const { activeTab, setActiveTab, profile, opportunities } = useAurora();
+  const { activeTab, setActiveTab, goToProfileHome, profile, opportunities } = useAurora();
   const [isPending, startTransition] = useTransition();
 
   const stats = {
@@ -225,7 +225,7 @@ export function SidebarNav() {
             className="w-full flex items-center justify-center lg:justify-start gap-3
                        lg:px-3 py-2 rounded-xl text-muted-foreground
                        hover:bg-white/25 hover:text-foreground transition-all"
-            onClick={() => setActiveTab("profile")}
+            onClick={goToProfileHome}
           >
             <Settings className="w-4 h-4 shrink-0" />
             <span className="hidden lg:block text-sm font-medium">Settings</span>
