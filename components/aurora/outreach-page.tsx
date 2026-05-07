@@ -1463,14 +1463,16 @@ export function OutreachPage() {
         </div>
       )}
 
-      <div className={`space-y-4${selectedSequence ? ' hidden lg:block' : ''}`}>
+      <div className={`space-y-3${selectedSequence ? ' hidden lg:block' : ''}`}>
 
-        {/* ── Page header ── */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-extrabold" style={{ color: '#131b2e' }}>Outreach</h1>
+        {/* ── Pipeline strip + Templates ── */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <PipelineStrip counts={counts} active={activeStage} onChange={s => { setActiveStage(s); setSelectedSequence(null); }} />
+          </div>
           <button
             onClick={() => setShowTemplates(true)}
-            className="flex items-center gap-1.5 text-sm font-bold transition-colors hover:opacity-80"
+            className="shrink-0 flex items-center gap-1.5 text-sm font-bold transition-colors hover:opacity-80"
             style={{ color: ACCENT }}
           >
             <FileText className="w-4 h-4" />
@@ -1478,14 +1480,11 @@ export function OutreachPage() {
           </button>
         </div>
 
-        {/* ── Pipeline strip ── */}
-        <PipelineStrip counts={counts} active={activeStage} onChange={s => { setActiveStage(s); setSelectedSequence(null); }} />
-
         {/* ══════════════════════════════════════
             DESKTOP: Split pane (lg+)
         ══════════════════════════════════════ */}
         <div className="hidden lg:flex glass-panel rounded-2xl overflow-hidden"
-             style={{ height: 'calc(100vh - 260px)', minHeight: '520px' }}>
+             style={{ height: 'calc(100vh - 210px)', minHeight: '520px' }}>
 
           {/* Left pane — contact list */}
           <div className="w-[350px] shrink-0 border-r border-white/30 flex flex-col">
