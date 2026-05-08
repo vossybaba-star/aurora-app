@@ -66,16 +66,13 @@ export async function POST(req: Request) {
     );
   }
 
-  // ── Optionally extend with target-market keywords ────────────────────────
-  const marketKeywords: string[] = [];
-  if (target_markets && target_markets.length > 0) {
-    for (const market of target_markets as TargetMarket[]) {
-      const extra = TARGET_MARKET_KEYWORDS[market];
-      if (extra) marketKeywords.push(...extra);
-    }
-  }
+  // ── Extend with ALL target-market keywords (every selected market contributes) ──
+  // flatMap over every market so no market is skipped even if the first returns nothing.
+  const marketKeywords: string[] = (target_markets as TargetMarket[] ?? []).flatMap(
+    (market) => TARGET_MARKET_KEYWORDS[market] ?? []
+  );
 
-  // Deduplicate combined keyword list
+  // Deduplicate: base role keywords + all market keywords combined
   const allKeywords = Array.from(
     new Set([...baseKeywords, ...marketKeywords])
   );

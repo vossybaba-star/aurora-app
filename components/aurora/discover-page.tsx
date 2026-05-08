@@ -78,20 +78,23 @@ function getPersona(businessType: string | undefined): Persona {
 
 /**
  * Resolves the best role_id to send to Apollo, in priority order:
- *  1. profile.roleId  — structured role from the new role picker
- *  2. Legacy businessType detection — keeps existing users working
- *     during the rollout before everyone has set a roleId
+ *  1. profile.roleId — only if it maps to a known entry in lib/roles.ts
+ *     (guards against legacy generic strings like "mua" that predate the role picker)
+ *  2. businessType detection — derives a specific sub-role from the free-text field
  */
 function resolveRoleId(
   roleId: string | undefined,
   businessType: string | undefined
 ): string | null {
-  if (roleId) return roleId;
-  // Legacy fallback: map old persona buckets to a sensible default role_id
+  // Only trust roleId if it actually resolves to a known role config
+  if (roleId && getRoleById(roleId)) return roleId;
+
+  // roleId absent or unrecognised (e.g. legacy "mua" / "makeup_artist") —
+  // map businessType to the most broadly useful sub-role
   const persona = getPersona(businessType);
-  if (persona === "mua")      return "bridal_mua";
-  if (persona === "startup")  return "startup_founder_b2b";
-  // photographers use Google Places, not Apollo
+  if (persona === "mua")          return "commercial_mua";
+  if (persona === "startup")      return "startup_founder_b2b";
+  if (persona === "photographer") return "wedding_photographer";
   return null;
 }
 
