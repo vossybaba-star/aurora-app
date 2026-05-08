@@ -52,6 +52,12 @@ export async function POST(req: Request) {
     );
   }
 
+  // ── Generic / bot first-name blocklist ──────────────────────────────────
+  const GENERIC_NAMES = new Set([
+    "bride", "team", "admin", "info", "contact",
+    "hello", "support", "sales", "enquiries", "office",
+  ]);
+
   // ── Apollo people search ─────────────────────────────────────────────────
   // First try: scoped to company (may return 0 if company is thin in Apollo)
   const searchParams = {
@@ -74,5 +80,10 @@ export async function POST(req: Request) {
     console.log("[apollo/people] Broad result count:", people.length);
   }
 
-  return NextResponse.json({ people });
+  // Filter out generic / inbox-style first names
+  const filtered = people.filter(
+    (p) => !GENERIC_NAMES.has(p.first_name?.toLowerCase().trim() ?? "")
+  );
+
+  return NextResponse.json({ people: filtered });
 }

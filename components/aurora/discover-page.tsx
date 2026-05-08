@@ -38,6 +38,7 @@ import { useVenueEnrichment } from "@/hooks/useVenueEnrichment";
 import type { VenueEnrichmentResult } from "@/hooks/useVenueEnrichment";
 import { CompanyCard } from "@/components/discover/CompanyCard";
 import type { ApolloCompany } from "@/lib/apollo";
+import { getRoleById } from "@/lib/roles";
 
 /* ─── Constants ──────────────────────────────── */
 const ACCENT  = "#7c6ef7";
@@ -252,22 +253,31 @@ export function DiscoverPage() {
       setIsLoadingApollo(true);
       setApolloError(null);
       try {
-        const target_markets = profile?.targetMarkets?.length
-          ? profile.targetMarkets
-          : undefined;
-        console.log("[discover] Apollo companies params:", {
-          role_id:        roleId,
-          target_markets,
-          persona:        getPersona(profile?.businessType),
-          profile_roleId: profile?.roleId,
-          location:       profile?.location,
+        const userTargetMarkets = profile?.targetMarkets ?? [];
+        // If the user hasn't set target markets yet, fall back to the role's
+        // defaultTargetMarkets so the Apollo query is never sent with an empty
+        // market list (which causes it to return only base keyword results).
+        const role = getRoleById(roleId);
+        const effectiveTargetMarkets =
+          userTargetMarkets.length > 0
+            ? userTargetMarkets
+            : (role?.defaultTargetMarkets ?? []);
+
+        console.log("[discover] Companies fetch params:", {
+          role_id:               roleId,
+          target_markets:        effectiveTargetMarkets,
+          profile_roleId:        profile?.roleId,
+          persona:               getPersona(profile?.businessType),
+          location:              profile?.location,
+          used_default_markets:  userTargetMarkets.length === 0,
         });
+
         const res = await fetch("/api/apollo/companies", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({
             role_id:        roleId,
-            target_markets,
+            target_markets: effectiveTargetMarkets,
           }),
         });
         if (!cancelled) {
