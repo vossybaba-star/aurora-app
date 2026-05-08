@@ -5,7 +5,9 @@
  * Server-side only — never import from client components.
  */
 
-const APOLLO_BASE = "https://api.apollo.io/v1";
+const APOLLO_BASE      = "https://api.apollo.io/v1";
+// People search migrated to the newer api/v1 namespace (mixed_people/search deprecated May 2025)
+const APOLLO_BASE_PEOPLE = "https://api.apollo.io/api/v1";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -43,7 +45,7 @@ function apiKey(): string {
   return process.env.APOLLO_API_KEY ?? "";
 }
 
-async function apolloPost<T>(path: string, body: object): Promise<T | null> {
+async function apolloPost<T>(path: string, body: object, base = APOLLO_BASE): Promise<T | null> {
   const key = apiKey();
   if (!key) {
     console.error("[apollo] APOLLO_API_KEY is not set");
@@ -51,7 +53,7 @@ async function apolloPost<T>(path: string, body: object): Promise<T | null> {
   }
   try {
     // Try header-based auth first (Apollo's preferred modern method)
-    const res = await fetch(`${APOLLO_BASE}${path}`, {
+    const res = await fetch(`${base}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -157,7 +159,7 @@ interface RawPerson {
 }
 
 export async function searchPeople(params: SearchPeopleParams): Promise<ApolloPerson[]> {
-  const data = await apolloPost<ApolloPeopleResponse>("/mixed_people/search", params);
+  const data = await apolloPost<ApolloPeopleResponse>("/mixed_people/api_search", params, APOLLO_BASE_PEOPLE);
   if (!data?.people) return [];
 
   return data.people.map((p) => ({
