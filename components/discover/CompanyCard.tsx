@@ -28,6 +28,16 @@ function initials(name: string): string {
     .join("");
 }
 
+/**
+ * Apollo free tier returns last_name_obfuscated (e.g. "As***s").
+ * Show first name only when the last name is obfuscated.
+ */
+function displayName(person: ApolloPerson): string {
+  const obfuscated = person.last_name?.includes("*");
+  if (obfuscated || !person.last_name) return person.first_name;
+  return `${person.first_name} ${person.last_name}`.trim();
+}
+
 function scoreBadge(score: number) {
   if (score >= 70) return { label: "Strong lead", bg: "rgba(22,163,74,0.12)",  color: "#16a34a" };
   if (score >= 40) return { label: "Good lead",   bg: "rgba(234,179,8,0.12)",  color: "#ca8a04" };
@@ -61,7 +71,7 @@ function ContactRow({
   isConnecting: boolean;
   isConnected:  boolean;
 }) {
-  const fullName = `${person.first_name} ${person.last_name}`.trim();
+  const fullName = displayName(person);
 
   return (
     <div className="flex items-center gap-2.5 py-1.5">
@@ -259,7 +269,7 @@ export function CompanyCard({
           source:        "apollo",
           status:        "outreach_ready",
           liked:         true,
-          contact_name:  `${person.first_name} ${person.last_name}`.trim(),
+          contact_name:  displayName(person),
           contact_title: person.title ?? undefined,
           contact_email: person.email ?? undefined,
           whyGoodFit:    result?.suggested_angle ?? undefined,
