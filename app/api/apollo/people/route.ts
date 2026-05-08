@@ -58,32 +58,33 @@ export async function POST(req: Request) {
     "hello", "support", "sales", "enquiries", "office",
   ]);
 
+  const filterGeneric = (list: Awaited<ReturnType<typeof searchPeople>>) =>
+    list.filter((p) => !GENERIC_NAMES.has(p.first_name?.toLowerCase().trim() ?? ""));
+
   // ── Apollo people search ─────────────────────────────────────────────────
+  // Request 10 so we have headroom after filtering generics down to 3 display slots.
   // First try: scoped to company (may return 0 if company is thin in Apollo)
   const searchParams = {
     ...(company_name ? { q_organization_name: company_name } : {}),
     ...(domain       ? { organization_domains: [domain] }    : {}),
     person_titles: personTitles,
-    per_page: 5,
+    per_page: 10,
     page:     1,
   };
   console.log("[apollo/people] role_id:", role_id, "titles:", personTitles);
   console.log("[apollo/people] Search params:", JSON.stringify(searchParams));
 
-  let people = await searchPeople(searchParams);
-  console.log("[apollo/people] Scoped result count:", people.length);
+  let people = filterGeneric(await searchPeople(searchParams));
+  console.log("[apollo/people] Scoped result count (post-filter):", people.length);
 
   // Fallback: if company-scoped search returns nothing, broaden to title-only
   if (people.length === 0 && (company_name || domain)) {
     console.log("[apollo/people] Falling back to title-only search (no org filter)");
-    people = await searchPeople({ person_titles: personTitles, per_page: 5, page: 1 });
-    console.log("[apollo/people] Broad result count:", people.length);
+    people = filterGeneric(
+      await searchPeople({ person_titles: personTitles, per_page: 10, page: 1 })
+    );
+    console.log("[apollo/people] Broad result count (post-filter):", people.length);
   }
 
-  // Filter out generic / inbox-style first names
-  const filtered = people.filter(
-    (p) => !GENERIC_NAMES.has(p.first_name?.toLowerCase().trim() ?? "")
-  );
-
-  return NextResponse.json({ people: filtered });
+  return NextResponse.json({ people });
 }
