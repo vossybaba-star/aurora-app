@@ -75,6 +75,25 @@ function getPersona(businessType: string | undefined): Persona {
   return "other";
 }
 
+/**
+ * Resolves the best role_id to send to Apollo, in priority order:
+ *  1. profile.roleId  — structured role from the new role picker
+ *  2. Legacy businessType detection — keeps existing users working
+ *     during the rollout before everyone has set a roleId
+ */
+function resolveRoleId(
+  roleId: string | undefined,
+  businessType: string | undefined
+): string | null {
+  if (roleId) return roleId;
+  // Legacy fallback: map old persona buckets to a sensible default role_id
+  const persona = getPersona(businessType);
+  if (persona === "mua")      return "bridal_mua";
+  if (persona === "startup")  return "startup_founder_b2b";
+  // photographers use Google Places, not Apollo
+  return null;
+}
+
 function getSearchPrompts(businessType: string | undefined): string[] {
   switch (getPersona(businessType)) {
     case "photographer":
@@ -224,31 +243,28 @@ export function DiscoverPage() {
     load();
   }, []);
 
-  // Load Apollo companies for MUA / startup personas
+  // Load Apollo companies when the user has a role that uses company leads
   useEffect(() => {
-    const bt = profile?.businessType;
-    const persona = getPersona(bt);
-    console.log("[discover] Apollo effect fired — businessType:", JSON.stringify(bt), "→ persona:", persona);
-    if (persona !== "mua" && persona !== "startup") return;
-    const apolloPersona = persona === "mua" ? "makeup_artist" : "startup_founder";
+    const roleId = resolveRoleId(profile?.roleId, profile?.businessType);
+    if (!roleId) return; // photographer / unset — use Google Places instead
     let cancelled = false;
     const load = async () => {
       setIsLoadingApollo(true);
       setApolloError(null);
-      console.log("[discover] Fetching Apollo companies for persona:", apolloPersona);
       try {
         const res = await fetch("/api/apollo/companies", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          // No location filter — beauty/fashion brands are global and Apollo's
-          // location format is strict; filtering by location returns 0 results
-          // for most stored profile location strings.
-          body:    JSON.stringify({ persona: apolloPersona }),
+          body:    JSON.stringify({
+            role_id:       roleId,
+            target_markets: profile?.targetMarkets?.length
+              ? profile.targetMarkets
+              : undefined,
+          }),
         });
         if (!cancelled) {
           if (res.ok) {
             const data = await res.json();
-            console.log("[discover] Apollo companies loaded:", data.companies?.length ?? 0, data.error ?? "");
             if (data.error) {
               setApolloError(data.error);
             } else {
@@ -269,7 +285,9 @@ export function DiscoverPage() {
     };
     load();
     return () => { cancelled = true; };
-  }, [profile?.businessType]);
+  // Re-fetch when roleId or targetMarkets change (profile update)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.roleId, profile?.businessType, profile?.targetMarkets]);
 
   // Infinite scroll
   useEffect(() => {
@@ -598,10 +616,9 @@ export function DiscoverPage() {
 
               {/* Responsive card grid: 1 col mobile / 2 col tablet / 3 col desktop */}
               {(() => {
-                const persona = getPersona(profile?.businessType);
-                const useApollo = persona === "mua" || persona === "startup";
+                const resolvedRoleId = resolveRoleId(profile?.roleId, profile?.businessType);
+                const useApollo = resolvedRoleId !== null;
                 if (useApollo) {
-                  const apolloPersona = persona === "mua" ? "makeup_artist" : "startup_founder";
                   if (isLoadingApollo) {
                     return (
                       <div className="flex items-center justify-center py-8">
@@ -638,7 +655,7 @@ export function DiscoverPage() {
                         <CompanyCard
                           key={company.id}
                           company={company}
-                          persona={apolloPersona}
+                          roleId={resolvedRoleId}
                           isSaved={savedApolloIds.has(company.id)}
                           onSaved={handleApolloSaved}
                           onToast={showToast}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   Globe,
   Linkedin,
@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Loader2,
   UserRound,
+  Users,
 } from "lucide-react";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import { useCompanyEnrichment } from "@/hooks/useCompanyEnrichment";
@@ -64,10 +65,8 @@ function ContactRow({
 
   return (
     <div className="flex items-center gap-2.5 py-1.5">
-      {/* Avatar */}
       <AvatarPill name={fullName} size="sm" />
 
-      {/* Name + title */}
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold truncate" style={{ color: "#131b2e" }}>
           {fullName}
@@ -80,7 +79,6 @@ function ContactRow({
         )}
       </div>
 
-      {/* Connect button */}
       {isConnected ? (
         <span className="text-[10px] font-semibold px-2 py-1 rounded-lg"
               style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
@@ -125,14 +123,12 @@ function InlineAnalysisPanel({ result, accent }: { result: CompanyScoreResult; a
 
   return (
     <div className="space-y-2 text-xs">
-      {/* Score + label */}
       <div className="flex items-center gap-2">
         <span className="font-bold text-sm" style={{ color: badge.color }}>{result.score}/100</span>
         <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold"
               style={{ background: badge.bg, color: badge.color }}>{result.score_label}</span>
       </div>
 
-      {/* Why good — bullet list */}
       {result.why_good.length > 0 && (
         <ul className="space-y-0.5 text-muted-foreground leading-relaxed list-none">
           {result.why_good.map((point, i) => (
@@ -144,7 +140,6 @@ function InlineAnalysisPanel({ result, accent }: { result: CompanyScoreResult; a
         </ul>
       )}
 
-      {/* Caution */}
       {result.caution && (
         <p className="text-[10px] font-medium px-2 py-1.5 rounded-lg"
            style={{ background: "rgba(234,179,8,0.08)", color: "#b45309", borderLeft: "2px solid #fcd34d" }}>
@@ -152,7 +147,6 @@ function InlineAnalysisPanel({ result, accent }: { result: CompanyScoreResult; a
         </p>
       )}
 
-      {/* Suggested angle */}
       {result.suggested_angle && (
         <div className="px-2 py-1.5 rounded-lg"
              style={{ background: "rgba(124,110,247,0.06)", borderLeft: `2px solid ${accent}40` }}>
@@ -165,11 +159,12 @@ function InlineAnalysisPanel({ result, accent }: { result: CompanyScoreResult; a
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   CompanyCard — Apollo-sourced lead card for MUA / startup personas
+   CompanyCard — Apollo-sourced lead card for role-based personas
 ═══════════════════════════════════════════════════════════════ */
 export interface CompanyCardProps {
   company:             ApolloCompany;
-  persona:             "makeup_artist" | "startup_founder";
+  /** role_id from lib/roles.ts, e.g. "bridal_mua", "wedding_photographer" */
+  roleId:              string;
   isSaved:             boolean;
   onSaved:             (companyId: string) => void;
   onToast:             (message: string, icon?: "sparkles" | "check") => void;
@@ -180,62 +175,73 @@ export interface CompanyCardProps {
 }
 
 export function CompanyCard({
-  company, persona, isSaved, onSaved, onToast,
+  company, roleId, isSaved, onSaved, onToast,
   userProfession, userAbout, userSpecialityTags, userLocation,
 }: CompanyCardProps) {
 
-  /* ── Contacts state ─────────────────────────────────────────── */
-  const [people,          setPeople]          = useState<ApolloPerson[]>([]);
-  const [loadingPeople,   setLoadingPeople]   = useState(true);
-  const [connectingId,    setConnectingId]    = useState<string | null>(null);
-  const [connectedIds,    setConnectedIds]    = useState<Set<string>>(new Set());
-  const [saved,           setSaved]           = useState(isSaved);
+  /* ── People state ───────────────────────────────────────────── */
+  const [people,        setPeople]        = useState<ApolloPerson[]>([]);
+  const [loadingPeople, setLoadingPeople] = useState(false);
+  // true once the first people fetch has been attempted (success or empty)
+  const [peopleFetched, setPeopleFetched] = useState(false);
+  const [connectingId,  setConnectingId]  = useState<string | null>(null);
+  const [connectedIds,  setConnectedIds]  = useState<Set<string>>(new Set());
+  const [saved,         setSaved]         = useState(isSaved);
 
-  /* ── Enrichment / expand state ──────────────────────────────── */
+  /* ── Expand / enrichment state ──────────────────────────────── */
   const [isExpanded, setIsExpanded]  = useState(false);
   const { enrichCompany, enriching, result } = useCompanyEnrichment();
 
-  /* ── Load contacts on mount ─────────────────────────────────── */
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoadingPeople(true);
-      try {
-        const res = await fetch("/api/apollo/people", {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({
-            company_name: company.name,
-            domain:       company.primary_domain ?? undefined,
-            persona,
-          }),
-        });
-        if (res.ok && !cancelled) {
-          const data = await res.json();
-          setPeople((data.people as ApolloPerson[]).slice(0, 3));
-        }
-      } catch { /* non-fatal */ }
-      finally  { if (!cancelled) setLoadingPeople(false); }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [company.name, company.primary_domain, persona]);
-
-  /* ── Enrichment on expand ───────────────────────────────────── */
-  useEffect(() => {
-    if (isExpanded && !result && !enriching) {
-      enrichCompany(
-        company.id,
-        company,
-        people,
-        userProfession,
-        userAbout,
-        userSpecialityTags,
-        userLocation,
-      );
+  /* ── Fetch people — fires only on first card expand ─────────── */
+  const fetchPeople = useCallback(async () => {
+    if (peopleFetched || loadingPeople) return;
+    setLoadingPeople(true);
+    try {
+      const res = await fetch("/api/apollo/people", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          company_name: company.name,
+          domain:       company.primary_domain ?? undefined,
+          role_id:      roleId,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPeople((data.people as ApolloPerson[]).slice(0, 3));
+      }
+    } catch { /* non-fatal */ }
+    finally {
+      setLoadingPeople(false);
+      setPeopleFetched(true);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isExpanded]);
+  }, [company.name, company.primary_domain, roleId, peopleFetched, loadingPeople]);
+
+  /* ── Expand handler — triggers people fetch + enrichment ────── */
+  const handleExpand = useCallback(() => {
+    const expanding = !isExpanded;
+    setIsExpanded(expanding);
+
+    if (expanding) {
+      // People: first expand only
+      fetchPeople();
+      // Enrichment: first expand only
+      if (!result && !enriching) {
+        enrichCompany(
+          company.id,
+          company,
+          people,
+          userProfession,
+          userAbout,
+          userSpecialityTags,
+          userLocation,
+        );
+      }
+    }
+  }, [
+    isExpanded, fetchPeople, result, enriching, enrichCompany,
+    company, people, userProfession, userAbout, userSpecialityTags, userLocation,
+  ]);
 
   /* ── Connect handler ────────────────────────────────────────── */
   const handleConnect = useCallback(async (person: ApolloPerson) => {
@@ -247,7 +253,7 @@ export function CompanyCard({
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
           name:          company.name,
-          type:          persona === "startup_founder" ? "agency" : "brand",
+          type:          "brand",
           location:      company.city ?? company.country ?? "",
           website:       company.website_url ?? undefined,
           source:        "apollo",
@@ -256,8 +262,6 @@ export function CompanyCard({
           contact_name:  `${person.first_name} ${person.last_name}`.trim(),
           contact_title: person.title ?? undefined,
           contact_email: person.email ?? undefined,
-          // Store the Aurora Score suggested_angle in why_good_fit so the
-          // email generation prompt can use it as the opening hook.
           whyGoodFit:    result?.suggested_angle ?? undefined,
         }),
       });
@@ -271,18 +275,21 @@ export function CompanyCard({
       }
     } catch { /* non-fatal */ }
     finally { setConnectingId(null); }
-  }, [company, persona, saved, onSaved, onToast, connectingId]);
+  }, [company, saved, onSaved, onToast, connectingId, result]);
 
   /* ── Derived ────────────────────────────────────────────────── */
-  const domain   = company.primary_domain ?? (company.website_url ? new URL(company.website_url).hostname.replace(/^www\./, "") : null);
+  const domain   = company.primary_domain
+    ?? (company.website_url
+      ? (() => { try { return new URL(company.website_url!).hostname.replace(/^www\./, ""); } catch { return null; } })()
+      : null);
   const hasScore = result?.score != null;
 
   return (
     <div
       className="glass-card rounded-2xl overflow-hidden flex flex-col transition-all duration-200"
       style={{
-        border:     saved ? "1.5px solid rgba(22,163,74,0.4)" : "1px solid rgba(255,255,255,0.6)",
-        boxShadow:  saved ? "0 4px 20px rgba(22,163,74,0.08)" : "0 2px 12px rgba(124,110,247,0.06)",
+        border:    saved ? "1.5px solid rgba(22,163,74,0.4)" : "1px solid rgba(255,255,255,0.6)",
+        boxShadow: saved ? "0 4px 20px rgba(22,163,74,0.08)" : "0 2px 12px rgba(124,110,247,0.06)",
       }}
     >
       {/* ── Header ────────────────────────────────────────────── */}
@@ -295,7 +302,7 @@ export function CompanyCard({
               <p className="text-sm font-bold leading-tight line-clamp-2" style={{ color: "#131b2e" }}>
                 {company.name}
               </p>
-              {/* Score badge — shown once enrichment completes */}
+
               {hasScore && (() => {
                 const b = scoreBadge(result!.score);
                 return (
@@ -305,7 +312,6 @@ export function CompanyCard({
                   </span>
                 );
               })()}
-              {/* Saved badge */}
               {saved && !hasScore && (
                 <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md"
                       style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
@@ -314,7 +320,6 @@ export function CompanyCard({
               )}
             </div>
 
-            {/* Industry tag */}
             {company.industry && (
               <span className="inline-block mt-0.5 text-[10px] font-medium px-2 py-0.5 rounded-full"
                     style={{ background: `${ACCENT}12`, color: ACCENT }}>
@@ -324,14 +329,12 @@ export function CompanyCard({
           </div>
         </div>
 
-        {/* Location */}
         {(company.city || company.country) && (
           <p className="text-[11px] text-muted-foreground mt-2">
             {[company.city, company.country].filter(Boolean).join(", ")}
           </p>
         )}
 
-        {/* Short description */}
         {company.short_description && (
           <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
             {company.short_description}
@@ -341,8 +344,29 @@ export function CompanyCard({
 
       {/* ── Contacts section ──────────────────────────────────── */}
       <div className="px-4 py-3 border-t border-white/40 flex-1">
-        {loadingPeople ? (
+        {/* Not yet expanded — show teaser CTA instead of fetching */}
+        {!peopleFetched && !isExpanded ? (
+          <button
+            onClick={handleExpand}
+            className="w-full flex items-center gap-2 py-1.5 text-left group"
+          >
+            <div
+              className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: `${ACCENT}12` }}
+            >
+              <Users className="w-3.5 h-3.5" style={{ color: ACCENT }} />
+            </div>
+            <span
+              className="text-xs font-semibold group-hover:opacity-80 transition-opacity"
+              style={{ color: ACCENT }}
+            >
+              Tap to reveal key contacts
+            </span>
+          </button>
+
+        ) : loadingPeople ? (
           <ContactsSkeleton />
+
         ) : people.length > 0 ? (
           <div className="divide-y divide-white/30">
             {people.map((person) => (
@@ -356,6 +380,7 @@ export function CompanyCard({
               />
             ))}
           </div>
+
         ) : (
           <div className="flex items-center gap-2 py-2">
             <UserRound className="w-4 h-4 shrink-0 text-muted-foreground" />
@@ -374,7 +399,7 @@ export function CompanyCard({
         )}
       </div>
 
-      {/* ── Footer: links + expand ────────────────────────────── */}
+      {/* ── Footer: links + expand toggle ────────────────────── */}
       <div className="px-4 py-2.5 border-t border-white/40 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {domain && (
@@ -404,10 +429,11 @@ export function CompanyCard({
           )}
         </div>
 
-        {/* Expand toggle — triggers enrichment analysis */}
+        {/* Expand/collapse — triggers people fetch + enrichment */}
         <button
-          onClick={() => setIsExpanded((v) => !v)}
+          onClick={handleExpand}
           className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+          aria-label={isExpanded ? "Collapse analysis" : "Expand analysis"}
         >
           {enriching ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
