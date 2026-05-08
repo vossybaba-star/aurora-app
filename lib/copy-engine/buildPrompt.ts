@@ -17,12 +17,18 @@ import type { CopyContext } from "./buildContext";
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
-export function buildSystemPrompt(): string {
-  return `You are the Copy Engine for Aurora — an AI outreach assistant for independent creative professionals in the UK.
+export function buildSystemPrompt(ctx: CopyContext): string {
+  const pitchContextLine = ctx.sender.pitch_context
+    ? `\n\nCONTEXT ABOUT THE SENDER'S GOALS:\n${ctx.sender.pitch_context}`
+    : "";
+
+  const locationLine = ctx.sender.location ? ` based in ${ctx.sender.location}` : "";
+
+  return `You are writing outreach emails for a ${ctx.sender.profession} named ${ctx.sender.name}${locationLine}.${pitchContextLine}
 
 Your job is to write cold outreach emails that:
 - Feel genuinely personal and human — like the sender wrote them at their desk, not like a tool generated them
-- Reference specific, real details about the venue — never generic filler
+- Reference specific, real details about the recipient — never generic filler
 - Are concise and respectful of the recipient's time
 - Have one clear, low-friction ask — not "let's partner" but "would you be open to a quick chat"
 - Sound like a talented, confident professional — not desperate
@@ -108,7 +114,17 @@ export function buildInitialEmailPrompt(ctx: CopyContext): string {
     ? `- FIRST sentence: lead with the suggested angle — reference ${firstName}'s role${contactTitle ? ` (${contactTitle})` : ""} at ${ctx.recipient.venue_name} naturally. Do NOT open with "I came across your profile" or "I wanted to reach out"`
     : `- FIRST sentence after the greeting: lead with the suggested angle above — do NOT open with a generic "I wanted to reach out" or "I came across your venue"\n- The hook must feel like the sender noticed something genuine and specific about ${ctx.recipient.venue_name}`;
 
-  return `Write a cold outreach email from a ${ctx.sender.profession} to ${isApollo ? "a specific contact at a company" : "a venue"}.
+  // For Apollo: sign off with first name only (addressing an individual feels more personal)
+  // For venue/manual: sign off with full name as before
+  const signOff = isApollo && firstName
+    ? ctx.sender.first_name
+    : ctx.sender.name;
+
+  return `Write a personalised outreach email${isApollo && firstName && contactTitle
+    ? ` to ${contactName}, ${contactTitle} at ${ctx.recipient.venue_name}`
+    : isApollo && firstName
+      ? ` to ${contactName} at ${ctx.recipient.venue_name}`
+      : ` to ${ctx.recipient.venue_name}`}.
 
 SENDER PROFILE:
 - Name: ${ctx.sender.name}
@@ -138,13 +154,14 @@ INSTRUCTIONS:
 - Start with: ${greeting}
 ${openingInstruction}
 ${isApollo && firstName
-  ? `- In 2-3 sentences: briefly introduce who the sender is, their specialities (${specialityLine}), and why ${ctx.recipient.venue_name} specifically is interesting to them`
+  ? `- Reference ${firstName}'s specific role (${contactTitle ?? "their position"}) in the opening line — make them feel this email was written for them, not a template
+- In 2-3 sentences: briefly introduce who the sender is, their specialities (${specialityLine}), and why ${ctx.recipient.venue_name} specifically is interesting to them`
   : `- In 2-3 sentences: who the sender is, their specialities (${specialityLine}), and why this venue specifically suits their work`}
 - The voice must match the "About them" text above — not a sales template, not corporate-speak
 ${pastClientsLine ? `- Naturally work in: "${pastClientsLine}"` : ""}
-- One soft ask: "Would you be open to a quick chat?" or similar — never pushy
+- One soft ask: "Would you be open to a quick chat?" or similar — never pushy, never "partnership opportunity"
 - Never use the word "partnership" anywhere in the email
-- Sign off with the sender's ACTUAL name: ${ctx.sender.name}
+- Sign off with: ${signOff}${isApollo && firstName ? " (first name only — this is a personal email to an individual)" : ""}
 - Maximum 120 words
 - UK English throughout
 - No exclamation marks
@@ -186,6 +203,11 @@ export function buildFollowUpPrompt(
     ? `${followUpFirstName} at ${ctx.recipient.venue_name}`
     : ctx.recipient.venue_name;
 
+  // Follow-ups also sign off with first name only for Apollo
+  const followUpSignOff = isApolloFollowUp && followUpFirstName
+    ? ctx.sender.first_name
+    : ctx.sender.name;
+
   return `Write follow-up email #${followUpNumber} in an outreach sequence from ${ctx.sender.name} to ${followUpTarget}.
 
 PREVIOUS EMAILS SENT:
@@ -198,14 +220,15 @@ ${angle}
 
 SENDER: ${ctx.sender.name}, ${ctx.sender.profession}, specialising in ${ctx.sender.speciality_tags.join(", ") || ctx.sender.profession}
 TONE: ${ctx.sender.tone}
-${ctx.sender.voice_sample ? `WRITING VOICE (match this style):\n"""\n${ctx.sender.voice_sample}\n"""\n` : ""}VENUE: ${ctx.recipient.venue_name}${ctx.recipient.address ? `, ${ctx.recipient.address}` : ""}
+${ctx.sender.voice_sample ? `WRITING VOICE (match this style):\n"""\n${ctx.sender.voice_sample}\n"""\n` : ""}RECIPIENT: ${ctx.recipient.venue_name}${ctx.recipient.address ? `, ${ctx.recipient.address}` : ""}${isApolloFollowUp && followUpFirstName ? `\nCONTACT: ${followUpFirstName}${ctx.recipient.contact_title ? ` (${ctx.recipient.contact_title})` : ""}` : ""}
 
 INSTRUCTIONS:
 - Subject: "Re: ${previousSubject}" (reply in thread)
+- Greeting: Hi ${isApolloFollowUp && followUpFirstName ? followUpFirstName : (ctx.recipient.contact_name ?? "there")},
 - Do NOT start with "just following up on my previous email" — add genuine new value
 - Maximum 100 words
 - UK English, no exclamation marks
-- End with sender's actual name: ${ctx.sender.name}
+- End with sender's name: ${followUpSignOff}${isApolloFollowUp && followUpFirstName ? " (first name only)" : ""}
 
 Return ONLY valid JSON — no markdown, no preamble:
 {

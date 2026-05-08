@@ -10,6 +10,7 @@ import {
   Loader2,
   UserRound,
   Users,
+  Check,
 } from "lucide-react";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import { useCompanyEnrichment } from "@/hooks/useCompanyEnrichment";
@@ -90,9 +91,10 @@ function ContactRow({
       </div>
 
       {isConnected ? (
-        <span className="text-[10px] font-semibold px-2 py-1 rounded-lg"
-              style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
-          Saved
+        <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg"
+              style={{ background: "rgba(22,163,74,0.12)", color: "#16a34a" }}>
+          <Check className="w-3 h-3" />
+          Added
         </span>
       ) : (
         <button
@@ -257,24 +259,40 @@ export function CompanyCard({
   const handleConnect = useCallback(async (person: ApolloPerson) => {
     if (connectingId) return;
     setConnectingId(person.id);
+
+    const payload = {
+      name:          company.name,
+      type:          "brand",
+      location:      company.city ?? company.country ?? "",
+      website:       company.website_url ?? undefined,
+      source:        "apollo",
+      status:        "outreach_ready",
+      liked:         true,
+      contact_name:  displayName(person),
+      contact_title: person.title ?? undefined,
+      contact_email: person.email ?? undefined,
+      whyGoodFit:    result?.suggested_angle ?? undefined,
+    };
+
+    console.log("[CompanyCard] Connect clicked — payload:", payload);
+
     try {
       const res = await fetch("/api/opportunities", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          name:          company.name,
-          type:          "brand",
-          location:      company.city ?? company.country ?? "",
-          website:       company.website_url ?? undefined,
-          source:        "apollo",
-          status:        "outreach_ready",
-          liked:         true,
-          contact_name:  displayName(person),
-          contact_title: person.title ?? undefined,
-          contact_email: person.email ?? undefined,
-          whyGoodFit:    result?.suggested_angle ?? undefined,
-        }),
+        body:    JSON.stringify(payload),
       });
+
+      // Always log the response, whether success or failure
+      let resBody: unknown;
+      try { resBody = await res.json(); } catch { resBody = null; }
+
+      console.log("[CompanyCard] /api/opportunities response:", {
+        status:  res.status,
+        ok:      res.ok,
+        body:    resBody,
+      });
+
       if (res.ok) {
         setConnectedIds((prev) => new Set([...prev, person.id]));
         if (!saved) {
@@ -282,9 +300,16 @@ export function CompanyCard({
           onSaved(company.id);
         }
         onToast(`${person.first_name} added to Outreach`, "check");
+      } else {
+        console.error("[CompanyCard] Save failed:", res.status, resBody);
+        onToast("Couldn't save — check console for details", "sparkles");
       }
-    } catch { /* non-fatal */ }
-    finally { setConnectingId(null); }
+    } catch (err) {
+      console.error("[CompanyCard] Network error on Connect:", err);
+      onToast("Network error — couldn't save contact", "sparkles");
+    } finally {
+      setConnectingId(null);
+    }
   }, [company, saved, onSaved, onToast, connectingId, result]);
 
   /* ── Derived ────────────────────────────────────────────────── */

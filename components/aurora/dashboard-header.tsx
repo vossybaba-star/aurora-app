@@ -3,6 +3,7 @@
 import { RefreshCw, Sparkles, Bell } from "lucide-react";
 import { useAurora } from "./aurora-app";
 import { Spinner } from "@/components/ui/spinner";
+import { getRoleById } from "@/lib/roles";
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   home:     { title: "Overview",      subtitle: "Your outreach at a glance" },
@@ -58,7 +59,7 @@ export function DashboardHeader() {
           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-sm"
                style={{ background:"linear-gradient(135deg,#7c6ef7,#9585f9)" }}>
             {profile?.businessName?.charAt(0).toUpperCase() ||
-             profile?.businessType?.charAt(0).toUpperCase() || "A"}
+             ((profile?.roleId ? getRoleById(profile.roleId)?.label : undefined) ?? profile?.businessType)?.charAt(0).toUpperCase() || "A"}
           </div>
         </div>
       </div>

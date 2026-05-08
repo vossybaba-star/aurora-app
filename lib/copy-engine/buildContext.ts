@@ -6,7 +6,8 @@
  * Used by app/api/generate-sequence/route.ts.
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient }  from "@/lib/supabase/server";
+import { getRoleById }   from "@/lib/roles";
 
 export async function buildCopyContext(opportunityId: string, userId: string) {
   const supabase = await createClient();
@@ -48,15 +49,24 @@ export async function buildCopyContext(opportunityId: string, userId: string) {
     ? (opp.why_good_fit || null)
     : (analysis.recommended_angle ?? null);
 
+  // Resolve role config (prefer role_id, fall back to roleId camelCase written by profile PATCH)
+  const roleId    = prof.role_id ?? prof.roleId ?? null;
+  const roleConfig = roleId ? getRoleById(roleId) : undefined;
+
+  const senderFullName = prof.full_name ?? prof.business_name ?? prof.businessName ?? "your team";
+  const senderFirstName = senderFullName.split(" ")[0];
+
   return {
     source: (opp.source ?? "manual") as string,
     sender: {
-      name:            prof.full_name ?? prof.business_name ?? prof.businessName ?? "your team",
+      name:            senderFullName,
+      first_name:      senderFirstName,
       business_name:   prof.business_name ?? null,
-      profession:      prof.business_type ?? "photographer",
+      profession:      roleConfig?.label ?? prof.business_type ?? "photographer",
       speciality_tags: prof.speciality_tags ?? [],
       positioning:     prof.positioning ?? "mid-market",
       pitch:           prof.pitch ?? "",
+      pitch_context:   roleConfig?.pitchContext ?? null,
       past_clients:    (prof.past_clients ?? [])
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((c: any) => (typeof c === "string" ? c : c?.name))

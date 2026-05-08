@@ -14,6 +14,8 @@ import {
   Zap, User, Bell, CreditCard, Plus, AlertTriangle,
   Trophy, Briefcase, Globe,
 } from "lucide-react";
+import { RolePickerInline } from "@/components/profile/RolePickerInline";
+import { getRoleById } from "@/lib/roles";
 
 /* ─── Constants ─────────────────────────────── */
 const ACCENT  = "#7c6ef7";
@@ -250,14 +252,15 @@ function SaveButton({ onClick, isPending, label = "Save changes" }: { onClick: (
 function MyProfileSection({
   profile,
   onSave,
+  onRoleSaved,
   isPending,
 }: {
-  profile: UserProfile;
-  onSave: (updates: Partial<UserProfile>) => void;
-  isPending: boolean;
+  profile:      UserProfile;
+  onSave:       (updates: Partial<UserProfile>) => void;
+  onRoleSaved:  (roleId: string, roleCategory: string, targetMarkets: string[], businessType: string) => void;
+  isPending:    boolean;
 }) {
   const [bizName,     setBizName]     = useState(profile.businessName || "");
-  const [profession,  setProfession]  = useState(profile.businessType || "");
   const [location,    setLocation]    = useState(profile.location || "");
   const [workRadius,  setWorkRadius]  = useState(profile.workRadius || "");
   const [pitch,       setPitch]       = useState(profile.pitch || "");
@@ -306,11 +309,10 @@ function MyProfileSection({
 
   const handleSave = () => {
     onSave({
-      businessName: bizName,
-      businessType: profession,
+      businessName:   bizName,
       location,
       pitch,
-      website: portfolioUrl,
+      website:        portfolioUrl,
       instagram,
       workRadius,
       specialityTags: tags,
@@ -377,8 +379,12 @@ function MyProfileSection({
           <FieldRow label="Business name" incomplete={!bizName}>
             <GlassInput value={bizName} onChange={setBizName} placeholder="e.g., Luna & Light Photography" />
           </FieldRow>
-          <FieldRow label="Profession / type" incomplete={!profession}>
-            <GlassInput value={profession} onChange={setProfession} placeholder="e.g., Wedding Photographer" />
+          <FieldRow label="Role">
+            <RolePickerInline
+              currentRoleId={profile.roleId}
+              currentTargetMarkets={profile.targetMarkets}
+              onSaved={onRoleSaved}
+            />
           </FieldRow>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FieldRow label="Based in" incomplete={!location}>
@@ -928,13 +934,15 @@ function SidebarCard({
              style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 8px 20px ${ACCENT}30` }}>
           {initial}
         </div>
-        {/* Name + profession */}
+        {/* Name + role */}
         <div>
           <p className="text-sm font-extrabold leading-tight" style={{ color: "#131b2e" }}>
-            {profile.businessName || profile.businessType || "Your Business"}
+            {profile.businessName || (profile.roleId ? getRoleById(profile.roleId)?.label : undefined) || profile.businessType || "Your Business"}
           </p>
           {profile.businessName && (
-            <p className="text-[11px] text-muted-foreground mt-0.5">{profile.businessType}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {(profile.roleId ? getRoleById(profile.roleId)?.label : undefined) ?? profile.businessType}
+            </p>
           )}
           {profile.location && (
             <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1 mt-1">
@@ -1007,6 +1015,11 @@ export function ProfilePage() {
     });
   };
 
+  /* ── Role saved callback ── */
+  const handleRoleSaved = (roleId: string, roleCategory: string, targetMarkets: string[], businessType: string) => {
+    setProfile({ ...profile, roleId, roleCategory, targetMarkets, businessType } as UserProfile);
+  };
+
   /* ── Sign out ── */
   const handleSignOut = () => {
     startTransition(async () => {
@@ -1019,7 +1032,7 @@ export function ProfilePage() {
   /* ── Active section renderer ── */
   const renderSection = () => {
     switch (activeSection) {
-      case "my-profile":   return <MyProfileSection profile={profile} onSave={handleSave} isPending={isPending} />;
+      case "my-profile":   return <MyProfileSection profile={profile} onSave={handleSave} onRoleSaved={handleRoleSaved} isPending={isPending} />;
       case "my-work":      return <MyWorkSection profile={profile} onSave={handleSave} isPending={isPending} />;
       case "past-clients": return <PastClientsSection isPending={isPending} />;
       case "email":        return <EmailSection />;

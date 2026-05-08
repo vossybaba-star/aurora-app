@@ -2,6 +2,7 @@
 
 import { useAurora } from "./aurora-app";
 import { signOut } from "@/lib/actions";
+import { getRoleById } from "@/lib/roles";
 import { useTransition } from "react";
 import {
   LayoutDashboard,
@@ -39,7 +40,8 @@ export function SidebarNav() {
     startTransition(async () => { await signOut(); });
   };
 
-  const initial = (profile?.businessName || profile?.businessType || "A").charAt(0).toUpperCase();
+  const roleLabel = (profile?.roleId ? getRoleById(profile.roleId)?.label : undefined) ?? profile?.businessType;
+  const initial = (profile?.businessName || roleLabel || "A").charAt(0).toUpperCase();
 
   return (
     /*
@@ -208,8 +210,8 @@ export function SidebarNav() {
             </span>
           </div>
           <p className="text-[11px] text-muted-foreground leading-snug mt-1.5">
-            {profile?.businessType
-              ? `Scanning for ${profile.businessType} leads`
+            {roleLabel
+              ? `Scanning for ${roleLabel} leads`
               : "Set up your profile to unlock AI outreach"}
           </p>
         </div>
@@ -261,7 +263,7 @@ export function SidebarNav() {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-bold truncate" style={{ color: "#131b2e" }}>
-                {profile.businessName || profile.businessType || "Your Business"}
+                {profile.businessName || roleLabel || "Your Business"}
               </p>
               <p className="text-[10px] text-muted-foreground truncate">
                 {profile.location?.split(",")[0] || "No location set"}
@@ -293,7 +295,7 @@ export function SidebarNav() {
             >
               <span className="absolute right-full top-1/2 -translate-y-1/2 block w-0 h-0"
                     style={{ borderTop:"5px solid transparent", borderBottom:"5px solid transparent", borderRight:"5px solid #1a1a2e" }} />
-              <span className="font-bold">{profile.businessName || profile.businessType || "Your Business"}</span>
+              <span className="font-bold">{profile.businessName || roleLabel || "Your Business"}</span>
               {profile.location && (
                 <span className="opacity-60 text-[10px] mt-0.5">{profile.location.split(",")[0]}</span>
               )}

@@ -115,7 +115,7 @@ export async function POST(req: Request) {
   }
 
   // ── 4. Generate with Claude ───────────────────────────────────────────────
-  const system = buildSystemPrompt();
+  const system = buildSystemPrompt(ctx);
 
   if (process.env.NODE_ENV === "development") {
     console.log("[Copy Engine] Generating sequence for:", ctx.recipient.venue_name, {
