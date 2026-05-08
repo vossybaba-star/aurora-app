@@ -53,13 +53,26 @@ export async function POST(req: Request) {
   }
 
   // ── Apollo people search ─────────────────────────────────────────────────
-  const people = await searchPeople({
+  // First try: scoped to company (may return 0 if company is thin in Apollo)
+  const searchParams = {
     ...(company_name ? { q_organization_name: company_name } : {}),
     ...(domain       ? { organization_domains: [domain] }    : {}),
     person_titles: personTitles,
     per_page: 5,
     page:     1,
-  });
+  };
+  console.log("[apollo/people] role_id:", role_id, "titles:", personTitles);
+  console.log("[apollo/people] Search params:", JSON.stringify(searchParams));
+
+  let people = await searchPeople(searchParams);
+  console.log("[apollo/people] Scoped result count:", people.length);
+
+  // Fallback: if company-scoped search returns nothing, broaden to title-only
+  if (people.length === 0 && (company_name || domain)) {
+    console.log("[apollo/people] Falling back to title-only search (no org filter)");
+    people = await searchPeople({ person_titles: personTitles, per_page: 5, page: 1 });
+    console.log("[apollo/people] Broad result count:", people.length);
+  }
 
   return NextResponse.json({ people });
 }
