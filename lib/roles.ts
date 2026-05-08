@@ -530,6 +530,169 @@ export const ROLES: RoleConfig[] = [
     scanningLabel:        "Scanning wellness programmes and health brands…",
   },
 
+
+
+  // ── TECH & DIGITAL ────────────────────────────────────────────────────────
+
+  {
+    id:                   "app_developer",
+    label:                "App Developer",
+    category:             "tech_digital",
+    defaultTargetMarkets: ["co_founders_partners", "investors_vcs", "retail_brands", "corporate_clients"],
+    companyKeywords:      ["mobile app development", "iOS development", "Android development", "startup", "digital product studio", "app agency"],
+    contactKeywords:      "CTO, Head of Product, Technical Lead, Founder, VP Engineering, Product Manager",
+    pitchContext:         "A freelance iOS/Android developer who builds and ships native and cross-platform mobile apps. They want project-based and retained engagements with startup founders, product teams and digital agencies who need mobile development resource without hiring full-time.",
+    scanningLabel:        "Scanning startups and digital product studios…",
+  },
+
+  {
+    id:                   "data_analyst",
+    label:                "Data Analyst",
+    category:             "tech_digital",
+    defaultTargetMarkets: ["enterprise_companies", "corporate_clients", "co_founders_partners", "investors_vcs"],
+    companyKeywords:      ["data analytics", "business intelligence", "SaaS", "fintech", "e-commerce", "data consultancy", "market research"],
+    contactKeywords:      "Head of Data, Chief Data Officer, VP Analytics, Data Engineering Manager, Head of Insights",
+    pitchContext:         "A freelance data analyst or scientist who turns raw data into actionable business insight. They want embedded or project-based engagements with data teams at tech companies, fintechs and scale-ups who need specialist analytical resource on demand.",
+    scanningLabel:        "Scanning data-driven businesses and tech companies…",
+  },
+
+  {
+    id:                   "cybersecurity_consultant",
+    label:                "Cybersecurity Consultant",
+    category:             "tech_digital",
+    defaultTargetMarkets: ["enterprise_companies", "corporate_clients", "co_founders_partners"],
+    companyKeywords:      ["cybersecurity", "information security", "penetration testing", "CISO advisory", "managed security", "compliance", "fintech"],
+    contactKeywords:      "CISO, Head of Security, IT Director, CTO, Risk Manager, Compliance Director",
+    pitchContext:         "A freelance cybersecurity consultant who delivers penetration testing, security audits and compliance programmes for businesses. They want contracts with IT directors and CISOs at mid-market and enterprise firms who need independent security expertise without a full-time hire.",
+    scanningLabel:        "Scanning businesses needing security expertise…",
+  },
+
+  {
+    id:                   "it_contractor",
+    label:                "IT Contractor",
+    category:             "tech_digital",
+    defaultTargetMarkets: ["enterprise_companies", "corporate_clients", "co_founders_partners"],
+    companyKeywords:      ["IT infrastructure", "cloud computing", "managed services", "systems integration", "IT consultancy", "ERP implementation"],
+    contactKeywords:      "IT Director, Head of Infrastructure, CTO, IT Manager, Head of Technology, Programme Manager",
+    pitchContext:         "An IT contractor who delivers infrastructure, cloud migration and systems integration projects. They want fixed-term contracts with IT leaders at medium and large organisations undergoing transformation programmes who need experienced hands-on technical resource.",
+    scanningLabel:        "Scanning businesses with IT programmes…",
+  },
+
+  {
+    id:                   "ai_ml_engineer",
+    label:                "AI / ML Engineer",
+    category:             "tech_digital",
+    defaultTargetMarkets: ["enterprise_companies", "co_founders_partners", "investors_vcs", "corporate_clients"],
+    companyKeywords:      ["artificial intelligence", "machine learning", "AI startup", "LLM", "deep learning", "data science", "automation"],
+    contactKeywords:      "CTO, Head of AI, Machine Learning Lead, VP Engineering, Founder, Head of Data Science",
+    pitchContext:         "A freelance AI and machine learning engineer who builds production ML systems, LLM integrations and automation pipelines. They want project-based engagements with technical founders and CTOs at AI-first startups and enterprises piloting AI capabilities.",
+    scanningLabel:        "Scanning AI startups and tech companies…",
+  },
+
+  // ── MEDIA & PUBLISHING ────────────────────────────────────────────────────
+
+  {
+    id:                   "journalist_writer",
+    label:                "Journalist / Writer",
+    category:             "media_publishing",
+    defaultTargetMarkets: ["editorial_magazines", "industry_press", "corporate_clients", "pr_talent_agencies"],
+    companyKeywords:      ["newspaper", "magazine", "online publication", "trade press", "digital media", "content agency", "PR agency"],
+    contactKeywords:      "Editor, Commissioning Editor, Features Editor, Content Director, Head of Editorial",
+    pitchContext:         "A freelance journalist and writer who produces features, news and long-form editorial for publications and brands. They want regular commissions from editors at consumer and trade publications, and content briefs from PR agencies and brand teams who need credible written output.",
+    scanningLabel:        "Scanning publications and editorial teams…",
+  },
+
+  {
+    id:                   "podcaster",
+    label:                "Podcaster",
+    category:             "media_publishing",
+    defaultTargetMarkets: ["beauty_brands", "corporate_clients", "pr_talent_agencies", "retail_brands"],
+    companyKeywords:      ["podcast network", "audio content", "branded podcast", "media company", "sponsorship", "content marketing", "thought leadership"],
+    contactKeywords:      "Brand Partnerships Manager, Head of Marketing, Sponsorship Manager, Head of Content, PR Manager",
+    pitchContext:         "A podcast host and producer who runs an established show in a defined niche. They want sponsorship deals and brand partnership integrations from companies whose audience overlaps with their listeners, and branded podcast commissions from corporates.",
+    scanningLabel:        "Scanning brands and podcast sponsors…",
+  },
+
+  {
+    id:                   "newsletter_writer",
+    label:                "Newsletter Writer",
+    category:             "media_publishing",
+    defaultTargetMarkets: ["corporate_clients", "retail_brands", "beauty_brands", "co_founders_partners"],
+    companyKeywords:      ["newsletter sponsorship", "email marketing", "B2B content", "thought leadership", "founder community", "industry media"],
+    contactKeywords:      "Head of Content, Brand Partnerships Manager, Marketing Director, Head of Marketing, Founder",
+    pitchContext:         "A newsletter author with a loyal subscriber base in a specific vertical. They want sponsored placement deals and content partnerships from brands and companies whose product or service is highly relevant to their readership.",
+    scanningLabel:        "Scanning newsletter sponsors and brand partners…",
+  },
+
+  {
+    id:                   "photographer_journalist",
+    label:                "Photojournalist",
+    category:             "media_publishing",
+    defaultTargetMarkets: ["editorial_magazines", "industry_press", "pr_talent_agencies", "corporate_clients"],
+    companyKeywords:      ["news agency", "newspaper", "magazine", "wire service", "documentary", "photojournalism", "press photography"],
+    contactKeywords:      "Picture Editor, Photo Editor, Head of Photography, Commissioning Editor, News Editor",
+    pitchContext:         "A photojournalist who covers news, documentary and editorial assignments for publications and agencies. They want regular commissions from picture desks at newspapers and magazines, and relationship contracts with news agencies and wire services.",
+    scanningLabel:        "Scanning picture desks and news organisations…",
+  },
+
+  {
+    id:                   "social_media_manager",
+    label:                "Social Media Manager",
+    category:             "media_publishing",
+    defaultTargetMarkets: ["retail_brands", "beauty_brands", "pr_talent_agencies", "fashion_agencies"],
+    companyKeywords:      ["social media agency", "content agency", "digital marketing", "e-commerce brand", "lifestyle brand", "influencer marketing"],
+    contactKeywords:      "Head of Social, Marketing Manager, Head of Digital, Brand Manager, Content Director",
+    pitchContext:         "A freelance social media manager who runs content strategy, scheduling and community management for brands across Instagram, TikTok and LinkedIn. They want retained monthly contracts with growing brands and boutique agencies who need senior social expertise without a full-time headcount.",
+    scanningLabel:        "Scanning brands and digital agencies…",
+  },
+
+
+  {
+    id:                   "beauty_therapist",
+    label:                "Beauty Therapist / Aesthetician",
+    category:             "wellness_personal",
+    defaultTargetMarkets: ["beauty_brands", "hospitality_hotels", "luxury_hotels", "corporate_clients"],
+    companyKeywords:      ["spa", "beauty salon", "aesthetics clinic", "luxury hotel spa", "wellness centre", "medical aesthetics"],
+    contactKeywords:      "Spa Manager, Salon Owner, Clinic Manager, Wellness Director, Head Therapist",
+    pitchContext:         "A beauty therapist or aesthetician who offers treatments and is looking to work with hotel spas, wellness venues and aesthetic clinics. They want chair rental, partnership agreements or brand ambassador opportunities with professional beauty brands.",
+    scanningLabel:        "Scanning spas and beauty clinics…",
+  },
+
+  // ── OTHER ─────────────────────────────────────────────────────────────────
+
+  {
+    id:                   "independent_professional",
+    label:                "Independent Professional",
+    category:             "other",
+    defaultTargetMarkets: ["corporate_clients", "co_founders_partners", "enterprise_companies", "retail_brands"],
+    companyKeywords:      ["professional services", "consulting", "advisory", "freelance", "independent", "SME", "small business"],
+    contactKeywords:      "Founder, Director, Managing Director, Head of Partnerships, Business Development Manager",
+    pitchContext:         "An independent professional who offers specialist services to businesses. They want to build a pipeline of direct client relationships and strategic partnerships with organisations who regularly engage external experts.",
+    scanningLabel:        "Scanning businesses and partner organisations…",
+  },
+
+  {
+    id:                   "social_enterprise_founder",
+    label:                "Social Enterprise / Charity",
+    category:             "other",
+    defaultTargetMarkets: ["corporate_clients", "enterprise_companies", "co_founders_partners", "investors_vcs"],
+    companyKeywords:      ["charitable foundation", "grant-making", "corporate social responsibility", "CSR", "impact investment", "social enterprise", "community foundation"],
+    contactKeywords:      "CSR Manager, Head of Grants, Philanthropy Director, Partnerships Manager, Corporate Affairs Director",
+    pitchContext:         "A social enterprise or charity leader who develops funding relationships, corporate partnerships and grant applications. They want to connect with CSR teams, grant-making foundations and impact investors who support missions aligned with their work.",
+    scanningLabel:        "Scanning foundations and corporate CSR teams…",
+  },
+
+  {
+    id:                   "artisan_maker",
+    label:                "Artisan / Maker",
+    category:             "other",
+    defaultTargetMarkets: ["retail_brands", "corporate_clients", "hospitality_hotels", "luxury_hotels"],
+    companyKeywords:      ["boutique retailer", "gift shop", "independent retail", "interior design", "lifestyle brand", "concept store", "homeware"],
+    contactKeywords:      "Buyer, Head of Buying, Retail Manager, Store Manager, Interior Designer, Founder",
+    pitchContext:         "An independent maker or artisan who produces handcrafted goods for retail and wholesale. They want stockist relationships with boutique shops, gift retailers and interior designers who champion independent makers and curate unique product selections for their customers.",
+    scanningLabel:        "Scanning boutique retailers and lifestyle brands…",
+  },
+
 ];
 
 // ─── Grouped by category ──────────────────────────────────────────────────────

@@ -134,7 +134,8 @@ export async function searchCompanies(params: SearchCompaniesParams): Promise<Ap
 export interface SearchPeopleParams {
   q_organization_name?: string;
   organization_domains?: string[];
-  person_titles?: string[];
+  /** Boolean keyword query, e.g. "Venue Manager OR Wedding Coordinator" */
+  q_keywords?: string;
   per_page?: number;
   page?: number;
 }

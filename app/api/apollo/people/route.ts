@@ -24,10 +24,14 @@ export async function POST(req: Request) {
   if (role?.contactKeywords) {
     // contactKeywords is a comma-separated string, e.g.:
     // "Head of Events, Event Coordinator, Venue Manager, Director of Events"
-    personTitles = role.contactKeywords
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+    // Joined with OR so Apollo treats it as a keyword query, not exact title match.
+    personTitles = [
+      role.contactKeywords
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .join(" OR "),
+    ];
   } else {
     // Legacy persona fallback so existing callers don't break during rollout
     const legacyTitles: Record<string, string[]> = {
@@ -57,7 +61,7 @@ export async function POST(req: Request) {
   const people = await searchPeople({
     ...(company_name ? { q_organization_name: company_name }   : {}),
     ...(domain       ? { organization_domains: [domain] }      : {}),
-    person_titles: personTitles,
+    q_keywords: personTitles[0],
     per_page: 5,
     page:     1,
   });
