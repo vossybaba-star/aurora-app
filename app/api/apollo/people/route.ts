@@ -1,70 +1,39 @@
-import { NextResponse }  from "next/server";
-import { searchPeople }  from "@/lib/apollo";
-import { getRoleById }   from "@/lib/roles";
+import { NextResponse } from "next/server";
 
-export async function POST(req: Request) {
-  let body: {
-    company_name?: string;
-    domain?:       string;
-    role_id?:      string;
-    // Legacy fallback — deprecated
-    persona?:      string;
+export async function POST(_req: Request) {
+  // ── DIAGNOSTIC MODE ──────────────────────────────────────────────────────
+  // Stripped to absolute minimum to confirm Apollo returns people at all.
+  // Role-specific filtering will be restored once baseline is confirmed.
+  const requestBody = {
+    api_key:    process.env.APOLLO_API_KEY,
+    q_keywords: "marketing OR brand OR director OR manager",
+    per_page:   5,
   };
-  try { body = await req.json(); } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+
+  console.log("[apollo/people] Sending request:", JSON.stringify(requestBody));
+
+  let data: Record<string, unknown>;
+  try {
+    const response = await fetch("https://api.apollo.io/v1/mixed_people/search", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": process.env.APOLLO_API_KEY ?? "" },
+      body:    JSON.stringify(requestBody),
+      cache:   "no-store",
+    });
+
+    console.log("[apollo/people] Response status:", response.status);
+
+    data = await response.json() as Record<string, unknown>;
+  } catch (err) {
+    console.error("[apollo/people] Fetch error:", err);
+    return NextResponse.json({ people: [] });
   }
 
-  const { company_name, domain, role_id } = body;
+  console.log("[apollo/people] Raw response keys:", Object.keys(data));
 
-  // ── Resolve contact title list from role config ──────────────────────────
-  const role = role_id ? getRoleById(role_id) : undefined;
-
-  let personTitles: string[] = [];
-
-  if (role?.contactKeywords) {
-    // contactKeywords is a comma-separated string, e.g.:
-    // "Head of Events, Event Coordinator, Venue Manager, Director of Events"
-    // Joined with OR so Apollo treats it as a keyword query, not exact title match.
-    personTitles = [
-      role.contactKeywords
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean)
-        .join(" OR "),
-    ];
-  } else {
-    // Legacy persona fallback so existing callers don't break during rollout
-    const legacyTitles: Record<string, string[]> = {
-      makeup_artist: [
-        "Head of Talent", "Casting", "Creative Director", "Brand Manager",
-        "Campaign Producer", "PR Manager", "Bookings", "Production Manager",
-        "Partnerships", "Influencer", "Marketing Manager", "Founder", "Director",
-      ],
-      startup_founder: [
-        "CEO", "Co-founder", "CTO", "Head of Partnerships", "VP Sales",
-        "Business Development", "Head of Growth", "Investor",
-        "Managing Director", "General Partner",
-      ],
-    };
-    const persona = body.persona ?? "";
-    personTitles = legacyTitles[persona] ?? [];
-  }
-
-  if (personTitles.length === 0) {
-    return NextResponse.json(
-      { error: `Unknown role_id "${role_id ?? body.persona}" — no contact keywords found` },
-      { status: 400 }
-    );
-  }
-
-  // ── Apollo people search ─────────────────────────────────────────────────
-  const people = await searchPeople({
-    ...(company_name ? { q_organization_name: company_name }   : {}),
-    ...(domain       ? { organization_domains: [domain] }      : {}),
-    q_keywords: personTitles[0],
-    per_page: 5,
-    page:     1,
-  });
+  const people = Array.isArray(data.people) ? data.people : [];
+  console.log("[apollo/people] People count:", people.length);
+  console.log("[apollo/people] First person:", JSON.stringify(people[0] ?? null));
 
   return NextResponse.json({ people });
 }

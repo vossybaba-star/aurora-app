@@ -252,14 +252,22 @@ export function DiscoverPage() {
       setIsLoadingApollo(true);
       setApolloError(null);
       try {
+        const target_markets = profile?.targetMarkets?.length
+          ? profile.targetMarkets
+          : undefined;
+        console.log("[discover] Apollo companies params:", {
+          role_id:        roleId,
+          target_markets,
+          persona:        getPersona(profile?.businessType),
+          profile_roleId: profile?.roleId,
+          location:       profile?.location,
+        });
         const res = await fetch("/api/apollo/companies", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({
-            role_id:       roleId,
-            target_markets: profile?.targetMarkets?.length
-              ? profile.targetMarkets
-              : undefined,
+            role_id:        roleId,
+            target_markets,
           }),
         });
         if (!cancelled) {
