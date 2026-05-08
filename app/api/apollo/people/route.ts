@@ -30,6 +30,7 @@ export async function POST(_req: Request) {
   }
 
   console.log("[apollo/people] Raw response keys:", Object.keys(data));
+  if (data.error) console.error("[apollo/people] Apollo error message:", JSON.stringify(data.error));
 
   const people = Array.isArray(data.people) ? data.people : [];
   console.log("[apollo/people] People count:", people.length);
