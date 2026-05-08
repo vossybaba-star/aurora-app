@@ -5,9 +5,9 @@ export async function POST(_req: Request) {
   // Stripped to absolute minimum to confirm Apollo returns people at all.
   // Role-specific filtering will be restored once baseline is confirmed.
   const requestBody = {
-    api_key:    process.env.APOLLO_API_KEY,
-    q_keywords: "marketing OR brand OR director OR manager",
-    per_page:   5,
+    api_key:       process.env.APOLLO_API_KEY,
+    person_titles: ["Marketing Manager", "Brand Manager", "Director", "Manager"],
+    per_page:      5,
   };
 
   console.log("[apollo/people] Sending request:", JSON.stringify(requestBody));
