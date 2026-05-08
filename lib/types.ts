@@ -6,6 +6,7 @@
 export interface UserProfile {
   id: string;
   email: string;
+  /** Free-text profession string. Kept for persona detection and copy engine. Deprecated in favour of roleId. */
   businessType: string;
   businessName: string;
   location: string;
@@ -17,9 +18,18 @@ export interface UserProfile {
   phone?: string;
   tone: Tone;
   opportunitiesPerWeek: number;
+  onboardingCompleted: boolean;
   specialityTags: string[];
   workRadius: string;
   voiceSample?: string;
+  // ── Structured role system ──────────────────────────────────────────────
+  /** e.g. "bridal_mua" — references ROLES[].id in lib/roles.ts */
+  roleId?: string;
+  /** e.g. "creative_visual" — top-level grouping */
+  roleCategory?: string;
+  /** e.g. ["venues", "bridal_boutiques"] — from TargetMarket in lib/roles.ts */
+  targetMarkets: string[];
+  // ────────────────────────────────────────────────────────────────────────
   createdAt: string;
   updatedAt: string;
 }

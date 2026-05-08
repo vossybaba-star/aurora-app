@@ -71,6 +71,10 @@ export async function updateProfile(profileData: Partial<{
   specialityTags: string[];
   workRadius: string;
   voiceSample: string;
+  // Structured role fields
+  roleId: string;
+  roleCategory: string;
+  targetMarkets: string[];
 }>): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
   const user = await getCurrentUser();
@@ -79,22 +83,26 @@ export async function updateProfile(profileData: Partial<{
   const { error } = await supabase
     .from("profiles")
     .update({
-      business_name: profileData.businessName,
-      business_type: profileData.businessType,
-      location: profileData.location,
-      opportunity_types: profileData.opportunityTypes,
-      pitch: profileData.pitch,
-      website: profileData.website,
-      instagram: profileData.instagram,
-      linkedin: profileData.linkedin,
-      phone: profileData.phone,
-      tone: profileData.tone,
+      business_name:        profileData.businessName,
+      business_type:        profileData.businessType,
+      location:             profileData.location,
+      opportunity_types:    profileData.opportunityTypes,
+      pitch:                profileData.pitch,
+      website:              profileData.website,
+      instagram:            profileData.instagram,
+      linkedin:             profileData.linkedin,
+      phone:                profileData.phone,
+      tone:                 profileData.tone,
       opportunities_per_week: profileData.opportunitiesPerWeek,
       onboarding_completed: profileData.onboardingCompleted,
-      speciality_tags: profileData.specialityTags,
-      work_radius: profileData.workRadius,
-      voice_sample: profileData.voiceSample,
-      updated_at: new Date().toISOString(),
+      speciality_tags:      profileData.specialityTags,
+      work_radius:          profileData.workRadius,
+      voice_sample:         profileData.voiceSample,
+      // Structured role fields
+      role_id:              profileData.roleId,
+      role_category:        profileData.roleCategory,
+      target_markets:       profileData.targetMarkets,
+      updated_at:           new Date().toISOString(),
     })
     .eq("id", user.id);
 

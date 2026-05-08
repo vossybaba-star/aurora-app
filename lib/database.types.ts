@@ -4,6 +4,7 @@ export interface DbProfile {
   email: string;
   name: string | null;
   business_name: string | null;
+  /** Free-text profession — kept for persona detection & copy engine. Deprecated in favour of role_id. */
   business_type: string | null;
   location: string | null;
   opportunity_types: string[] | null;
@@ -18,6 +19,11 @@ export interface DbProfile {
   speciality_tags: string[] | null;
   work_radius: string | null;
   voice_sample: string | null;
+  // ── Structured role system (added via migration) ──────────────────────────
+  role_id: string | null;
+  role_category: string | null;
+  target_markets: string[] | null;
+  // ─────────────────────────────────────────────────────────────────────────
   created_at: string;
   updated_at: string;
 }
@@ -163,9 +169,14 @@ export function dbProfileToProfile(db: DbProfile): UserProfile {
     phone: db.phone || undefined,
     tone: (db.tone as Tone) || 'professional',
     opportunitiesPerWeek: db.opportunities_per_week || 5,
+    onboardingCompleted: db.onboarding_completed ?? false,
     specialityTags: db.speciality_tags || [],
     workRadius: db.work_radius || '',
     voiceSample: db.voice_sample || undefined,
+    // Structured role fields
+    roleId: db.role_id || undefined,
+    roleCategory: db.role_category || undefined,
+    targetMarkets: db.target_markets || [],
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   };
