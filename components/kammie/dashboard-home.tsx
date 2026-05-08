@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { typeLabels, contactMethodLabels } from "@/lib/types";
 import type { Opportunity, ContactMethodType } from "@/lib/types";
 import { deleteOpportunity, updateOpportunity } from "@/lib/actions";
@@ -306,7 +306,7 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
    Main Dashboard Home
 ═══════════════════════════════════════════════ */
 export function DashboardHome() {
-  const { setActiveTab, profile, opportunities, refreshData, goToProfileSection, goToOutreachStage } = useAurora();
+  const { setActiveTab, profile, opportunities, refreshData, goToProfileSection, goToOutreachStage } = useKammie();
 
   const [selectedOpp,          setSelectedOpp]          = useState<Opportunity | null>(null);
   const [viewingOpp,            setViewingOpp]            = useState<Opportunity | null>(null);
@@ -458,7 +458,7 @@ export function DashboardHome() {
               </div>
               <p className="text-sm text-muted-foreground leading-snug">
                 <span className="font-bold" style={{ color: "#131b2e" }}>Connect your inbox</span>{" "}
-                to start sending directly from Aurora — no copy-paste needed.
+                to start sending directly from Kammie — no copy-paste needed.
               </p>
             </div>
             <button
@@ -618,7 +618,7 @@ export function DashboardHome() {
                 All caught up!
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                No actions due. Aurora will surface new opportunities.
+                No actions due. Kammie will surface new opportunities.
               </p>
             </div>
           )}
@@ -1293,7 +1293,7 @@ function OpportunityDetailView({
   onBack: () => void;
   onRefresh: () => Promise<void>;
 }) {
-  const { setActiveTab } = useAurora();
+  const { setActiveTab } = useKammie();
   const [isPending, startTransition] = useTransition();
   const [suggestedMessage, setSuggestedMessage] = useState<{
     subject: string; body: string; contactMethod: string;

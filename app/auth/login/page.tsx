@@ -55,7 +55,7 @@ export default function LoginPage() {
               <Sparkles className="w-6 h-6 text-primary" />
             </div>
             <CardTitle className="text-2xl">Welcome back</CardTitle>
-            <CardDescription>Sign in to your Aurora account</CardDescription>
+            <CardDescription>Sign in to your Kammie account</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">

@@ -63,7 +63,7 @@ export default function SignUpPage() {
               <Sparkles className="w-6 h-6 text-primary" />
             </div>
             <CardTitle className="text-2xl">Create your account</CardTitle>
-            <CardDescription>Start finding opportunities with Aurora</CardDescription>
+            <CardDescription>Start finding opportunities with Kammie</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignUp} className="space-y-4">

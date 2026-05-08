@@ -1,7 +1,7 @@
 /**
  * lib/roles.ts
  *
- * Single source of truth for every role Aurora supports.
+ * Single source of truth for every role Kammie supports.
  * Pure config — no API calls, no side effects, no imports.
  *
  * Exported:
@@ -123,7 +123,7 @@ export interface RoleConfig {
    * 1–2 sentences max.
    */
   pitchContext: string;
-  /** Label shown in the UI while Aurora is scanning for leads */
+  /** Label shown in the UI while Kammie is scanning for leads */
   scanningLabel: string;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { LayoutDashboard, Compass, Send, Users, Settings } from "lucide-react";
 
 const ACCENT  = "#7c6ef7";
@@ -15,7 +15,7 @@ const navItems = [
 ];
 
 export function BottomNav() {
-  const { activeTab, setActiveTab, opportunities } = useAurora();
+  const { activeTab, setActiveTab, opportunities } = useKammie();
 
   const outreachBadge = opportunities.filter(
     o => o.status === "sent" || o.status === "follow_up_due"

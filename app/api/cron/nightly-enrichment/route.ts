@@ -193,7 +193,7 @@ export async function GET(req: Request) {
               body,
               to: [{ name: contact.name, email: contact.email }],
               from: emailConn.email
-                ? [{ name: profile?.business_name ?? "Aurora", email: emailConn.email }]
+                ? [{ name: profile?.business_name ?? "Kammie", email: emailConn.email }]
                 : undefined,
             }),
           }

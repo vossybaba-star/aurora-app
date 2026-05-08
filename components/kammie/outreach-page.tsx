@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { createOutreachMessage, markMessageAsSent, updateOpportunity, createOpportunity } from "@/lib/actions";
 import { typeLabels, contactMethodLabels, statusLabels } from "@/lib/types";
 import type { Opportunity, OutreachMessage, ContactMethod, ContactMethodType, FollowUpTask } from "@/lib/types";
@@ -249,7 +249,7 @@ function PaneDetail({
   onDeselect: () => void;
 }) {
   const { opportunity, messages, followUps } = sequence;
-  const { setActiveTab } = useAurora();
+  const { setActiveTab } = useKammie();
   const [isPending, startTransition] = useTransition();
   const [sequenceSteps, setSequenceSteps] = useState<SequenceStep[]>([]);
   const [isLoadingSteps, setIsLoadingSteps] = useState(true);
@@ -618,7 +618,7 @@ function PaneDetail({
           {isRegenerating && (
             <div className="px-4 py-2 border-b border-white/20 flex items-center gap-2" style={{ background: `${ACCENT}0a` }}>
               <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: ACCENT }} />
-              <span className="text-xs font-medium" style={{ color: ACCENT }}>Aurora is rewriting this sequence…</span>
+              <span className="text-xs font-medium" style={{ color: ACCENT }}>Kammie is rewriting this sequence…</span>
             </div>
           )}
 
@@ -631,7 +631,7 @@ function PaneDetail({
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: ACCENT }} />
                 <span className="text-sm font-semibold" style={{ color: ACCENT }}>
-                  Aurora is writing your email sequence…
+                  Kammie is writing your email sequence…
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">This usually takes 20–40 seconds. Hang tight.</p>
@@ -1146,7 +1146,7 @@ function AISuggestedTab({
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-muted-foreground leading-snug">
-        Aurora-crafted sequences based on common outreach patterns. Click <strong>Use template</strong> to copy one to your library.
+        Kammie-crafted sequences based on common outreach patterns. Click <strong>Use template</strong> to copy one to your library.
       </p>
       {AI_SUGGESTION_BANK.map(s => (
         <div
@@ -1202,7 +1202,7 @@ function AISuggestedTab({
    Templates Modal  (3-tab redesign)
 ════════════════════════════════════════════════ */
 function TemplatesModal({ onClose }: { onClose: () => void }) {
-  const { profile } = useAurora();
+  const { profile } = useKammie();
   const [templates,      setTemplates]      = useState<SequenceTemplate[]>([]);
   const [editingTemplate, setEditingTemplate] = useState<SequenceTemplate | null>(null);
   const [isCreating,     setIsCreating]     = useState(false);
@@ -1397,7 +1397,7 @@ function TemplatesModal({ onClose }: { onClose: () => void }) {
                     <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold" style={{ color: '#131b2e' }}>Let Aurora write your template</p>
+                    <p className="text-sm font-bold" style={{ color: '#131b2e' }}>Let Kammie write your template</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
                       AI generates a full sequence based on your profession and target type
                     </p>
@@ -1467,7 +1467,7 @@ function TemplatesModal({ onClose }: { onClose: () => void }) {
    Main Outreach Page
 ════════════════════════════════════════════════ */
 export function OutreachPage() {
-  const { opportunities, outreachMessages, followUpTasks, refreshData, outreachStage, goToOutreachStage } = useAurora();
+  const { opportunities, outreachMessages, followUpTasks, refreshData, outreachStage, goToOutreachStage } = useKammie();
 
   // Pipeline stage — seeded from context so metric-card nav can pre-select a tab
   const [activeStage, setActiveStage] = useState<PipelineStage>(outreachStage as PipelineStage ?? 'sent');
@@ -1837,7 +1837,7 @@ function SequenceDetail({
   onBack: () => void;
   onRefresh: () => Promise<void>;
 }) {
-  const { profile } = useAurora();
+  const { profile } = useKammie();
   const { opportunity, messages, followUps } = sequence;
   const [isPending, startTransition] = useTransition();
   const [sequenceSteps, setSequenceSteps] = useState<SequenceStep[]>([]);
@@ -2135,7 +2135,7 @@ function SequenceDetail({
           </div>
           {isRegenerating && (
             <p className="text-xs mt-1" style={{ color: ACCENT }}>
-              Aurora is rewriting this sequence…
+              Kammie is rewriting this sequence…
             </p>
           )}
         </CardHeader>
@@ -2146,7 +2146,7 @@ function SequenceDetail({
             <div className="py-8 flex flex-col items-center gap-3 text-center">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: ACCENT }} />
-                <span className="text-sm font-semibold" style={{ color: ACCENT }}>Aurora is writing your email sequence…</span>
+                <span className="text-sm font-semibold" style={{ color: ACCENT }}>Kammie is writing your email sequence…</span>
               </div>
               <p className="text-xs text-muted-foreground">This usually takes 20–40 seconds. Hang tight.</p>
             </div>
@@ -2438,7 +2438,7 @@ function TemplateEditor({
   onSave: (t: SequenceTemplate) => void;
   onCancel: () => void;
 }) {
-  const { profile } = useAurora();
+  const { profile } = useKammie();
   const [name, setName] = useState(template?.name || "");
   const [description, setDescription] = useState(template?.description || "");
   const [steps, setSteps] = useState(
@@ -2668,7 +2668,7 @@ function TemplateEditor({
                   <div>
                     <p className="text-[11px] font-bold" style={{ color: '#be185d' }}>Manual send required</p>
                     <p className="text-[10px] text-muted-foreground leading-snug mt-0.5">
-                      You'll send this manually on Instagram — Aurora will copy the message to your clipboard.
+                      You'll send this manually on Instagram — Kammie will copy the message to your clipboard.
                     </p>
                   </div>
                 </div>

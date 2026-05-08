@@ -13,7 +13,7 @@ export default function SignUpSuccessPage() {
           </div>
           <CardTitle className="text-2xl">Check your email</CardTitle>
           <CardDescription className="text-base">
-            We&apos;ve sent you a confirmation link. Click it to activate your Aurora account.
+            We&apos;ve sent you a confirmation link. Click it to activate your Kammie account.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

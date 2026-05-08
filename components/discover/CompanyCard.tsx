@@ -65,12 +65,14 @@ function ContactRow({
   onConnect,
   isConnecting,
   isConnected,
+  isFailed,
 }: {
   person:       ApolloPerson;
   companyName:  string;
   onConnect:    (person: ApolloPerson) => void;
   isConnecting: boolean;
   isConnected:  boolean;
+  isFailed:     boolean;
 }) {
   const fullName = displayName(person);
 
@@ -96,6 +98,15 @@ function ContactRow({
           <Check className="w-3 h-3" />
           Added
         </span>
+      ) : isFailed ? (
+        /* Persistent inline error — impossible to miss, click to retry */
+        <button
+          onClick={() => onConnect(person)}
+          className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all hover:opacity-80"
+          style={{ borderColor: "rgba(239,68,68,0.4)", color: "#ef4444", background: "rgba(239,68,68,0.07)" }}
+        >
+          Failed — retry?
+        </button>
       ) : (
         <button
           onClick={() => onConnect(person)}
@@ -198,6 +209,7 @@ export function CompanyCard({
   const [peopleFetched, setPeopleFetched] = useState(false);
   const [connectingId,  setConnectingId]  = useState<string | null>(null);
   const [connectedIds,  setConnectedIds]  = useState<Set<string>>(new Set());
+  const [failedIds,     setFailedIds]     = useState<Set<string>>(new Set());
   const [saved,         setSaved]         = useState(isSaved);
 
   /* ── Expand / enrichment state ──────────────────────────────── */
@@ -258,6 +270,9 @@ export function CompanyCard({
   /* ── Connect handler ────────────────────────────────────────── */
   const handleConnect = useCallback(async (person: ApolloPerson) => {
     if (connectingId) return;
+
+    // Clear any previous failure for this person so the spinner shows on retry
+    setFailedIds((prev) => { const n = new Set(prev); n.delete(person.id); return n; });
     setConnectingId(person.id);
 
     const payload = {
@@ -269,12 +284,12 @@ export function CompanyCard({
       status:        "outreach_ready",
       liked:         true,
       contact_name:  displayName(person),
-      contact_title: person.title ?? undefined,
-      contact_email: person.email ?? undefined,
-      whyGoodFit:    result?.suggested_angle ?? undefined,
+      contact_title: person.title  ?? null,
+      contact_email: person.email  ?? null,
+      whyGoodFit:    result?.suggested_angle ?? "",
     };
 
-    console.log("[CompanyCard] Connect clicked — payload:", payload);
+    console.log("[CompanyCard] Connect → /api/opportunities payload:", payload);
 
     try {
       const res = await fetch("/api/opportunities", {
@@ -283,14 +298,13 @@ export function CompanyCard({
         body:    JSON.stringify(payload),
       });
 
-      // Always log the response, whether success or failure
-      let resBody: unknown;
-      try { resBody = await res.json(); } catch { resBody = null; }
+      let resBody: unknown = null;
+      try { resBody = await res.json(); } catch { /* body not JSON */ }
 
       console.log("[CompanyCard] /api/opportunities response:", {
-        status:  res.status,
-        ok:      res.ok,
-        body:    resBody,
+        status: res.status,
+        ok:     res.ok,
+        body:   resBody,
       });
 
       if (res.ok) {
@@ -301,11 +315,14 @@ export function CompanyCard({
         }
         onToast(`${person.first_name} added to Outreach`, "check");
       } else {
-        console.error("[CompanyCard] Save failed:", res.status, resBody);
-        onToast("Couldn't save — check console for details", "sparkles");
+        // Mark this person's button as failed — stays red until they retry
+        setFailedIds((prev) => new Set([...prev, person.id]));
+        console.error("[CompanyCard] Save failed — status:", res.status, "body:", resBody);
+        onToast(`Save failed (${res.status}) — see console`, "sparkles");
       }
     } catch (err) {
-      console.error("[CompanyCard] Network error on Connect:", err);
+      setFailedIds((prev) => new Set([...prev, person.id]));
+      console.error("[CompanyCard] Network error:", err);
       onToast("Network error — couldn't save contact", "sparkles");
     } finally {
       setConnectingId(null);
@@ -412,6 +429,7 @@ export function CompanyCard({
                 onConnect={handleConnect}
                 isConnecting={connectingId === person.id}
                 isConnected={connectedIds.has(person.id)}
+                isFailed={failedIds.has(person.id)}
               />
             ))}
           </div>

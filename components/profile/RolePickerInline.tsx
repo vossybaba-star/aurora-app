@@ -341,7 +341,7 @@ export function RolePickerInline({
             Who do you want to reach?
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Aurora prioritises leads based on your targets. You can change this anytime.
+            Kammie prioritises leads based on your targets. You can change this anytime.
           </p>
         </div>
 

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { createOpportunity, updateOpportunity, deleteOpportunity, addContactMethod } from "@/lib/actions";
 import { 
   typeLabels, 
@@ -52,7 +52,7 @@ const statusFilters: { id: OpportunityStatus | "all"; label: string }[] = [
 ];
 
 export function OpportunitiesPage() {
-  const { opportunities, refreshData } = useAurora();
+  const { opportunities, refreshData } = useKammie();
   const [activeFilter, setActiveFilter] = useState<OpportunityStatus | "all">("all");
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -510,7 +510,7 @@ function OpportunityDetail({
           {opportunity.source === 'aurora_ai' && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5">
               <Sparkles className="w-3 h-3" />
-              Found by Aurora AI
+              Found by Kammie AI
             </div>
           )}
         </div>
@@ -677,7 +677,7 @@ function EmptyState({
         <h3 className="font-semibold text-lg mb-1">No opportunities yet</h3>
         <p className="text-sm text-muted-foreground mb-6">
           {filter === "all" 
-            ? "Let Aurora find opportunities for you, or add them manually."
+            ? "Let Kammie find opportunities for you, or add them manually."
             : `No opportunities with status "${statusLabels[filter as OpportunityStatus]}" at the moment.`}
         </p>
         {filter === "all" && (

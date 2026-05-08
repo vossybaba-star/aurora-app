@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { typeLabels, statusLabels } from "@/lib/types";
 import type { Opportunity, OpportunityStatus } from "@/lib/types";
 import { 
@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 
 export function SavedPage() {
-  const { opportunities, setActiveTab, refreshData } = useAurora();
+  const { opportunities, setActiveTab, refreshData } = useKammie();
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
   
   // Only show liked opportunities (not closed)

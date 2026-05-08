@@ -1,6 +1,6 @@
 "use client";
 
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { SidebarNav } from "./sidebar-nav";
 import { DashboardHeader } from "./dashboard-header";
 import { DashboardHome } from "./dashboard-home";
@@ -14,7 +14,7 @@ import { FirstRunWizard } from "./first-run-wizard";
 import { Spinner } from "@/components/ui/spinner";
 
 export function Dashboard() {
-  const { activeTab, profileNavKey, isLoading } = useAurora();
+  const { activeTab, profileNavKey, isLoading } = useKammie();
 
   const renderContent = () => {
     if (isLoading) {

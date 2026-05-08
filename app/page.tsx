@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { AuroraApp } from "@/components/aurora/aurora-app";
+import { KammieApp } from "@/components/kammie/kammie-app";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -16,12 +16,12 @@ export default async function Home() {
 
     // Redirect to dashboard or onboarding based on profile status
     if (profile?.onboarding_completed) {
-      return <AuroraApp initialState="dashboard" userId={user.id} />;
+      return <KammieApp initialState="dashboard" userId={user.id} />;
     } else {
-      return <AuroraApp initialState="onboarding" userId={user.id} />;
+      return <KammieApp initialState="onboarding" userId={user.id} />;
     }
   }
 
   // Not logged in - show landing page
-  return <AuroraApp initialState="landing" userId={null} />;
+  return <KammieApp initialState="landing" userId={null} />;
 }

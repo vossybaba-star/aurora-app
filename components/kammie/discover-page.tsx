@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { typeLabels } from "@/lib/types";
 import type { OpportunityType } from "@/lib/types";
 import {
@@ -176,7 +176,7 @@ function ToastNotification({
 
 /* ─── DiscoverPage ───────────────────────────── */
 export function DiscoverPage() {
-  const { profile, opportunities, refreshData, setActiveTab, goToProfileSection } = useAurora();
+  const { profile, opportunities, refreshData, setActiveTab, goToProfileSection } = useKammie();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
@@ -467,7 +467,7 @@ export function DiscoverPage() {
       // reverse so newest-found comes first)
       arr.reverse();
     } else {
-      // Aurora Score: scored cards by descending score, unscored at bottom in original order
+      // Kammie Score: scored cards by descending score, unscored at bottom in original order
       const scored   = arr.filter((p) => scoreMap.has(p.id));
       const unscored = arr.filter((p) => !scoreMap.has(p.id));
       scored.sort((a, b) => (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0));
@@ -545,7 +545,7 @@ export function DiscoverPage() {
             <SelectValue placeholder="Sort" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="score">Aurora Score</SelectItem>
+            <SelectItem value="score">Kammie Score</SelectItem>
             <SelectItem value="rating">Rating</SelectItem>
             <SelectItem value="newest">Newest</SelectItem>
           </SelectContent>
@@ -599,7 +599,7 @@ export function DiscoverPage() {
           className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-opacity hover:opacity-80"
           style={{ background: `${ACCENT}14`, color: ACCENT, border: `1px solid ${ACCENT}30` }}
         >
-          <span>Tell Aurora what you do →</span>
+          <span>Tell Kammie what you do →</span>
         </button>
       )}
 
@@ -884,7 +884,7 @@ function DiscoverCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExpanded, place.id]);
 
-  // Report score to parent so the grid can sort by Aurora Score
+  // Report score to parent so the grid can sort by Kammie Score
   useEffect(() => {
     if (result?.signal_score != null) {
       onScoreReady?.(place.id, result.signal_score);
@@ -940,7 +940,7 @@ function DiscoverCard({
 
       setSaveSuccess(true);
       onSaved(place.id);
-      onToast("Added to Outreach — Aurora is writing your email sequence", "sparkles");
+      onToast("Added to Outreach — Kammie is writing your email sequence", "sparkles");
     } catch (err) {
       console.error("[DiscoverCard] Save failed:", err);
       setSaveError("Couldn't save — tap to retry");
@@ -1107,7 +1107,7 @@ function DiscoverCard({
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: ACCENT }} />
                 <span className="text-xs font-semibold" style={{ color: ACCENT }}>
-                  Aurora is researching this venue…
+                  Kammie is researching this venue…
                 </span>
               </div>
               <div className="text-xs text-muted-foreground space-y-0.5 pl-6">
@@ -1166,7 +1166,7 @@ function VenueAnalysisPanel({
 
       {/* Signal score badge */}
       <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Aurora Score</span>
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Kammie Score</span>
         <div className="flex items-center gap-1.5">
           <span
             className="px-2 py-0.5 rounded-lg text-xs font-bold"
@@ -1359,7 +1359,7 @@ function DiscoverCardCompact({
       }
       setSaveSuccess(true);
       onSaved(place.id);
-      onToast("Added to Outreach — Aurora is writing your email sequence", "sparkles");
+      onToast("Added to Outreach — Kammie is writing your email sequence", "sparkles");
     } catch (err) {
       console.error("[DiscoverCardCompact] Save failed:", err);
       setIsSaving(false);

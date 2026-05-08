@@ -1,5 +1,5 @@
 // ============================================
-// Core Types for Aurora Backend-Ready Structure
+// Core Types for Kammie Backend-Ready Structure
 // ============================================
 
 // ---- User Profile ----
@@ -59,7 +59,7 @@ export interface ContactMethod {
 
 // ---- Opportunity Status ----
 export type OpportunityStatus = 
-  | 'new'           // Aurora found it, user hasn't reviewed
+  | 'new'           // Kammie found it, user hasn't reviewed
   | 'outreach_ready' // User reviewed, ready to reach out
   | 'sent'          // Outreach sent, waiting for response
   | 'follow_up_due' // Time to follow up (based on config)
@@ -88,7 +88,7 @@ export interface Opportunity {
   status: OpportunityStatus;
   priority: 'high' | 'medium' | 'low';
   tags: string[];
-  source?: string; // Where Aurora found this (e.g., "aurora_ai", "manual")
+  source?: string; // Where Kammie found this (e.g., "aurora_ai", "manual")
   website?: string;
   notes?: string;
   liked?: boolean; // Whether the user has liked/saved this opportunity

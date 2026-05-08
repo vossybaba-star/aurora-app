@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PlacesAutocomplete } from "./places-autocomplete";
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { updateProfile, signOut } from "@/lib/actions";
 import { toneLabels } from "@/lib/types";
 import type { Tone, UserProfile } from "@/lib/types";
@@ -205,7 +205,7 @@ function FieldRow({ label, hint, incomplete, children }: { label: string; hint?:
         {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
         {incomplete && (
           <p className="text-[10px] mt-0.5 font-medium" style={{ color: ACCENT }}>
-            Aurora uses this to personalise your outreach — the more detail the better.
+            Kammie uses this to personalise your outreach — the more detail the better.
           </p>
         )}
       </div>
@@ -334,7 +334,7 @@ function MyProfileSection({
           <div>
             <p className="text-sm font-bold" style={{ color: "#131b2e" }}>Import from your website</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              Aurora reads your site and fills your bio, specialities, positioning, and tone automatically.
+              Kammie reads your site and fills your bio, specialities, positioning, and tone automatically.
             </p>
           </div>
         </div>
@@ -406,10 +406,10 @@ function MyProfileSection({
       {/* ── About you ── */}
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">About you</p>
-        <p className="text-[11px] text-muted-foreground">Write in your own voice — Aurora uses this in emails</p>
+        <p className="text-[11px] text-muted-foreground">Write in your own voice — Kammie uses this in emails</p>
         {pitch.length < 30 && (
           <p className="text-[10px] font-medium mt-0.5 mb-3" style={{ color: ACCENT }}>
-            Aurora uses this to personalise your outreach — the more detail the better.
+            Kammie uses this to personalise your outreach — the more detail the better.
           </p>
         )}
         {pitch.length >= 30 && <div className="mb-3" />}
@@ -427,14 +427,14 @@ function MyProfileSection({
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">My writing voice</p>
         <p className="text-[11px] text-muted-foreground mb-3">
-          Paste 1–2 emails you've previously sent to clients. Aurora will learn your tone and use it when drafting outreach.
+          Paste 1–2 emails you've previously sent to clients. Kammie will learn your tone and use it when drafting outreach.
         </p>
 
         {voiceSaved && !!voiceSample.trim() && (
           <div className="flex items-center justify-between mb-3 px-3 py-2 rounded-xl"
                style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)" }}>
             <p className="text-[11px] font-semibold" style={{ color: "#16a34a" }}>
-              Voice saved — Aurora will use this when drafting your emails
+              Voice saved — Kammie will use this when drafting your emails
             </p>
             <button
               onClick={() => setVoiceSaved(false)}
@@ -478,7 +478,7 @@ function MyProfileSection({
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Speciality tags</p>
         {tags.length === 0 && (
           <p className="text-[10px] font-medium mt-0.5 mb-3" style={{ color: ACCENT }}>
-            Aurora uses this to personalise your outreach — the more detail the better.
+            Kammie uses this to personalise your outreach — the more detail the better.
           </p>
         )}
         {tags.length > 0 && <div className="mb-3" />}
@@ -581,7 +581,7 @@ function MyWorkSection({
           What types of clients are you looking for?
         </p>
         <p className="text-[11px] text-muted-foreground mb-4">
-          Aurora prioritises leads from these categories when scanning for opportunities.
+          Kammie prioritises leads from these categories when scanning for opportunities.
         </p>
         <div className="flex flex-wrap gap-2">
           {OPP_TYPE_OPTIONS.map(opt => {
@@ -628,7 +628,7 @@ function PastClientsSection({ isPending }: { isPending: boolean }) {
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Past clients & venues</p>
         <p className="text-[11px] text-muted-foreground mb-4">
-          Aurora mentions these as social proof when writing outreach emails.
+          Kammie mentions these as social proof when writing outreach emails.
         </p>
         <PillInput
           pills={clients}
@@ -677,7 +677,7 @@ function EmailSection() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-sm" style={{ color: "#131b2e" }}>Inbox connected</p>
-              <p className="text-xs text-muted-foreground">Aurora can send outreach directly from your address</p>
+              <p className="text-xs text-muted-foreground">Kammie can send outreach directly from your address</p>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -711,7 +711,7 @@ function EmailSection() {
             </div>
             <p className="font-bold text-base mb-1">Connect your inbox</p>
             <p className="text-sm opacity-80 mb-4">
-              Send outreach directly from Aurora using your own email address — no copy-paste needed.
+              Send outreach directly from Kammie using your own email address — no copy-paste needed.
             </p>
             <button onClick={handleConnect}
               className="w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
@@ -726,7 +726,7 @@ function EmailSection() {
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">About email connection</p>
         <ul className="space-y-2 text-[12px] text-muted-foreground">
           {[
-            "Aurora uses Nylas to send from your real inbox — emails land in Sent.",
+            "Kammie uses Nylas to send from your real inbox — emails land in Sent.",
             "We never store your email password. You can revoke access any time.",
             "Works with Gmail, Outlook, and most IMAP-compatible providers.",
           ].map((t, i) => (
@@ -795,7 +795,7 @@ function OutreachSection({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Max follow-ups per lead</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Aurora stops after this many follow-ups with no reply</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Kammie stops after this many follow-ups with no reply</p>
           </div>
           <Stepper value={maxFollowUps} min={1} max={7} onChange={setMaxFollowUps} />
         </div>
@@ -811,7 +811,7 @@ function OutreachSection({
         <div className="flex items-center justify-between border-t border-white/40 pt-4">
           <div>
             <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Leads per week</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">How many new leads Aurora finds each week</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">How many new leads Kammie finds each week</p>
           </div>
           <Stepper value={oppsPerWeek} min={1} max={20} onChange={setOppsPerWeek} />
         </div>
@@ -877,7 +877,7 @@ function BillingSection() {
             <CreditCard className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="font-bold text-sm" style={{ color: "#131b2e" }}>Aurora Pro</p>
+            <p className="font-bold text-sm" style={{ color: "#131b2e" }}>Kammie Pro</p>
             <p className="text-xs text-muted-foreground">Active subscription</p>
           </div>
           <span className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full text-white"
@@ -887,8 +887,8 @@ function BillingSection() {
         </div>
         <p className="text-[12px] text-muted-foreground">
           Billing management is coming soon. To manage your subscription, contact{" "}
-          <a href="mailto:hello@auroraoutreach.com" className="underline" style={{ color: ACCENT }}>
-            hello@auroraoutreach.com
+          <a href="mailto:hello@kammie.com" className="underline" style={{ color: ACCENT }}>
+            hello@kammie.com
           </a>
         </p>
       </SectionCard>
@@ -902,7 +902,7 @@ function BillingSection() {
             <p className="text-[11px] text-muted-foreground mt-0.5">Permanently removes all your data. This cannot be undone.</p>
           </div>
           <button
-            onClick={() => toast.error("Please email hello@auroraoutreach.com to request account deletion.")}
+            onClick={() => toast.error("Please email hello@kammie.com to request account deletion.")}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-red-600 border border-red-200
                        hover:bg-red-50 transition-colors shrink-0"
           >
@@ -978,7 +978,7 @@ function SidebarCard({
 ═══════════════════════════════════════════════ */
 export function ProfilePage() {
   const router = useRouter();
-  const { profile, setProfile, profileSection } = useAurora();
+  const { profile, setProfile, profileSection } = useKammie();
   const [isPending, startTransition] = useTransition();
   const [activeSection, setActiveSection] = useState<Section>(profileSection as Section ?? "my-profile");
 

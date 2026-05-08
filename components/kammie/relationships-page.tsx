@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * components/aurora/relationships-page.tsx
+ * components/kammie/relationships-page.tsx
  *
  * Relationships CRM — light glassmorphism, matching app design system:
  *  - glass-card class (white frosted), text-[#131b2e], text-muted-foreground
@@ -747,7 +747,7 @@ export function RelationshipsPage() {
 
   // Auto-populate from opportunities on first visit
   useEffect(() => {
-    const key = "aurora_contacts_populated_v1";
+    const key = "kammie_contacts_populated_v1";
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
     fetch("/api/contacts/auto-populate", { method: "POST" }).catch(() => {});

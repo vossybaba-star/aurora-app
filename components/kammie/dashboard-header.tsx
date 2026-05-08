@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw, Sparkles, Bell } from "lucide-react";
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { Spinner } from "@/components/ui/spinner";
 import { getRoleById } from "@/lib/roles";
 
@@ -14,14 +14,14 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
 };
 
 export function DashboardHeader() {
-  const { profile, refreshData, isLoading, activeTab } = useAurora();
+  const { profile, refreshData, isLoading, activeTab } = useKammie();
   const page = pageTitles[activeTab] ?? pageTitles.home;
 
   return (
     <header className="glass-header sticky top-0 z-30 px-4 lg:px-8 py-3 lg:py-4">
       <div className="flex items-center justify-between">
 
-        {/* Left — mobile: Aurora logo | desktop: page title */}
+        {/* Left — mobile: Kammie logo | desktop: page title */}
         <div>
           {/* Mobile-only logo (hidden when sidebar appears at md+) */}
           <div className="flex items-center gap-2.5 md:hidden">
@@ -29,7 +29,7 @@ export function DashboardHeader() {
                  style={{ background:"linear-gradient(135deg,#7c6ef7,#9585f9)" }}>
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <span className="font-extrabold tracking-tight liquid-gradient-text">Aurora</span>
+            <span className="font-extrabold tracking-tight liquid-gradient-text">Kammie</span>
           </div>
 
           {/* Page title — visible when sidebar is present (md+) */}

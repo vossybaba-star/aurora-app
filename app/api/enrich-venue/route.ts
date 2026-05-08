@@ -91,7 +91,7 @@ function calculateSignalScore(
   // Exclusive photographer penalty (–40 — significant blocker)
   const exclusivePenalty = ai.has_exclusive_photographer ? -40 : 0;
 
-  // Aurora network signal (aggregate, max 10)
+  // Kammie network signal (aggregate, max 10)
   const networkScore = Math.min(networkContactedCount * 2, 10);
 
   const total = Math.max(

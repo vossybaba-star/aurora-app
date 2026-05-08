@@ -9,7 +9,7 @@ import type { UserProfile, Opportunity, OutreachMessage, FollowUpTask } from "@/
 
 type AppState = "landing" | "onboarding" | "dashboard";
 
-interface AuroraContextType {
+interface KammieContextType {
   appState: AppState;
   setAppState: (state: AppState) => void;
   userId: string | null;
@@ -35,22 +35,22 @@ interface AuroraContextType {
   isLoading: boolean;
 }
 
-const AuroraContext = createContext<AuroraContextType | undefined>(undefined);
+const KammieContext = createContext<KammieContextType | undefined>(undefined);
 
-export function useAurora() {
-  const context = useContext(AuroraContext);
+export function useKammie() {
+  const context = useContext(KammieContext);
   if (context === undefined) {
-    throw new Error("useAurora must be used within an AuroraProvider");
+    throw new Error("useKammie must be used within a KammieProvider");
   }
   return context;
 }
 
-interface AuroraAppProps {
+interface KammieAppProps {
   initialState: AppState;
   userId: string | null;
 }
 
-export function AuroraApp({ initialState, userId }: AuroraAppProps) {
+export function KammieApp({ initialState, userId }: KammieAppProps) {
   const [appState, setAppState] = useState<AppState>(initialState);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -147,7 +147,7 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
   };
 
   return (
-    <AuroraContext.Provider
+    <KammieContext.Provider
       value={{
         appState,
         setAppState,
@@ -175,6 +175,6 @@ export function AuroraApp({ initialState, userId }: AuroraAppProps) {
       }}
     >
       {renderContent()}
-    </AuroraContext.Provider>
+    </KammieContext.Provider>
   );
 }

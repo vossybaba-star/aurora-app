@@ -17,8 +17,8 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'Aurora - Get More Bookings',
-  description: 'Aurora finds relevant opportunities, writes the outreach, and reminds you when to follow up.',
+  title: 'Kammie - Get More Bookings',
+  description: 'Kammie finds relevant opportunities, writes the outreach, and reminds you when to follow up.',
   generator: 'v0.app',
   icons: {
     icon: [

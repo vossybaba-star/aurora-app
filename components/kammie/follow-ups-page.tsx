@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { completeFollowUpTask, snoozeFollowUpTask } from "@/lib/actions";
 import { typeLabels } from "@/lib/types";
 import type { FollowUpTask, Opportunity } from "@/lib/types";
@@ -46,7 +46,7 @@ function formatRelativeDate(dateString: string): string {
 }
 
 export function FollowUpsPage() {
-  const { followUpTasks, opportunities, refreshData } = useAurora();
+  const { followUpTasks, opportunities, refreshData } = useKammie();
 
   const today = new Date().toISOString().split("T")[0];
   
@@ -152,7 +152,7 @@ export function FollowUpsPage() {
             </div>
             <h3 className="font-medium mb-1">No follow-ups needed</h3>
             <p className="text-sm text-muted-foreground">
-              When you reach out to opportunities, Aurora will remind you to follow up.
+              When you reach out to opportunities, Kammie will remind you to follow up.
             </p>
           </CardContent>
         </Card>

@@ -13,7 +13,7 @@ export function LandingPage() {
           <div className="w-9 h-9 rounded-xl fluid-gradient flex items-center justify-center shadow-md shadow-primary/30">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="font-extrabold text-lg tracking-tight liquid-gradient-text">Aurora</span>
+          <span className="font-extrabold text-lg tracking-tight liquid-gradient-text">Kammie</span>
         </div>
         <Button variant="ghost" size="sm" className="text-muted-foreground font-medium" asChild>
           <Link href="/auth/login">Sign in</Link>
@@ -41,7 +41,7 @@ export function LandingPage() {
           </h1>
 
           <p className="text-muted-foreground text-base leading-relaxed">
-            Tell Aurora what you do. Aurora finds relevant opportunities, writes the outreach, and reminds you when to follow up.
+            Tell Kammie what you do. Kammie finds relevant opportunities, writes the outreach, and reminds you when to follow up.
           </p>
 
           <div className="pt-3 space-y-3">
@@ -67,7 +67,7 @@ export function LandingPage() {
           <FeatureCard
             icon={<Search className="w-5 h-5" style={{ color: '#3525cd' }} />}
             title="Find opportunities"
-            description="Aurora searches for venues, planners, and clients that match your business"
+            description="Kammie searches for venues, planners, and clients that match your business"
           />
           <FeatureCard
             icon={<Mail className="w-5 h-5" style={{ color: '#3525cd' }} />}
@@ -77,7 +77,7 @@ export function LandingPage() {
           <FeatureCard
             icon={<Bell className="w-5 h-5" style={{ color: '#3525cd' }} />}
             title="Never miss a follow-up"
-            description="Aurora reminds you when it's time to follow up"
+            description="Kammie reminds you when it's time to follow up"
           />
         </div>
 

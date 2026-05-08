@@ -3,7 +3,7 @@
 /**
  * First-run onboarding wizard
  *
- * Shows once per browser (localStorage key aurora_frw_v1) on the
+ * Shows once per browser (localStorage key kammie_frw_v1) on the
  * very first dashboard visit. Skipped entirely if the flag is already set.
  *
  * Step 1 — Profession picker (saves to profile.businessType)
@@ -13,13 +13,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { updateProfile } from "@/lib/actions";
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { Sparkles, Mail, Check, ChevronRight, Zap, MapPin, Building2 } from "lucide-react";
 
 /* ── Constants ─────────────────────────────────────────────── */
 const ACCENT  = "#7c6ef7";
 const ACCENT2 = "#9585f9";
-const LS_KEY  = "aurora_frw_v1";
+const LS_KEY  = "kammie_frw_v1";
 
 const PROFESSIONS = [
   { id: "Wedding photographer",  label: "Wedding photographer",  icon: "💍" },
@@ -173,7 +173,7 @@ function ScanAnimation({ onDone }: { onDone: () => void }) {
    Main wizard
 ════════════════════════════════════════════════════════════ */
 export function FirstRunWizard() {
-  const { setActiveTab, profile } = useAurora();
+  const { setActiveTab, profile } = useKammie();
   const [visible,    setVisible]    = useState(false);
   const [step,       setStep]       = useState(0);  // 0 | 1 | 2
   const [profession, setProfession] = useState("");
@@ -271,7 +271,7 @@ export function FirstRunWizard() {
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               <span className="font-extrabold text-sm tracking-tight" style={{ color: "#131b2e" }}>
-                Aurora
+                Kammie
               </span>
             </div>
 
@@ -292,7 +292,7 @@ export function FirstRunWizard() {
                 What kind of work do you do?
               </h2>
               <p className="text-sm text-muted-foreground mb-6">
-                Aurora tailors your leads and messages to your profession.
+                Kammie tailors your leads and messages to your profession.
               </p>
 
               <div className="space-y-2 mb-8">
@@ -352,7 +352,7 @@ export function FirstRunWizard() {
                 Connect your inbox
               </h2>
               <p className="text-sm text-muted-foreground mb-6">
-                Send outreach directly from Aurora — no copy-paste, no switching apps.
+                Send outreach directly from Kammie — no copy-paste, no switching apps.
               </p>
 
               {emailStatus === "connected" ? (
@@ -367,7 +367,7 @@ export function FirstRunWizard() {
                   </div>
                   <div>
                     <p className="text-sm font-bold" style={{ color: "#131b2e" }}>Inbox already connected</p>
-                    <p className="text-xs text-muted-foreground">Aurora can send from your real address</p>
+                    <p className="text-xs text-muted-foreground">Kammie can send from your real address</p>
                   </div>
                   <div className="ml-auto flex items-center gap-1 shrink-0">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -395,7 +395,7 @@ export function FirstRunWizard() {
                       <p className="font-bold text-base">Connect your inbox</p>
                     </div>
                     <p className="text-sm opacity-80 mb-4 leading-relaxed">
-                      Works with Gmail, Outlook, and most email providers. Aurora uses Nylas — we never store your password.
+                      Works with Gmail, Outlook, and most email providers. Kammie uses Nylas — we never store your password.
                     </p>
                     <button
                       onClick={handleConnectEmail}
@@ -461,7 +461,7 @@ export function FirstRunWizard() {
           {step === 2 && (
             <>
               <h2 className="text-xl font-extrabold mb-1.5 leading-snug" style={{ color: "#131b2e" }}>
-                Aurora is finding your first leads
+                Kammie is finding your first leads
               </h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Sit tight — this takes just a moment.

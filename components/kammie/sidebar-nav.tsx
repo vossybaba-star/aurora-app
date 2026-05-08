@@ -1,6 +1,6 @@
 "use client";
 
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { signOut } from "@/lib/actions";
 import { getRoleById } from "@/lib/roles";
 import { useTransition } from "react";
@@ -28,7 +28,7 @@ const navItems = [
 ];
 
 export function SidebarNav() {
-  const { activeTab, setActiveTab, profile, opportunities } = useAurora();
+  const { activeTab, setActiveTab, profile, opportunities } = useKammie();
   const [isPending, startTransition] = useTransition();
 
   const stats = {
@@ -72,7 +72,7 @@ export function SidebarNav() {
         {/* Wordmark — desktop only */}
         <div className="hidden lg:block">
           <span className="font-extrabold text-base tracking-tight liquid-gradient-text block leading-tight">
-            Aurora
+            Kammie
           </span>
           <span className="text-[10px] text-muted-foreground font-medium">AI Outreach Engine</span>
         </div>

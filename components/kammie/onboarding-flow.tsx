@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { PlacesAutocomplete } from "./places-autocomplete";
-import { useAurora } from "./aurora-app";
+import { useKammie } from "./kammie-app";
 import { completeOnboarding } from "@/lib/actions";
 import { ArrowLeft, ArrowRight, Sparkles, Check } from "lucide-react";
 import type { Tone } from "@/lib/types";
@@ -42,15 +42,15 @@ const opportunityExamples = [
 const tones: Tone[] = ["friendly", "professional", "premium", "casual"];
 
 const steps = [
-  { title: "About You", subtitle: "Tell Aurora what you do" },
+  { title: "About You", subtitle: "Tell Kammie what you do" },
   { title: "Opportunities", subtitle: "What are you looking for?" },
   { title: "Your Pitch", subtitle: "What makes you special?" },
-  { title: "Preferences", subtitle: "How should Aurora work?" },
+  { title: "Preferences", subtitle: "How should Kammie work?" },
 ];
 
 export function OnboardingFlow() {
   const router = useRouter();
-  const { setAppState, onboardingStep, setOnboardingStep } = useAurora();
+  const { setAppState, onboardingStep, setOnboardingStep } = useKammie();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   
@@ -276,7 +276,7 @@ export function OnboardingFlow() {
                 <Label htmlFor="pitch">What makes your business special?</Label>
                 <Textarea
                   id="pitch"
-                  placeholder="Tell Aurora about your unique selling points, experience, awards, or specialties..."
+                  placeholder="Tell Kammie about your unique selling points, experience, awards, or specialties..."
                   value={formData.pitch}
                   onChange={(e) => updateFormData("pitch", e.target.value)}
                   rows={4}
@@ -395,7 +395,7 @@ export function OnboardingFlow() {
                   <div className="w-6 h-6 rounded-lg fluid-gradient flex items-center justify-center">
                     <Sparkles className="w-3 h-3 text-white" />
                   </div>
-                  <span className="text-sm font-bold">Your Aurora Profile</span>
+                  <span className="text-sm font-bold">Your Kammie Profile</span>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   You are a <span className="font-semibold text-foreground">{formData.businessType || "[business type]"}</span> based in{" "}
@@ -405,7 +405,7 @@ export function OnboardingFlow() {
                       ? formData.opportunities.join(", ").toLowerCase()
                       : "[opportunities]"}
                   </span>
-                  . Aurora will find{" "}
+                  . Kammie will find{" "}
                   <span className="font-semibold text-primary">{formData.opportunitiesPerWeek}</span>{" "}
                   opportunities per week.
                 </p>
