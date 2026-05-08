@@ -134,12 +134,12 @@ export async function searchCompanies(params: SearchCompaniesParams): Promise<Ap
 // ── searchPeople ───────────────────────────────────────────────────────────
 
 export interface SearchPeopleParams {
-  q_organization_name?: string;
+  q_organization_name?:  string;
   organization_domains?: string[];
-  /** Title array for the api_search endpoint (preferred over q_keywords) */
-  person_titles?: string[];
-  per_page?: number;
-  page?: number;
+  /** Array of job titles — maps to person_titles on Apollo's api_search endpoint */
+  person_titles?:        string[];
+  per_page?:             number;
+  page?:                 number;
 }
 
 interface ApolloPeopleResponse {
