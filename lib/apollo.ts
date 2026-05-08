@@ -50,13 +50,18 @@ async function apolloPost<T>(path: string, body: object): Promise<T | null> {
     return null;
   }
   try {
+    // Try header-based auth first (Apollo's preferred modern method)
     const res = await fetch(`${APOLLO_BASE}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",
+        "x-api-key": key,
       },
+      // Also include api_key in body for backward compat
       body: JSON.stringify({ ...body, api_key: key }),
+      // Opt out of Next.js fetch cache — results must be fresh
+      cache: "no-store",
     });
 
     if (!res.ok) {
@@ -101,8 +106,10 @@ interface RawOrganization {
   phone: string | null;
 }
 
-export async function searchCompanies(params: SearchCompaniesParams): Promise<ApolloCompany[]> {
+export async function searchCompanies(params: SearchCompaniesParams): Promise<ApolloCompany[] | null> {
   const data = await apolloPost<ApolloOrganizationsResponse>("/mixed_companies/search", params);
+  // null means the API call itself failed (401, 500, etc.) — caller can distinguish from empty results
+  if (data === null) return null;
   if (!data?.organizations) return [];
 
   return data.organizations.map((o) => ({

@@ -173,6 +173,7 @@ export function DiscoverPage() {
   const [lastTextQuery, setLastTextQuery] = useState<string | null>(null);
   const [igMap, setIgMap] = useState<Map<string, string>>(new Map());
   const [apolloCompanies,      setApolloCompanies]      = useState<ApolloCompany[]>([]);
+  const [apolloError,          setApolloError]          = useState<string | null>(null);
   const [savedApolloIds,       setSavedApolloIds]       = useState(new Set<string>());
   const [isLoadingApollo,      setIsLoadingApollo]      = useState(false);
   const toastCounter = useRef(0);
@@ -233,6 +234,7 @@ export function DiscoverPage() {
     let cancelled = false;
     const load = async () => {
       setIsLoadingApollo(true);
+      setApolloError(null);
       console.log("[discover] Fetching Apollo companies for persona:", apolloPersona);
       try {
         const res = await fetch("/api/apollo/companies", {
@@ -246,15 +248,21 @@ export function DiscoverPage() {
         if (!cancelled) {
           if (res.ok) {
             const data = await res.json();
-            console.log("[discover] Apollo companies loaded:", data.companies?.length ?? 0);
-            setApolloCompanies(data.companies ?? []);
+            console.log("[discover] Apollo companies loaded:", data.companies?.length ?? 0, data.error ?? "");
+            if (data.error) {
+              setApolloError(data.error);
+            } else {
+              setApolloCompanies(data.companies ?? []);
+            }
           } else {
             const text = await res.text().catch(() => "");
             console.error("[apollo] companies fetch failed:", res.status, text);
+            setApolloError(`API error (${res.status})`);
           }
         }
       } catch (err) {
         console.error("[apollo] companies fetch error:", err);
+        if (!cancelled) setApolloError("Network error — check connection");
       } finally {
         if (!cancelled) setIsLoadingApollo(false);
       }
@@ -601,6 +609,19 @@ export function DiscoverPage() {
                           <Loader2 className="w-4 h-4 animate-spin" />
                           Finding companies…
                         </div>
+                      </div>
+                    );
+                  }
+                  if (apolloError) {
+                    return (
+                      <div className="glass-panel rounded-3xl p-8 text-center space-y-2">
+                        <p className="text-sm font-semibold text-amber-600 flex items-center justify-center gap-1.5">
+                          <AlertTriangle className="w-4 h-4" />
+                          Apollo connection issue
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Could not load companies. Please check that your Apollo API key is valid in your Vercel environment variables.
+                        </p>
                       </div>
                     );
                   }

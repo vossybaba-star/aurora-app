@@ -32,5 +32,10 @@ export async function POST(req: Request) {
     page: page ?? 1,
   });
 
+  // companies === null means Apollo returned a non-OK response (e.g. 401)
+  if (companies === null) {
+    return NextResponse.json({ companies: [], error: "Apollo API error — check APOLLO_API_KEY" }, { status: 200 });
+  }
+
   return NextResponse.json({ companies });
 }
