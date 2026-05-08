@@ -149,7 +149,9 @@ interface ApolloPeopleResponse {
 interface RawPerson {
   id: string;
   first_name: string;
-  last_name: string;
+  // api_search endpoint returns last_name_obfuscated instead of last_name
+  last_name?: string;
+  last_name_obfuscated?: string;
   title: string | null;
   email: string | null;
   linkedin_url: string | null;
@@ -165,7 +167,7 @@ export async function searchPeople(params: SearchPeopleParams): Promise<ApolloPe
   return data.people.map((p) => ({
     id: p.id,
     first_name: p.first_name,
-    last_name: p.last_name,
+    last_name: p.last_name ?? p.last_name_obfuscated ?? "",
     title: p.title ?? null,
     email: p.email ?? null,
     linkedin_url: p.linkedin_url ?? null,
