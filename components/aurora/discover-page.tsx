@@ -225,12 +225,15 @@ export function DiscoverPage() {
 
   // Load Apollo companies for MUA / startup personas
   useEffect(() => {
-    const persona = getPersona(profile?.businessType);
+    const bt = profile?.businessType;
+    const persona = getPersona(bt);
+    console.log("[discover] Apollo effect fired — businessType:", JSON.stringify(bt), "→ persona:", persona);
     if (persona !== "mua" && persona !== "startup") return;
     const apolloPersona = persona === "mua" ? "makeup_artist" : "startup_founder";
     let cancelled = false;
     const load = async () => {
       setIsLoadingApollo(true);
+      console.log("[discover] Fetching Apollo companies for persona:", apolloPersona);
       try {
         const res = await fetch("/api/apollo/companies", {
           method:  "POST",
@@ -243,9 +246,11 @@ export function DiscoverPage() {
         if (!cancelled) {
           if (res.ok) {
             const data = await res.json();
+            console.log("[discover] Apollo companies loaded:", data.companies?.length ?? 0);
             setApolloCompanies(data.companies ?? []);
           } else {
-            console.error("[apollo] companies fetch failed:", res.status, await res.text());
+            const text = await res.text().catch(() => "");
+            console.error("[apollo] companies fetch failed:", res.status, text);
           }
         }
       } catch (err) {

@@ -44,6 +44,11 @@ function apiKey(): string {
 }
 
 async function apolloPost<T>(path: string, body: object): Promise<T | null> {
+  const key = apiKey();
+  if (!key) {
+    console.error("[apollo] APOLLO_API_KEY is not set");
+    return null;
+  }
   try {
     const res = await fetch(`${APOLLO_BASE}${path}`, {
       method: "POST",
@@ -51,12 +56,17 @@ async function apolloPost<T>(path: string, body: object): Promise<T | null> {
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",
       },
-      body: JSON.stringify({ ...body, api_key: apiKey() }),
+      body: JSON.stringify({ ...body, api_key: key }),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const text = await res.text().catch(() => "(unreadable)");
+      console.error(`[apollo] ${path} → ${res.status}: ${text}`);
+      return null;
+    }
     return (await res.json()) as T;
-  } catch {
+  } catch (err) {
+    console.error(`[apollo] ${path} fetch error:`, err);
     return null;
   }
 }
