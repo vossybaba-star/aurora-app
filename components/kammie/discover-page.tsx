@@ -719,16 +719,18 @@ export function DiscoverPage() {
                 {isLoadingMore && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Loading more venues…
+                    {(apolloCompanies.length > 0 || profile?.icp) ? "Loading more prospects…" : "Loading more venues…"}
                   </div>
                 )}
                 {!isLoadingMore && nextPageToken && (
                   <Button variant="outline" size="sm" onClick={loadMore} className="text-xs rounded-xl">
-                    Load more venues
+                    {(apolloCompanies.length > 0 || profile?.icp) ? "Load more prospects" : "Load more venues"}
                   </Button>
                 )}
                 {!isLoadingMore && !nextPageToken && searchResults.length > 0 && (
-                  <p className="text-xs text-muted-foreground">All venues loaded</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(apolloCompanies.length > 0 || profile?.icp) ? "All prospects loaded" : "All venues loaded"}
+                  </p>
                 )}
               </div>
             </>
@@ -738,9 +740,13 @@ export function DiscoverPage() {
                    style={{ background: `rgba(124,110,247,0.10)` }}>
                 <MapPin className="w-7 h-7" style={{ color: `${ACCENT}80` }} />
               </div>
-              <h3 className="font-semibold mb-2" style={{ color: "#131b2e" }}>No Venues Found</h3>
+              <h3 className="font-semibold mb-2" style={{ color: "#131b2e" }}>
+                {profile?.icp ? "No Prospects Found" : "No Venues Found"}
+              </h3>
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                Try a different search or update your location in your profile.
+                {profile?.icp
+                  ? "Try adjusting your ICP in your profile settings"
+                  : "Try a different search or update your location in your profile."}
               </p>
             </div>
           ) : null}
@@ -859,6 +865,8 @@ function DiscoverCard({
   place, isSaved, savedInstagram, igHandle, onSaved, onToast, selectedType,
   isExpanded = false, onToggle, onScoreReady,
 }: DiscoverCardProps) {
+  const { profile: dcProfile } = useKammie();
+  const isB2BCard = !!(dcProfile?.companyAnalysis || dcProfile?.icp);
   const photoUrl = place.photoReference
     ? `/api/places/photo?ref=${encodeURIComponent(place.photoReference)}&maxWidth=600`
     : null;
@@ -1107,13 +1115,22 @@ function DiscoverCard({
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: ACCENT }} />
                 <span className="text-xs font-semibold" style={{ color: ACCENT }}>
-                  Kammie is researching this venue…
+                  {isB2BCard ? "Kammie is researching this company…" : "Kammie is researching this venue…"}
                 </span>
               </div>
               <div className="text-xs text-muted-foreground space-y-0.5 pl-6">
                 <p>· Checking their website</p>
-                <p>· Analysing reviews</p>
-                <p>· Scoring fit</p>
+                {isB2BCard ? (
+                  <>
+                    <p>· Analysing company fit</p>
+                    <p>· Scoring against your ICP</p>
+                  </>
+                ) : (
+                  <>
+                    <p>· Analysing reviews</p>
+                    <p>· Scoring fit</p>
+                  </>
+                )}
               </div>
             </div>
           )}

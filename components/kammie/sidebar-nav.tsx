@@ -41,6 +41,7 @@ export function SidebarNav() {
   };
 
   const roleLabel = (profile?.roleId ? getRoleById(profile.roleId)?.label : undefined) ?? profile?.businessType;
+  const isB2BSidebar = !!(profile?.companyAnalysis || profile?.icp);
   const initial = (profile?.businessName || roleLabel || "A").charAt(0).toUpperCase();
 
   return (
@@ -210,9 +211,11 @@ export function SidebarNav() {
             </span>
           </div>
           <p className="text-[11px] text-muted-foreground leading-snug mt-1.5">
-            {roleLabel
-              ? `Scanning for ${roleLabel} leads`
-              : "Set up your profile to unlock AI outreach"}
+            {isB2BSidebar
+              ? "Scanning for ICP-matched companies"
+              : roleLabel
+                ? `Scanning for ${roleLabel} leads`
+                : "Set up your profile to unlock AI outreach"}
           </p>
         </div>
       </div>

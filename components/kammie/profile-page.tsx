@@ -6,7 +6,7 @@ import { PlacesAutocomplete } from "./places-autocomplete";
 import { useKammie } from "./kammie-app";
 import { updateProfile, signOut } from "@/lib/actions";
 import { toneLabels } from "@/lib/types";
-import type { Tone, UserProfile } from "@/lib/types";
+import type { Tone, UserProfile, CompanyAnalysis, ICP } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import {
@@ -25,25 +25,27 @@ type Section =
   | "my-profile" | "my-work" | "past-clients"
   | "email" | "outreach" | "notifications" | "billing";
 
-const NAV_GROUPS: { label: string; items: { id: Section; label: string; icon: React.FC<{ className?: string }> }[] }[] = [
-  {
-    label: "Profile",
-    items: [
-      { id: "my-profile",   label: "My profile",   icon: User },
-      { id: "my-work",      label: "My work",       icon: Briefcase },
-      { id: "past-clients", label: "Past clients",  icon: Trophy },
-    ],
-  },
-  {
-    label: "Settings",
-    items: [
-      { id: "email",         label: "Email connection", icon: Mail },
-      { id: "outreach",      label: "Outreach",          icon: Zap },
-      { id: "notifications", label: "Notifications",     icon: Bell },
-      { id: "billing",       label: "Billing",           icon: CreditCard },
-    ],
-  },
-];
+function getNavGroups(isB2B: boolean) {
+  return [
+    {
+      label: "Profile",
+      items: [
+        { id: "my-profile"   as Section, label: "My profile",              icon: User },
+        { id: "my-work"      as Section, label: isB2B ? "My company" : "My work", icon: Briefcase },
+        { id: "past-clients" as Section, label: "Past clients",             icon: Trophy },
+      ],
+    },
+    {
+      label: "Settings",
+      items: [
+        { id: "email"         as Section, label: "Email connection", icon: Mail },
+        { id: "outreach"      as Section, label: "Outreach",          icon: Zap },
+        { id: "notifications" as Section, label: "Notifications",     icon: Bell },
+        { id: "billing"       as Section, label: "Billing",           icon: CreditCard },
+      ],
+    },
+  ];
+}
 
 const POSITIONING_OPTIONS = [
   { id: "budget",    label: "Budget",      sub: "Value-focused" },
@@ -254,11 +256,13 @@ function MyProfileSection({
   onSave,
   onRoleSaved,
   isPending,
+  isB2B,
 }: {
   profile:      UserProfile;
   onSave:       (updates: Partial<UserProfile>) => void;
   onRoleSaved:  (roleId: string, roleCategory: string, targetMarkets: string[], businessType: string) => void;
   isPending:    boolean;
+  isB2B:        boolean;
 }) {
   const [bizName,     setBizName]     = useState(profile.businessName || "");
   const [location,    setLocation]    = useState(profile.location || "");
@@ -386,7 +390,7 @@ function MyProfileSection({
               onSaved={onRoleSaved}
             />
           </FieldRow>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className={`grid grid-cols-1 ${isB2B ? "" : "sm:grid-cols-2"} gap-4`}>
             <FieldRow label="Based in" incomplete={!location}>
               <PlacesAutocomplete
                 value={location}
@@ -396,17 +400,25 @@ function MyProfileSection({
                            focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-full"
               />
             </FieldRow>
-            <FieldRow label="Work radius" incomplete={!workRadius}>
-              <GlassInput value={workRadius} onChange={setWorkRadius} placeholder="e.g., 50 miles, UK-wide" />
-            </FieldRow>
+            {!isB2B && (
+              <FieldRow label="Work radius" incomplete={!workRadius}>
+                <GlassInput value={workRadius} onChange={setWorkRadius} placeholder="e.g., 50 miles, UK-wide" />
+              </FieldRow>
+            )}
           </div>
         </div>
       </SectionCard>
 
-      {/* ── About you ── */}
+      {/* ── About you / About your company ── */}
       <SectionCard>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">About you</p>
-        <p className="text-[11px] text-muted-foreground">Write in your own voice — Kammie uses this in emails</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+          {isB2B ? "About your company" : "About you"}
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          {isB2B
+            ? "Kammie uses this to personalise your B2B outreach"
+            : "Write in your own voice — Kammie uses this in emails"}
+        </p>
         {pitch.length < 30 && (
           <p className="text-[10px] font-medium mt-0.5 mb-3" style={{ color: ACCENT }}>
             Kammie uses this to personalise your outreach — the more detail the better.
@@ -416,7 +428,9 @@ function MyProfileSection({
         <textarea
           value={pitch}
           onChange={e => setPitch(e.target.value)}
-          placeholder="Describe your style, what you specialise in, and what makes you different…"
+          placeholder={isB2B
+            ? "Describe what your company does and why customers choose you…"
+            : "Describe your style, what you specialise in, and what makes you different…"}
           rows={5}
           className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
                      focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
@@ -427,7 +441,9 @@ function MyProfileSection({
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">My writing voice</p>
         <p className="text-[11px] text-muted-foreground mb-3">
-          Paste 1–2 emails you've previously sent to clients. Kammie will learn your tone and use it when drafting outreach.
+          {isB2B
+            ? "Paste 1–2 sales emails you've previously sent. Kammie will learn your tone and use it when drafting outreach."
+            : "Paste 1–2 emails you've previously sent to clients. Kammie will learn your tone and use it when drafting outreach."}
         </p>
 
         {voiceSaved && !!voiceSample.trim() && (
@@ -451,7 +467,9 @@ function MyProfileSection({
             <textarea
               value={voiceSample}
               onChange={e => { setVoiceSample(e.target.value); setVoiceSaved(false); }}
-              placeholder={"Paste an email you've sent before…\n\nHi [Name],\n\nI came across your venue and loved…"}
+              placeholder={isB2B
+                ? "Paste a sales email you've sent before…\n\nHi [Name],\n\nI wanted to reach out about…"
+                : "Paste an email you've sent before…\n\nHi [Name],\n\nI came across your venue and loved…"}
               rows={6}
               className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
                          focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground mb-3"
@@ -473,9 +491,11 @@ function MyProfileSection({
         )}
       </SectionCard>
 
-      {/* ── Speciality tags ── */}
+      {/* ── Speciality tags / Capabilities ── */}
       <SectionCard>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Speciality tags</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+          {isB2B ? "Capabilities / services" : "Speciality tags"}
+        </p>
         {tags.length === 0 && (
           <p className="text-[10px] font-medium mt-0.5 mb-3" style={{ color: ACCENT }}>
             Kammie uses this to personalise your outreach — the more detail the better.
@@ -486,7 +506,7 @@ function MyProfileSection({
           pills={tags}
           onAdd={v => setTags(t => [...t, v])}
           onRemove={v => setTags(t => t.filter(x => x !== v))}
-          placeholder="e.g. Black weddings, Natural light, Documentary…"
+          placeholder={isB2B ? "e.g. Enterprise sales, SaaS, Outbound…" : "e.g. Black weddings, Natural light, Documentary…"}
         />
       </SectionCard>
 
@@ -522,14 +542,14 @@ function MyProfileSection({
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Links</p>
         <div className="space-y-3">
-          <FieldRow label="Portfolio / website">
+          <FieldRow label={isB2B ? "Company website" : "Portfolio / website"}>
             <div className="relative">
               <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="url"
                 value={portfolioUrl}
                 onChange={e => setPortfolioUrl(e.target.value)}
-                placeholder="https://yourportfolio.com"
+                placeholder={isB2B ? "https://yourcompany.com" : "https://yourportfolio.com"}
                 className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
                            focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
               />
@@ -618,15 +638,226 @@ function MyWorkSection({
 }
 
 /* ═══════════════════════════════════════════════
+   SECTION: B2B Work (Company analysis + ICP)
+═══════════════════════════════════════════════ */
+const B2B_TONE_OPTIONS: { id: CompanyAnalysis['tone']; label: string }[] = [
+  { id: "professional", label: "Professional" },
+  { id: "friendly",     label: "Friendly" },
+  { id: "technical",    label: "Technical" },
+  { id: "casual",       label: "Casual" },
+];
+
+const ICP_SIZE_OPTIONS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
+
+function B2BWorkSection({
+  profile,
+  onSave,
+  isPending,
+}: {
+  profile:   UserProfile;
+  onSave:    (updates: Partial<UserProfile>) => void;
+  isPending: boolean;
+}) {
+  const ca = profile.companyAnalysis;
+  const ic = profile.icp;
+
+  // Company analysis state
+  const [description,       setDescription]      = useState(ca?.description       ?? "");
+  const [valueProposition,  setValueProposition]  = useState(ca?.value_proposition ?? "");
+  const [keyFeatures,       setKeyFeatures]       = useState<string[]>(ca?.key_features ?? []);
+  const [caTone,            setCaTone]            = useState<CompanyAnalysis['tone']>(ca?.tone ?? "professional");
+
+  // ICP state
+  const [industries,  setIndustries]  = useState<string[]>(ic?.industries   ?? []);
+  const [sizes,       setSizes]       = useState<string[]>(ic?.company_sizes ?? []);
+  const [personas,    setPersonas]    = useState<string[]>(ic?.personas      ?? []);
+  const [painPoints,  setPainPoints]  = useState<string[]>(ic?.pain_points   ?? []);
+  const [geography,   setGeography]   = useState<string[]>(ic?.geography     ?? []);
+
+  const toggleSize = (s: string) =>
+    setSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+
+  const handleSaveCompany = () => {
+    onSave({
+      companyAnalysis: {
+        description,
+        value_proposition: valueProposition,
+        key_features: keyFeatures,
+        tone: caTone,
+      },
+    });
+  };
+
+  const handleSaveIcp = () => {
+    onSave({
+      icp: {
+        industries,
+        company_sizes: sizes,
+        personas,
+        pain_points: painPoints,
+        geography,
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── Card 1: Your company ── */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Your company</p>
+        <div className="space-y-4">
+          <SectionCard>
+            <div className="space-y-4">
+              {profile.companyDomain && (
+                <FieldRow label="Company domain">
+                  <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>{profile.companyDomain}</p>
+                </FieldRow>
+              )}
+              <FieldRow label="Description" incomplete={!description}>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="What does your company do? Who do you serve?"
+                  rows={3}
+                  className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
+                             focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
+                />
+              </FieldRow>
+              <FieldRow label="Value proposition" incomplete={!valueProposition}>
+                <GlassInput
+                  value={valueProposition}
+                  onChange={setValueProposition}
+                  placeholder="e.g. We help sales teams book 3× more meetings with warm intros"
+                />
+              </FieldRow>
+              <FieldRow label="Key features / capabilities">
+                <PillInput
+                  pills={keyFeatures}
+                  onAdd={v => setKeyFeatures(f => [...f, v])}
+                  onRemove={v => setKeyFeatures(f => f.filter(x => x !== v))}
+                  placeholder="e.g. AI outreach, CRM sync, analytics…"
+                />
+              </FieldRow>
+              <FieldRow label="Brand tone">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {B2B_TONE_OPTIONS.map(opt => {
+                    const isActive = caTone === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => setCaTone(opt.id)}
+                        className="py-2.5 rounded-xl border text-sm font-bold transition-all"
+                        style={isActive ? {
+                          background: `linear-gradient(135deg,rgba(124,110,247,0.13),rgba(149,133,249,0.07))`,
+                          borderColor: "rgba(124,110,247,0.4)",
+                          color: ACCENT,
+                        } : {
+                          background: "rgba(255,255,255,0.5)",
+                          borderColor: "rgba(255,255,255,0.6)",
+                          color: "var(--muted-foreground)",
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </FieldRow>
+            </div>
+          </SectionCard>
+          <div className="flex justify-end">
+            <SaveButton onClick={handleSaveCompany} isPending={isPending} label="Save company" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Card 2: Your ideal customer (ICP) ── */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Your ideal customer (ICP)</p>
+        <div className="space-y-4">
+          <SectionCard>
+            <div className="space-y-4">
+              <FieldRow label="Target industries">
+                <PillInput
+                  pills={industries}
+                  onAdd={v => setIndustries(i => [...i, v])}
+                  onRemove={v => setIndustries(i => i.filter(x => x !== v))}
+                  placeholder="e.g. SaaS, FinTech, E-commerce…"
+                />
+              </FieldRow>
+              <FieldRow label="Company size">
+                <div className="flex flex-wrap gap-2">
+                  {ICP_SIZE_OPTIONS.map(s => {
+                    const isOn = sizes.includes(s);
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => toggleSize(s)}
+                        className="px-3 py-1.5 rounded-full text-sm border font-medium transition-all"
+                        style={isOn ? {
+                          background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
+                          borderColor: "transparent",
+                          color: "white",
+                        } : {
+                          background: "rgba(255,255,255,0.6)",
+                          borderColor: "rgba(255,255,255,0.7)",
+                          color: "var(--muted-foreground)",
+                        }}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+              </FieldRow>
+              <FieldRow label="Decision-maker personas">
+                <PillInput
+                  pills={personas}
+                  onAdd={v => setPersonas(p => [...p, v])}
+                  onRemove={v => setPersonas(p => p.filter(x => x !== v))}
+                  placeholder="e.g. VP Sales, Head of Marketing, Founder…"
+                />
+              </FieldRow>
+              <FieldRow label="Pain points you solve">
+                <PillInput
+                  pills={painPoints}
+                  onAdd={v => setPainPoints(p => [...p, v])}
+                  onRemove={v => setPainPoints(p => p.filter(x => x !== v))}
+                  placeholder="e.g. Low reply rates, manual prospecting…"
+                />
+              </FieldRow>
+              <FieldRow label="Geography">
+                <PillInput
+                  pills={geography}
+                  onAdd={v => setGeography(g => [...g, v])}
+                  onRemove={v => setGeography(g => g.filter(x => x !== v))}
+                  placeholder="e.g. UK, US, EMEA…"
+                />
+              </FieldRow>
+            </div>
+          </SectionCard>
+          <div className="flex justify-end">
+            <SaveButton onClick={handleSaveIcp} isPending={isPending} label="Save ICP" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
    SECTION: Past Clients
 ═══════════════════════════════════════════════ */
-function PastClientsSection({ isPending }: { isPending: boolean }) {
+function PastClientsSection({ isPending, isB2B }: { isPending: boolean; isB2B: boolean }) {
   const [clients, setClients] = useState<string[]>([]);
 
   return (
     <div className="space-y-5">
       <SectionCard>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Past clients & venues</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+          {isB2B ? "Past clients & key accounts" : "Past clients & venues"}
+        </p>
         <p className="text-[11px] text-muted-foreground mb-4">
           Kammie mentions these as social proof when writing outreach emails.
         </p>
@@ -634,7 +865,7 @@ function PastClientsSection({ isPending }: { isPending: boolean }) {
           pills={clients}
           onAdd={v => setClients(c => [...c, v])}
           onRemove={v => setClients(c => c.filter(x => x !== v))}
-          placeholder="e.g. The Shard, Claridge's Hotel, Vogue…"
+          placeholder={isB2B ? "e.g. Salesforce, HubSpot, a Fortune 500…" : "e.g. The Shard, Claridge's Hotel, Vogue…"}
           hint={undefined}
         />
       </SectionCard>
@@ -990,6 +1221,9 @@ export function ProfilePage() {
     );
   }
 
+  const isB2B = !!(profile.companyAnalysis || profile.icp);
+  const NAV_GROUPS = getNavGroups(isB2B);
+
   /* ── Completion metric ── */
   const completionItems = [
     { done: !!profile.businessName },
@@ -1032,9 +1266,11 @@ export function ProfilePage() {
   /* ── Active section renderer ── */
   const renderSection = () => {
     switch (activeSection) {
-      case "my-profile":   return <MyProfileSection profile={profile} onSave={handleSave} onRoleSaved={handleRoleSaved} isPending={isPending} />;
-      case "my-work":      return <MyWorkSection profile={profile} onSave={handleSave} isPending={isPending} />;
-      case "past-clients": return <PastClientsSection isPending={isPending} />;
+      case "my-profile":   return <MyProfileSection profile={profile} onSave={handleSave} onRoleSaved={handleRoleSaved} isPending={isPending} isB2B={isB2B} />;
+      case "my-work":      return isB2B
+                             ? <B2BWorkSection profile={profile} onSave={handleSave} isPending={isPending} />
+                             : <MyWorkSection profile={profile} onSave={handleSave} isPending={isPending} />;
+      case "past-clients": return <PastClientsSection isPending={isPending} isB2B={isB2B} />;
       case "email":        return <EmailSection />;
       case "outreach":     return <OutreachSection profile={profile} onSave={handleSave} isPending={isPending} />;
       case "notifications":return <NotificationsSection />;

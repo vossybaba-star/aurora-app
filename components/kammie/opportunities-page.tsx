@@ -177,6 +177,8 @@ export function OpportunitiesPage() {
 
 function CreateOpportunityForm({ onSuccess }: { onSuccess: () => void }) {
   const [isPending, startTransition] = useTransition();
+  const { profile: createProfile } = useKammie();
+  const isB2BCreate = !!(createProfile?.companyAnalysis || createProfile?.icp);
   const [formData, setFormData] = useState({
     name: "",
     type: "venue" as OpportunityType,
@@ -220,7 +222,7 @@ function CreateOpportunityForm({ onSuccess }: { onSuccess: () => void }) {
           value={formData.name}
           onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
           required
-          placeholder="e.g., Riverside Wedding Venue"
+          placeholder={isB2BCreate ? "e.g., Acme Corp, TechVenture Inc" : "e.g., Riverside Wedding Venue"}
         />
       </div>
 

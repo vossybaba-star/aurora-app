@@ -107,17 +107,18 @@ function statusBadge(status: string): { label: string; bg: string; color: string
    Pipeline Strip
 ════════════════════════════════════════════════ */
 function PipelineStrip({
-  counts, active, onChange,
+  counts, active, onChange, isB2B,
 }: {
   counts: Record<PipelineStage, number>;
   active: PipelineStage;
   onChange: (s: PipelineStage) => void;
+  isB2B?: boolean;
 }) {
   const stages: { id: PipelineStage; label: string; desc: string }[] = [
-    { id: 'ready',   label: 'Ready',   desc: 'Drafted, waiting to send' },
-    { id: 'sent',    label: 'Sent',    desc: 'Awaiting reply'           },
-    { id: 'replied', label: 'Replied', desc: 'They got back to you'     },
-    { id: 'won',     label: 'Won',     desc: 'Booking confirmed'        },
+    { id: 'ready',   label: 'Ready',   desc: 'Drafted, waiting to send'     },
+    { id: 'sent',    label: 'Sent',    desc: 'Awaiting reply'               },
+    { id: 'replied', label: 'Replied', desc: 'They got back to you'         },
+    { id: 'won',     label: 'Won',     desc: isB2B ? 'Deal closed' : 'Booking confirmed' },
   ];
 
   return (
@@ -1467,7 +1468,8 @@ function TemplatesModal({ onClose }: { onClose: () => void }) {
    Main Outreach Page
 ════════════════════════════════════════════════ */
 export function OutreachPage() {
-  const { opportunities, outreachMessages, followUpTasks, refreshData, outreachStage, goToOutreachStage } = useKammie();
+  const { opportunities, outreachMessages, followUpTasks, refreshData, outreachStage, goToOutreachStage, profile: outreachProfile } = useKammie();
+  const isB2BOutreach = !!(outreachProfile?.companyAnalysis || outreachProfile?.icp);
 
   // Pipeline stage — seeded from context so metric-card nav can pre-select a tab
   const [activeStage, setActiveStage] = useState<PipelineStage>(outreachStage as PipelineStage ?? 'sent');
@@ -1616,7 +1618,7 @@ export function OutreachPage() {
         {/* ── Pipeline strip + Templates ── */}
         <div className="flex items-center gap-3">
           <div className="flex-1 min-w-0">
-            <PipelineStrip counts={counts} active={activeStage} onChange={s => {
+            <PipelineStrip counts={counts} active={activeStage} isB2B={isB2BOutreach} onChange={s => {
               setActiveStage(s);
               setShowAddContact(false);
               // Auto-select first contact in the new tab immediately
@@ -2255,6 +2257,8 @@ function SequenceDetail({
 ════════════════════════════════════════════════ */
 function ContactIntelCard({ opportunity }: { opportunity: Opportunity }) {
   const [copiedHandle, setCopiedHandle] = useState(false);
+  const { profile: ciProfile } = useKammie();
+  const isB2B = !!(ciProfile?.companyAnalysis || ciProfile?.icp);
 
   // Collect all contact signals — prefer Tier 1 contact intel, fall back to contactMethods
   const emailFromMethods = opportunity.contactMethods.find(c => c.type === 'email');
@@ -2275,11 +2279,13 @@ function ContactIntelCard({ opportunity }: { opportunity: Opportunity }) {
   if (!hasAny && !website) return null;
 
   const emailTypeBadge: Record<string, { label: string; color: string }> = {
-    booking: { label: 'Booking',  color: '#7c6ef7' },
-    wedding: { label: 'Wedding',  color: '#e879a0' },
-    direct:  { label: 'Direct',   color: '#22c55e' },
-    info:    { label: 'Info',     color: '#f59e0b' },
-    other:   { label: 'General',  color: '#6b7280' },
+    ...(isB2B ? {} : {
+      booking: { label: 'Booking', color: '#7c6ef7' },
+      wedding: { label: 'Wedding', color: '#e879a0' },
+    }),
+    direct: { label: isB2B ? 'Sales' : 'Direct', color: '#22c55e' },
+    info:   { label: 'Info',    color: '#f59e0b' },
+    other:  { label: 'General', color: '#6b7280' },
   };
 
   const copyHandle = () => {

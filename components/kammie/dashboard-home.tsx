@@ -434,7 +434,7 @@ export function DashboardHome() {
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               {hasAnything
-                ? `${followUpsDue} follow-up${followUpsDue !== 1 ? 's' : ''} due, ${readyToContact} venue${readyToContact !== 1 ? 's' : ''} ready to contact`
+                ? `${followUpsDue} follow-up${followUpsDue !== 1 ? 's' : ''} due, ${readyToContact} prospect${readyToContact !== 1 ? 's' : ''} ready to contact`
                 : "You're all caught up — ready to find new leads"}
             </p>
           </div>
@@ -557,10 +557,12 @@ export function DashboardHome() {
                 <Compass className="w-7 h-7 text-white" />
               </div>
               <p className="font-bold text-sm mb-1" style={{ color: "#131b2e" }}>
-                No venues yet
+                {profile?.icp ? "No prospects yet" : "No venues yet"}
               </p>
               <p className="text-xs text-muted-foreground mb-4 max-w-[200px] mx-auto leading-relaxed">
-                Find your first opportunities and grow your business
+                {profile?.icp
+                  ? "Discover companies matching your ICP and start outreach"
+                  : "Find your first opportunities and grow your business"}
               </p>
               <button
                 onClick={() => setActiveTab("discover")}
