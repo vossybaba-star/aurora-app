@@ -522,7 +522,7 @@ export function DashboardHome() {
           {/* Section header */}
           <div className="flex items-center justify-between px-0.5">
             <h2 className="font-extrabold text-base" style={{ color: "#131b2e" }}>
-              Suggested venues
+              {profile?.icp ? "Suggested leads" : "Suggested venues"}
             </h2>
             <button
               className="text-xs font-bold hover:underline transition-colors"

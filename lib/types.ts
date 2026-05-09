@@ -29,9 +29,33 @@ export interface UserProfile {
   roleCategory?: string;
   /** e.g. ["venues", "bridal_boutiques"] — from TargetMarket in lib/roles.ts */
   targetMarkets: string[];
+  // ── B2B / Agency fields ─────────────────────────────────────────────────
+  /** Primary domain of the user's own company, e.g. "acme.com" */
+  companyDomain?: string;
+  /** AI-extracted company analysis: description, value_proposition, key_features, tone */
+  companyAnalysis?: CompanyAnalysis;
+  /** Ideal Customer Profile: industries, company_sizes, personas, pain_points, geography */
+  icp?: ICP;
   // ────────────────────────────────────────────────────────────────────────
   createdAt: string;
   updatedAt: string;
+}
+
+/** AI-extracted analysis of the user's own company website */
+export interface CompanyAnalysis {
+  description: string;
+  value_proposition: string;
+  key_features: string[];
+  tone: 'professional' | 'casual' | 'technical' | 'friendly';
+}
+
+/** Ideal Customer Profile — who the user wants to sell to */
+export interface ICP {
+  industries: string[];
+  company_sizes: string[];
+  personas: string[];
+  pain_points: string[];
+  geography: string[];
 }
 
 export type Tone = 'friendly' | 'professional' | 'premium' | 'casual';

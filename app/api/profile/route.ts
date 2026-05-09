@@ -36,6 +36,10 @@ export async function PATCH(request: Request) {
       roleId:              body.roleId,
       roleCategory:        body.roleCategory,
       targetMarkets:       body.targetMarkets,
+      // B2B / Agency fields
+      companyDomain:       body.companyDomain,
+      companyAnalysis:     body.companyAnalysis,
+      icp:                 body.icp,
     });
 
     if (!result.success) {

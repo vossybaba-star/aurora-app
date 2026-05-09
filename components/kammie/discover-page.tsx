@@ -247,32 +247,39 @@ export function DiscoverPage() {
     load();
   }, []);
 
-  // Load Apollo companies when the user has a role that uses company leads
+  // Load Apollo companies — ICP mode (B2B) takes priority over role-based (freelancer)
   useEffect(() => {
-    const roleId = resolveRoleId(profile?.roleId, profile?.businessType);
-    if (!roleId) return; // photographer / unset — use Google Places instead
+    const icp     = profile?.icp;
+    const roleId  = resolveRoleId(profile?.roleId, profile?.businessType);
+
+    // Neither ICP nor role — use Google Places (photographer flow)
+    if (!icp && !roleId) return;
+
     let cancelled = false;
     const load = async () => {
       setIsLoadingApollo(true);
       setApolloError(null);
       try {
-        const userTargetMarkets = profile?.targetMarkets ?? [];
-        // If the user hasn't set target markets yet, fall back to the role's
-        // defaultTargetMarkets so the Apollo query is never sent with an empty
-        // market list (which causes it to return only base keyword results).
-        const role = getRoleById(roleId);
-        const effectiveTargetMarkets =
-          userTargetMarkets.length > 0
-            ? userTargetMarkets
-            : (role?.defaultTargetMarkets ?? []);
+        let requestBody: Record<string, unknown>;
+
+        if (icp && (icp.industries?.length ?? 0) > 0) {
+          // ── B2B / ICP mode ──────────────────────────────────────────────
+          requestBody = { icp };
+        } else {
+          // ── Freelancer / role-based mode ────────────────────────────────
+          const userTargetMarkets = profile?.targetMarkets ?? [];
+          const role = roleId ? getRoleById(roleId) : undefined;
+          const effectiveTargetMarkets =
+            userTargetMarkets.length > 0
+              ? userTargetMarkets
+              : (role?.defaultTargetMarkets ?? []);
+          requestBody = { role_id: roleId, target_markets: effectiveTargetMarkets };
+        }
 
         const res = await fetch("/api/apollo/companies", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({
-            role_id:        roleId,
-            target_markets: effectiveTargetMarkets,
-          }),
+          body:    JSON.stringify(requestBody),
         });
         if (!cancelled) {
           if (res.ok) {
@@ -297,9 +304,9 @@ export function DiscoverPage() {
     };
     load();
     return () => { cancelled = true; };
-  // Re-fetch when roleId or targetMarkets change (profile update)
+  // Re-fetch when ICP, roleId, or targetMarkets change
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.roleId, profile?.businessType, profile?.targetMarkets]);
+  }, [profile?.icp, profile?.roleId, profile?.businessType, profile?.targetMarkets]);
 
   // Infinite scroll
   useEffect(() => {
@@ -675,6 +682,8 @@ export function DiscoverPage() {
                           userAbout={profile?.pitch ?? ""}
                           userSpecialityTags={profile?.specialityTags ?? []}
                           userLocation={profile?.location ?? ""}
+                          icp={profile?.icp}
+                          companyAnalysis={profile?.companyAnalysis}
                         />
                       ))}
                     </div>

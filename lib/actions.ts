@@ -75,6 +75,10 @@ export async function updateProfile(profileData: Partial<{
   roleId: string;
   roleCategory: string;
   targetMarkets: string[];
+  // B2B / Agency fields
+  companyDomain: string;
+  companyAnalysis: Record<string, unknown>;
+  icp: Record<string, unknown>;
 }>): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
   const user = await getCurrentUser();
@@ -102,6 +106,10 @@ export async function updateProfile(profileData: Partial<{
       role_id:              profileData.roleId,
       role_category:        profileData.roleCategory,
       target_markets:       profileData.targetMarkets,
+      // B2B / Agency fields
+      company_domain:       profileData.companyDomain,
+      company_analysis:     profileData.companyAnalysis,
+      icp:                  profileData.icp,
       updated_at:           new Date().toISOString(),
     })
     .eq("id", user.id);

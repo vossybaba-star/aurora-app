@@ -2,6 +2,7 @@ import { NextResponse }    from "next/server";
 import { searchCompanies } from "@/lib/apollo";
 import { getRoleById }      from "@/lib/roles";
 import type { TargetMarket } from "@/lib/roles";
+import type { ICP } from "@/lib/types";
 
 /**
  * Maps TargetMarket values → additional Apollo keyword tags.
@@ -31,21 +32,57 @@ const TARGET_MARKET_KEYWORDS: Partial<Record<TargetMarket, string[]>> = {
   sport_wellness:       ["fitness", "wellness", "sport", "health"],
 };
 
+/** Map ICP company_sizes strings to Apollo employee range format "min,max" */
+function icpSizesToRanges(sizes: string[]): string[] {
+  const map: Record<string, string> = {
+    "1-10":      "1,10",
+    "11-50":     "11,50",
+    "51-200":    "51,200",
+    "201-1000":  "201,1000",
+    "1000+":     "1001,10000",
+  };
+  return sizes.map(s => map[s]).filter(Boolean);
+}
+
 export async function POST(req: Request) {
   let body: {
-    role_id?:       string;
+    role_id?:        string;
     target_markets?: string[];
-    page?:          number;
+    page?:           number;
+    icp?:            ICP;
     // Legacy fallback — deprecated, kept for backwards compat
-    persona?:       string;
+    persona?:        string;
   };
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { role_id, target_markets, page } = body;
+  const { role_id, target_markets, page, icp } = body;
 
-  // ── Resolve role config ──────────────────────────────────────────────────
+  // ── ICP-driven mode (B2B users) ──────────────────────────────────────────
+  if (icp && icp.industries?.length > 0) {
+    const employeeRanges = icpSizesToRanges(icp.company_sizes ?? []);
+    const locations      = icp.geography?.length ? icp.geography : ["United Kingdom"];
+
+    const companies = await searchCompanies({
+      q_organization_keyword_tags:      icp.industries,
+      organization_num_employees_ranges: employeeRanges.length ? employeeRanges : undefined,
+      organization_locations:            locations,
+      per_page: 20,
+      page:     page ?? 1,
+    });
+
+    if (companies === null) {
+      return NextResponse.json(
+        { companies: [], error: "Apollo API error — check APOLLO_API_KEY" },
+        { status: 200 }
+      );
+    }
+
+    return NextResponse.json({ companies, role_label: null });
+  }
+
+  // ── Role-based mode (freelancer / legacy users) ──────────────────────────
   const role = role_id ? getRoleById(role_id) : undefined;
 
   // Legacy persona fallback so existing callers don't break while roleId rolls out
@@ -66,16 +103,12 @@ export async function POST(req: Request) {
     );
   }
 
-  // ── Extend with ALL target-market keywords (every selected market contributes) ──
-  // flatMap over every market so no market is skipped even if the first returns nothing.
+  // ── Extend with ALL target-market keywords ───────────────────────────────
   const marketKeywords: string[] = (target_markets as TargetMarket[] ?? []).flatMap(
     (market) => TARGET_MARKET_KEYWORDS[market] ?? []
   );
 
-  // Deduplicate: base role keywords + all market keywords combined
-  const allKeywords = Array.from(
-    new Set([...baseKeywords, ...marketKeywords])
-  );
+  const allKeywords = Array.from(new Set([...baseKeywords, ...marketKeywords]));
 
   // ── Apollo search ────────────────────────────────────────────────────────
   const companies = await searchCompanies({

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
+import type { ICP, CompanyAnalysis } from "@/lib/types";
 
 // ─── Exported types ───────────────────────────────────────────────────────────
 
@@ -34,6 +35,8 @@ export function useCompanyEnrichment() {
       userAbout:           string,
       userSpecialityTags:  string[],
       userLocation:        string,
+      icp?:                ICP,
+      companyAnalysis?:    CompanyAnalysis,
     ) => {
       if (scoreCache.has(companyId)) {
         setResult(scoreCache.get(companyId)!);
@@ -55,6 +58,8 @@ export function useCompanyEnrichment() {
             user_about:           userAbout,
             user_speciality_tags: userSpecialityTags,
             user_location:        userLocation,
+            ...(icp             ? { icp }              : {}),
+            ...(companyAnalysis ? { company_analysis: companyAnalysis } : {}),
           }),
         });
 

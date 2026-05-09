@@ -71,13 +71,18 @@ export async function buildCopyContext(opportunityId: string, userId: string) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((c: any) => (typeof c === "string" ? c : c?.name))
         .filter(Boolean),
-      tone:            prof.message_tone ?? prof.tone ?? "professional",
+      tone:            prof.message_tone ?? prof.tone ?? (prof.company_analysis as any)?.tone ?? "professional",
       voice_sample:    prof.voice_sample ? prof.voice_sample.trim().slice(0, 500) : null,
       location:        prof.location ?? null,
       work_radius:     prof.work_radius ?? prof.location ?? null,
       instagram:       prof.instagram ?? null,
       portfolio_url:   prof.portfolio_url ?? null,
       website:         prof.website ?? null,
+      // B2B fields (null for freelancer users)
+      product_description: (prof.company_analysis as any)?.description ?? null,
+      value_proposition:   (prof.company_analysis as any)?.value_proposition ?? null,
+      key_features:        (prof.company_analysis as any)?.key_features ?? [],
+      icp_pain_points:     (prof.icp as any)?.pain_points ?? [],
     },
     recipient: {
       venue_name:                 opp.name,

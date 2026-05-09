@@ -15,6 +15,7 @@ import {
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import { useCompanyEnrichment } from "@/hooks/useCompanyEnrichment";
 import type { CompanyScoreResult } from "@/hooks/useCompanyEnrichment";
+import type { ICP, CompanyAnalysis } from "@/lib/types";
 
 /* ─── Constants ───────────────────────────────────────────────── */
 const ACCENT  = "#7c6ef7";
@@ -195,11 +196,15 @@ export interface CompanyCardProps {
   userAbout:           string;
   userSpecialityTags:  string[];
   userLocation:        string;
+  /** B2B mode — passed through to score API for ICP-aware scoring */
+  icp?:                ICP;
+  companyAnalysis?:    CompanyAnalysis;
 }
 
 export function CompanyCard({
   company, roleId, isSaved, onSaved, onToast,
   userProfession, userAbout, userSpecialityTags, userLocation,
+  icp, companyAnalysis,
 }: CompanyCardProps) {
 
   /* ── People state ───────────────────────────────────────────── */
@@ -259,12 +264,15 @@ export function CompanyCard({
           userAbout,
           userSpecialityTags,
           userLocation,
+          icp,
+          companyAnalysis,
         );
       }
     }
   }, [
     isExpanded, fetchPeople, result, enriching, enrichCompany,
     company, people, userProfession, userAbout, userSpecialityTags, userLocation,
+    icp, companyAnalysis,
   ]);
 
   /* ── Connect handler ────────────────────────────────────────── */

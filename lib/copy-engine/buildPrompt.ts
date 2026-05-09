@@ -15,9 +15,41 @@
 
 import type { CopyContext } from "./buildContext";
 
+// ─── B2B mode detection ───────────────────────────────────────────────────────
+
+function isB2BMode(ctx: CopyContext): boolean {
+  return !!(ctx.sender as any).product_description;
+}
+
 // ─── System prompt ────────────────────────────────────────────────────────────
 
 export function buildSystemPrompt(ctx: CopyContext): string {
+  if (isB2BMode(ctx)) {
+    const s = ctx.sender as any;
+    return `You write B2B cold outreach emails for ${s.business_name || s.name}.
+Product: ${s.product_description}
+Value prop: ${s.value_proposition || "Not specified"}
+Capabilities: ${(s.key_features as string[]).join(", ") || "Not specified"}
+Sender: ${s.name}
+
+ABSOLUTE RULES:
+1. Lead with a specific insight or pain point relevant to this prospect's industry — never "I wanted to reach out"
+2. No "synergies", no "partnership opportunity", no "I hope this finds you well"
+3. Max 100 words for initial email
+4. Max 80 words for follow-ups
+5. Soft CTA only: 15-min call or "reply if relevant" — never pushy
+6. Never mention Kammie, AI, or software
+7. No exclamation marks
+8. Sign off with sender's name — always
+9. UK English throughout
+
+TONE GUIDE:
+- professional: warm but businesslike, clear and direct
+- friendly: conversational, approachable, slightly informal
+- technical: precise, credible, peer-to-peer
+- casual: relaxed, short sentences, feels almost like a text`;
+  }
+
   const pitchContextLine = ctx.sender.pitch_context
     ? `\n\nCONTEXT ABOUT THE SENDER'S GOALS:\n${ctx.sender.pitch_context}`
     : "";
@@ -57,9 +89,72 @@ UK ENGLISH ALWAYS:
 - Avoid Americanisms like "reaching out", "touch base", "circle back"`;
 }
 
+// ─── B2B email sequence angles ────────────────────────────────────────────────
+const B2B_INITIAL_ANGLE =
+  "Pain-point hook → product capability → soft CTA (15-min call or 'reply if relevant')";
+const B2B_FOLLOWUP_ANGLES = [
+  "Highlight a specific feature or use case relevant to their industry. Keep it short — one new thing only.",
+  "Lead with a brief social proof or outcome: a result you delivered for a similar company. One sentence, make it concrete.",
+  "Graceful exit. Acknowledge they're busy. Leave the door open — 'happy to reconnect whenever the timing is better.' No guilt, no pressure.",
+];
+
 // ─── Initial email prompt ─────────────────────────────────────────────────────
 
 export function buildInitialEmailPrompt(ctx: CopyContext): string {
+  if (isB2BMode(ctx)) {
+    const s = ctx.sender as any;
+    const contactName  = ctx.recipient.contact_name;
+    const contactTitle = ctx.recipient.contact_title ?? null;
+    const firstName    = contactName ? contactName.split(" ")[0] : null;
+    const greeting     = firstName ? `Hi ${firstName},` : "Hi there,";
+    const signOff      = firstName ? s.first_name : s.name;
+
+    const painPointsLine = (s.icp_pain_points as string[]).length > 0
+      ? `Key pain points your product solves: ${(s.icp_pain_points as string[]).join(", ")}`
+      : "";
+
+    return `Write a B2B cold outreach email${firstName && contactTitle
+      ? ` to ${contactName}, ${contactTitle} at ${ctx.recipient.venue_name}`
+      : firstName
+        ? ` to ${contactName} at ${ctx.recipient.venue_name}`
+        : ` to ${ctx.recipient.venue_name}`}.
+
+SENDER COMPANY:
+- Business: ${s.business_name || s.name}
+- Product: ${s.product_description}
+- Value proposition: ${s.value_proposition || "Not specified"}
+- Capabilities: ${(s.key_features as string[]).join(", ") || "Not specified"}
+${painPointsLine ? "- " + painPointsLine : ""}
+- Tone: ${s.tone}
+
+PROSPECT:
+- Company: ${ctx.recipient.venue_name}
+- Industry: ${(ctx.recipient as any).industry ?? "Unknown"}
+- Size: ${(ctx.recipient as any).estimated_num_employees != null ? `${(ctx.recipient as any).estimated_num_employees} employees` : "Unknown"}
+- Contact: ${contactName ?? "Unknown"}${contactTitle ? `, ${contactTitle}` : ""}
+- Suggested angle: ${ctx.recipient.recommended_angle ?? "Lead with a relevant pain point for their industry"}
+
+ANGLE FOR THIS EMAIL:
+${B2B_INITIAL_ANGLE}
+
+INSTRUCTIONS:
+- Start with: ${greeting}
+- FIRST sentence: lead with the suggested angle — reference a specific pain point or insight relevant to ${ctx.recipient.venue_name}'s industry. Never open with "I hope this finds you well" or "I wanted to reach out"
+- 1-2 sentences: what your product does and why it's relevant to this specific prospect
+- One soft CTA: suggest a 15-minute call or "reply if relevant" — never pushy
+- Max 100 words
+- UK English, no exclamation marks
+- Sign off: ${signOff}
+
+Return ONLY valid JSON — no markdown, no preamble:
+{
+  "subject": "<specific, curiosity-driven subject line, 6 words max>",
+  "subject_alternatives": ["<option 2>", "<option 3>"],
+  "body": "<the full email including greeting and sign-off>",
+  "word_count": <integer>,
+  "personalisation_score": <0-100 integer>
+}`;
+  }
   const isApollo     = ctx.source === "apollo";
   const contactName  = ctx.recipient.contact_name;
   const contactTitle = ctx.recipient.contact_title ?? null;
@@ -177,6 +272,44 @@ export function buildFollowUpPrompt(
   followUpNumber: number,
   previousEmails: Array<{ subject: string; body: string }>
 ): string {
+  if (isB2BMode(ctx)) {
+    const s = ctx.sender as any;
+    const contactName  = ctx.recipient.contact_name;
+    const firstName    = contactName ? contactName.split(" ")[0] : null;
+    const signOff      = firstName ? s.first_name : s.name;
+    const b2bAngle     = B2B_FOLLOWUP_ANGLES[Math.min(followUpNumber - 1, 2)];
+    const previousSubject = previousEmails[0]?.subject ?? `${s.business_name || s.name}`;
+
+    return `Write B2B follow-up email #${followUpNumber} from ${s.name} (${s.business_name || s.name}) to ${firstName ?? ctx.recipient.venue_name} at ${ctx.recipient.venue_name}.
+
+PREVIOUS EMAILS:
+${previousEmails.map((e, i) => `Email ${i + 1}:\nSubject: ${e.subject}\n${e.body}`).join("\n\n---\n\n")}
+
+FOLLOW-UP ANGLE:
+${b2bAngle}
+
+PRODUCT CONTEXT:
+- Product: ${s.product_description}
+- Value prop: ${s.value_proposition || "Not specified"}
+- Capabilities: ${(s.key_features as string[]).join(", ") || "Not specified"}
+
+INSTRUCTIONS:
+- Subject: "Re: ${previousSubject}"
+- Greeting: Hi ${firstName ?? "there"},
+- Do NOT just say "following up" — add genuine new value per the angle above
+- Max 80 words
+- UK English, no exclamation marks
+- Sign off: ${signOff}
+
+Return ONLY valid JSON:
+{
+  "subject": "Re: ${previousSubject}",
+  "body": "<follow-up body including greeting and sign-off>",
+  "word_count": <integer>,
+  "new_value_added": "<one sentence — what new value does this add>"
+}`;
+  }
+
   const angles = [
     // Follow-up 1 — add a new angle, reference their work
     `Add a new angle not mentioned in the first email. Could reference a specific service, a relevant recent project, or a genuine question about their upcoming events. Keep it light — this is a gentle nudge, not pressure.`,

@@ -16,7 +16,9 @@ import { updateProfile } from "@/lib/actions";
 import { useKammie } from "./kammie-app";
 import { getRoleById } from "@/lib/roles";
 import { RolePickerModal } from "@/components/onboarding/RolePickerModal";
+import { CompanySetupWizard } from "@/components/onboarding/CompanySetupWizard";
 import { Sparkles, Mail, Check, ChevronRight, Zap, MapPin, Building2 } from "lucide-react";
+import type { CompanyAnalysis, ICP } from "@/lib/types";
 
 /* ── Constants ─────────────────────────────────────────────── */
 const ACCENT  = "#7c6ef7";
@@ -24,9 +26,9 @@ const ACCENT2 = "#9585f9";
 const LS_KEY  = "kammie_frw_v1";
 
 const SCAN_MESSAGES = [
-  "Scanning your area for venues…",
+  "Scanning for companies matching your ICP…",
   "Analysing contact opportunities…",
-  "Preparing your lead pipeline…",
+  "Building your lead pipeline…",
   "Almost there — lining up your first leads…",
 ];
 
@@ -210,6 +212,17 @@ export function FirstRunWizard() {
     setStep(1);
   };
 
+  const handleSetupComplete = async (
+    companyDomain: string,
+    companyAnalysis: CompanyAnalysis,
+    icp: ICP,
+  ) => {
+    setIsSaving(true);
+    await updateProfile({ companyDomain, companyAnalysis, icp }).catch(() => {});
+    setIsSaving(false);
+    setStep(1);
+  };
+
   const handleConnectEmail = () => {
     markDone(); // mark before redirect so returning users skip wizard
     window.location.href = "/api/email/connect";
@@ -232,9 +245,9 @@ export function FirstRunWizard() {
 
   if (!visible) return null;
 
-  /* Step 0 — full-screen role picker (RolePickerModal handles its own overlay) */
+  /* Step 0 — full-screen company setup wizard (primary B2B onboarding) */
   if (step === 0) {
-    return <RolePickerModal overlay onComplete={handleRoleComplete} />;
+    return <CompanySetupWizard onComplete={handleSetupComplete} />;
   }
 
   const TOTAL = 2; // email + scan (role picker was step 0, outside this modal)
@@ -395,10 +408,10 @@ export function FirstRunWizard() {
           {step === 2 && (
             <>
               <h2 className="text-xl font-extrabold mb-1.5 leading-snug" style={{ color: "#131b2e" }}>
-                Kammie is finding your first leads
+                Building your lead pipeline…
               </h2>
               <p className="text-sm text-muted-foreground mb-4">
-                Sit tight — this takes just a moment.
+                Sit tight — finding companies that match your ICP.
               </p>
               <ScanAnimation onDone={handleScanDone} />
             </>

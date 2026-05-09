@@ -23,6 +23,10 @@ export interface DbProfile {
   role_id: string | null;
   role_category: string | null;
   target_markets: string[] | null;
+  // ── B2B / Agency fields (added via 20260510_b2b_profile migration) ────────
+  company_domain: string | null;
+  company_analysis: Record<string, unknown> | null;
+  icp: Record<string, unknown> | null;
   // ─────────────────────────────────────────────────────────────────────────
   created_at: string;
   updated_at: string;
@@ -177,6 +181,10 @@ export function dbProfileToProfile(db: DbProfile): UserProfile {
     roleId: db.role_id || undefined,
     roleCategory: db.role_category || undefined,
     targetMarkets: db.target_markets || [],
+    // B2B / Agency fields
+    companyDomain: db.company_domain || undefined,
+    companyAnalysis: db.company_analysis as import('./types').CompanyAnalysis | undefined,
+    icp: db.icp as import('./types').ICP | undefined,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   };

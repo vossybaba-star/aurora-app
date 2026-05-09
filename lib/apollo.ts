@@ -83,6 +83,8 @@ async function apolloPost<T>(path: string, body: object, base = APOLLO_BASE): Pr
 export interface SearchCompaniesParams {
   q_organization_keyword_tags?: string[];
   organization_locations?: string[];
+  organization_num_employees_ranges?: string[];  // e.g. ["1,10", "11,50"]
+  q_organization_name?: string;                  // name search for company-lookup
   per_page?: number;
   page?: number;
 }
