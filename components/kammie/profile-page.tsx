@@ -473,7 +473,16 @@ function MyProfileSection({
   const ic = profile.icp;
   const [caDescription,     setCaDescription]     = useState(ca?.description       ?? "");
   const [caValueProp,       setCaValueProp]       = useState(ca?.value_proposition ?? "");
-  const [caKeyProducts,     setCaKeyProducts]     = useState<string[]>(ca?.key_products  ?? []);
+  const [caKeyProducts,     setCaKeyProducts]     = useState<Record<string, string>>(
+    ca?.key_products && !Array.isArray(ca.key_products)
+      ? ca.key_products as Record<string, string>
+      : Array.isArray(ca?.key_products)
+        ? Object.fromEntries((ca.key_products as string[]).map((p: string) => [p, ""]))
+        : {}
+  );
+  const [activeProduct,        setActiveProduct]        = useState<string>("");
+  const [generatingProduct,    setGeneratingProduct]    = useState(false);
+  const [newProductInput,      setNewProductInput]      = useState("");
   const [caKeyFeatures,     setCaKeyFeatures]     = useState<string[]>(ca?.key_features  ?? []);
   const [caTone,            setCaTone]            = useState<CompanyAnalysis['tone']>(ca?.tone ?? "professional");
   const [icpIndustries,     setIcpIndustries]     = useState<string[]>(ic?.industries   ?? []);
@@ -492,7 +501,14 @@ function MyProfileSection({
     const ic2  = profile.icp;
     setCaDescription(ca2?.description       ?? "");
     setCaValueProp  (ca2?.value_proposition ?? "");
-    setCaKeyProducts(ca2?.key_products      ?? []);
+    const kp = ca2?.key_products;
+    setCaKeyProducts(
+      kp && !Array.isArray(kp) ? kp as Record<string, string>
+      : Array.isArray(kp)      ? Object.fromEntries((kp as string[]).map((p: string) => [p, ""]))
+      : {}
+    );
+    setActiveProduct("");
+    setNewProductInput("");
     setCaKeyFeatures(ca2?.key_features      ?? []);
     setCaTone       (ca2?.tone              ?? "professional");
     setActivePainPersona("");
@@ -567,7 +583,7 @@ function MyProfileSection({
 
   const handleSaveCompany = () => {
     onSave({
-      companyAnalysis: { description: caDescription, value_proposition: caValueProp, key_products: caKeyProducts, key_features: caKeyFeatures, tone: caTone },
+      companyAnalysis: { description: caDescription, value_proposition: caValueProp, key_products: caKeyProducts, key_features: caKeyFeatures, tone: caTone, name: profile.companyAnalysis?.name },
     });
   };
 
@@ -681,10 +697,137 @@ function MyProfileSection({
                 placeholder="e.g. We help sales teams book 3× more meetings with warm intros" />
             </FieldRow>
             <FieldRow label="Key products">
-              <PillInput pills={caKeyProducts}
-                onAdd={v => setCaKeyProducts(f => [...f, v])}
-                onRemove={v => setCaKeyProducts(f => f.filter(x => x !== v))}
-                placeholder="e.g. Kammie Pro, Growth Plan, API add-on…" />
+              {(() => {
+                const productNames   = Object.keys(caKeyProducts);
+                const currentProduct = activeProduct || productNames[0] || "";
+
+                const generateSummary = async (name: string) => {
+                  if (caKeyProducts[name]) return; // already has summary
+                  setGeneratingProduct(true);
+                  try {
+                    const res = await fetch("/api/generate-product-summary", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        companyName: profile.companyAnalysis?.name || profile.companyDomain,
+                        description: caDescription,
+                        productName: name,
+                      }),
+                    });
+                    const data = await res.json();
+                    if (data.summary) {
+                      setCaKeyProducts(prev => ({ ...prev, [name]: data.summary }));
+                    }
+                  } finally {
+                    setGeneratingProduct(false);
+                  }
+                };
+
+                const addProduct = (name: string) => {
+                  const trimmed = name.trim();
+                  if (!trimmed || caKeyProducts[trimmed] !== undefined) return;
+                  setCaKeyProducts(prev => ({ ...prev, [trimmed]: "" }));
+                  setActiveProduct(trimmed);
+                  setNewProductInput("");
+                  generateSummary(trimmed);
+                };
+
+                const removeProduct = (name: string) => {
+                  setCaKeyProducts(prev => {
+                    const next = { ...prev };
+                    delete next[name];
+                    return next;
+                  });
+                  if (activeProduct === name) {
+                    const remaining = productNames.filter(p => p !== name);
+                    setActiveProduct(remaining[0] ?? "");
+                  }
+                };
+
+                return (
+                  <div className="space-y-3">
+                    {/* Product tabs + add input */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {productNames.map(name => {
+                        const isActive = currentProduct === name;
+                        return (
+                          <div key={name} className="flex items-center gap-1">
+                            <button
+                              onClick={() => { setActiveProduct(name); generateSummary(name); }}
+                              className="px-3 py-1.5 rounded-full text-xs border font-semibold transition-all"
+                              style={isActive ? {
+                                background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
+                                borderColor: "transparent", color: "white",
+                              } : {
+                                background: "rgba(255,255,255,0.6)",
+                                borderColor: "rgba(255,255,255,0.7)", color: "var(--muted-foreground)",
+                              }}>
+                              {name}
+                            </button>
+                            <button onClick={() => removeProduct(name)}
+                              className="w-4 h-4 rounded-full flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors">
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      {/* Add product inline */}
+                      <div className="flex items-center gap-1">
+                        <input
+                          value={newProductInput}
+                          onChange={e => setNewProductInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addProduct(newProductInput); } }}
+                          placeholder="Add product…"
+                          className="px-2.5 py-1.5 rounded-full text-xs border border-dashed border-white/60 bg-white/40
+                                     focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground w-32"
+                        />
+                        <button onClick={() => addProduct(newProductInput)} disabled={!newProductInput.trim()}
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-white disabled:opacity-40"
+                          style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Summary panel for active product */}
+                    {currentProduct && (
+                      <div className="rounded-xl border border-white/50 bg-white/30 p-3">
+                        {generatingProduct && !caKeyProducts[currentProduct] ? (
+                          <div className="flex items-center gap-2 py-1">
+                            <Spinner className="w-3.5 h-3.5" />
+                            <p className="text-[11px] text-muted-foreground">Kammie is writing a summary…</p>
+                          </div>
+                        ) : (
+                          <>
+                            <textarea
+                              value={caKeyProducts[currentProduct] ?? ""}
+                              onChange={e => setCaKeyProducts(prev => ({ ...prev, [currentProduct]: e.target.value }))}
+                              placeholder={`Brief description of ${currentProduct}…`}
+                              rows={3}
+                              className="w-full text-sm bg-transparent resize-none focus:outline-none placeholder:text-muted-foreground"
+                            />
+                            {!caKeyProducts[currentProduct] && !generatingProduct && (
+                              <button
+                                onClick={() => generateSummary(currentProduct)}
+                                className="mt-1 text-[11px] font-bold flex items-center gap-1"
+                                style={{ color: ACCENT }}>
+                                <Sparkles className="w-3 h-3" /> Generate with Kammie
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {productNames.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground italic">
+                        Add your products or services above — Kammie will summarise each one.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </FieldRow>
             <FieldRow label="Key features / capabilities">
               <PillInput pills={caKeyFeatures}

@@ -155,7 +155,9 @@ Return ONLY valid JSON — no markdown, no explanation:
     const analysis: CompanyAnalysis = {
       description:       String(parsed.description || ""),
       value_proposition: String(parsed.value_proposition || ""),
-      key_products:      Array.isArray(parsed.key_products)  ? parsed.key_products.map(String)  : [],
+      key_products:      Array.isArray(parsed.key_products)
+                           ? Object.fromEntries(parsed.key_products.map((p: unknown) => [String(p), ""]))
+                           : {},
       key_features:      Array.isArray(parsed.key_features)  ? parsed.key_features.map(String)  : [],
       tone:              (["professional","casual","technical","friendly"] as const)
                            .includes(parsed.tone) ? parsed.tone : "professional",
