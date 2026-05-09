@@ -140,6 +140,8 @@ export interface SearchPeopleParams {
   organization_domains?: string[];
   /** Array of job titles — maps to person_titles on Apollo's api_search endpoint */
   person_titles?:        string[];
+  /** City / country strings to filter by person location */
+  person_locations?:     string[];
   per_page?:             number;
   page?:                 number;
 }

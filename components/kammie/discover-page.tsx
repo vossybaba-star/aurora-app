@@ -33,11 +33,15 @@ import {
   FileText,
   Copy,
   Check,
+  Building2,
+  Users,
+  UserSearch,
+  X,
 } from "lucide-react";
 import { useVenueEnrichment } from "@/hooks/useVenueEnrichment";
 import type { VenueEnrichmentResult } from "@/hooks/useVenueEnrichment";
 import { CompanyCard } from "@/components/discover/CompanyCard";
-import type { ApolloCompany } from "@/lib/apollo";
+import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import { getRoleById } from "@/lib/roles";
 
 /* ─── Constants ──────────────────────────────── */
@@ -199,6 +203,16 @@ export function DiscoverPage() {
   const [apolloError,          setApolloError]          = useState<string | null>(null);
   const [savedApolloIds,       setSavedApolloIds]       = useState(new Set<string>());
   const [isLoadingApollo,      setIsLoadingApollo]      = useState(false);
+  // B2B search mode + filters
+  const [searchMode,           setSearchMode]           = useState<"companies" | "contacts">("companies");
+  const [filterIndustry,       setFilterIndustry]       = useState("");
+  const [filterLocation,       setFilterLocation]       = useState("");
+  const [filterSize,           setFilterSize]           = useState("");
+  const [contactCompany,       setContactCompany]       = useState("");
+  const [contactTitle,         setContactTitle]         = useState("");
+  const [contactLocation,      setContactLocation]      = useState("");
+  const [apolloContacts,       setApolloContacts]       = useState<ApolloPerson[]>([]);
+  const [isLoadingContacts,    setIsLoadingContacts]    = useState(false);
   const toastCounter = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -247,8 +261,11 @@ export function DiscoverPage() {
     load();
   }, []);
 
+  const isB2B = !!(profile?.companyAnalysis || profile?.icp);
+
   // Load Apollo companies — ICP mode (B2B) takes priority over role-based (freelancer)
   useEffect(() => {
+    if (searchMode === "contacts") return; // contacts handled separately
     const icp     = profile?.icp;
     const roleId  = resolveRoleId(profile?.roleId, profile?.businessType);
 
@@ -262,9 +279,14 @@ export function DiscoverPage() {
       try {
         let requestBody: Record<string, unknown>;
 
-        if (icp && (icp.industries?.length ?? 0) > 0) {
-          // ── B2B / ICP mode ──────────────────────────────────────────────
-          requestBody = { icp };
+        if (icp || isB2B) {
+          // ── B2B / ICP mode — pass filters alongside ICP ─────────────────
+          const filters = {
+            industry: filterIndustry || undefined,
+            location: filterLocation || undefined,
+            size:     filterSize     || undefined,
+          };
+          requestBody = { icp: icp ?? {}, filters };
         } else {
           // ── Freelancer / role-based mode ────────────────────────────────
           const userTargetMarkets = profile?.targetMarkets ?? [];
@@ -304,9 +326,32 @@ export function DiscoverPage() {
     };
     load();
     return () => { cancelled = true; };
-  // Re-fetch when ICP, roleId, or targetMarkets change
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.icp, profile?.roleId, profile?.businessType, profile?.targetMarkets]);
+  }, [profile?.icp, profile?.roleId, profile?.businessType, profile?.targetMarkets, searchMode, filterIndustry, filterLocation, filterSize]);
+
+  // Load Apollo contacts (B2B contacts mode)
+  const fetchContacts = useCallback(async () => {
+    setIsLoadingContacts(true);
+    try {
+      const res = await fetch("/api/apollo/contacts", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          company:  contactCompany  || undefined,
+          title:    contactTitle    || undefined,
+          location: contactLocation || undefined,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setApolloContacts(data.contacts ?? []);
+      }
+    } catch (err) {
+      console.error("[apollo] contacts fetch error:", err);
+    } finally {
+      setIsLoadingContacts(false);
+    }
+  }, [contactCompany, contactTitle, contactLocation]);
 
   // Infinite scroll
   useEffect(() => {
@@ -486,6 +531,82 @@ export function DiscoverPage() {
   const SearchBar = (
     <div className="space-y-2 sticky top-0 z-10 pb-2"
          style={{ background: 'rgba(242,240,254,0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+
+      {/* ── B2B mode toggle ── */}
+      {isB2B && (
+        <div className="space-y-2">
+          {/* Companies / Contacts switch */}
+          <div className="flex rounded-xl border border-white/60 overflow-hidden glass-card w-fit">
+            {(["companies", "contacts"] as const).map(mode => (
+              <button key={mode}
+                onClick={() => setSearchMode(mode)}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold transition-colors"
+                style={searchMode === mode ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, color: "white" } : { color: "var(--muted-foreground)" }}>
+                {mode === "companies" ? <Building2 className="w-3.5 h-3.5" /> : <UserSearch className="w-3.5 h-3.5" />}
+                {mode === "companies" ? "Companies" : "Contacts"}
+              </button>
+            ))}
+          </div>
+
+          {/* Company filters */}
+          {searchMode === "companies" && (
+            <div className="flex flex-wrap gap-2">
+              <div className="relative">
+                <input value={filterIndustry} onChange={e => setFilterIndustry(e.target.value)}
+                  placeholder="Industry"
+                  className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
+                />
+                {filterIndustry && <button onClick={() => setFilterIndustry("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
+              </div>
+              <div className="relative">
+                <input value={filterLocation} onChange={e => setFilterLocation(e.target.value)}
+                  placeholder="Location"
+                  className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
+                />
+                {filterLocation && <button onClick={() => setFilterLocation("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
+              </div>
+              <select value={filterSize} onChange={e => setFilterSize(e.target.value)}
+                className="px-3 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30">
+                <option value="">Any size</option>
+                {["1-10","11-50","51-200","201-1000","1000+"].map(s => <option key={s} value={s}>{s} employees</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Contact filters */}
+          {searchMode === "contacts" && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <div className="relative">
+                <input value={contactCompany} onChange={e => setContactCompany(e.target.value)}
+                  placeholder="Company"
+                  className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
+                />
+                {contactCompany && <button onClick={() => setContactCompany("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
+              </div>
+              <div className="relative">
+                <input value={contactTitle} onChange={e => setContactTitle(e.target.value)}
+                  placeholder="Title / role"
+                  className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
+                />
+                {contactTitle && <button onClick={() => setContactTitle("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
+              </div>
+              <div className="relative">
+                <input value={contactLocation} onChange={e => setContactLocation(e.target.value)}
+                  placeholder="Location"
+                  className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
+                />
+                {contactLocation && <button onClick={() => setContactLocation("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
+              </div>
+              <button onClick={fetchContacts} disabled={isLoadingContacts}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-60"
+                style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+                {isLoadingContacts ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserSearch className="w-3 h-3" />}
+                Search
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {/* Search input row */}
       <div className="flex items-center gap-2">
         <div className="flex-1 relative">
@@ -633,10 +754,37 @@ export function DiscoverPage() {
                   : `${searchResults.length} leads near ${nearbyLocation || "you"}`}
               </p>
 
+              {/* B2B contacts mode */}
+              {isB2B && searchMode === "contacts" && (
+                isLoadingContacts ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Searching contacts…
+                    </div>
+                  </div>
+                ) : apolloContacts.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {apolloContacts.map(person => (
+                      <ContactCard key={person.id} person={person} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="glass-panel rounded-3xl p-8 text-center">
+                    <UserSearch className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm text-muted-foreground">
+                      {contactCompany || contactTitle || contactLocation
+                        ? "No contacts found — try different filters"
+                        : "Set filters above and click Search to find contacts"}
+                    </p>
+                  </div>
+                )
+              )}
+
               {/* Responsive card grid: 1 col mobile / 2 col tablet / 3 col desktop */}
-              {(() => {
+              {(!isB2B || searchMode === "companies") && (() => {
                 const resolvedRoleId = resolveRoleId(profile?.roleId, profile?.businessType);
-                const useApollo = resolvedRoleId !== null;
+                const useApollo = resolvedRoleId !== null || isB2B;
                 if (useApollo) {
                   if (isLoadingApollo) {
                     return (
@@ -859,6 +1007,56 @@ interface DiscoverCardProps {
   isExpanded?:     boolean;
   onToggle?:       () => void;
   onScoreReady?:   (placeId: string, score: number) => void;
+}
+
+/* ═══════════════════════════════════════════════
+   ContactCard — B2B people search result
+═══════════════════════════════════════════════ */
+function ContactCard({ person }: { person: ApolloPerson }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const displayLastName = person.last_name?.includes("*") ? "" : person.last_name ?? "";
+  const fullName = [person.first_name, displayLastName].filter(Boolean).join(" ");
+  return (
+    <div className="glass-card rounded-2xl border border-white/60 p-4 flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        {/* Avatar / photo */}
+        {person.photo_url && !imgFailed ? (
+          <img src={person.photo_url} alt={fullName}
+            className="w-10 h-10 rounded-xl object-cover shrink-0"
+            onError={() => setImgFailed(true)} />
+        ) : (
+          <div className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center font-bold text-sm text-white"
+               style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+            {fullName.split(" ").slice(0,2).map(w => w[0]?.toUpperCase()).join("")}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold truncate" style={{ color: "#131b2e" }}>{fullName}</p>
+          {person.title && <p className="text-[11px] text-muted-foreground truncate">{person.title}</p>}
+          {person.organization_name && (
+            <p className="text-[11px] font-medium truncate" style={{ color: ACCENT }}>{person.organization_name}</p>
+          )}
+          {person.city && <p className="text-[10px] text-muted-foreground">{person.city}</p>}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        {person.linkedin_url && (
+          <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold border border-white/60 bg-white/40 hover:bg-white/70 transition-colors"
+            style={{ color: ACCENT }}>
+            <ExternalLink className="w-3 h-3" /> LinkedIn
+          </a>
+        )}
+        {person.email && (
+          <a href={`mailto:${person.email}`}
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold border border-white/60 bg-white/40 hover:bg-white/70 transition-colors"
+            style={{ color: ACCENT }}>
+            <Mail className="w-3 h-3" /> Email
+          </a>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function DiscoverCard({

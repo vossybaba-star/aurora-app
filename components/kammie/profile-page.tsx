@@ -902,7 +902,7 @@ function MyProfileSection({
                         companyName: profile.companyAnalysis?.name || profile.companyDomain,
                         description: caDescription,
                         valueProp:   caValueProp,
-                        keyProducts: caKeyProducts,
+                        keyProducts: Object.keys(caKeyProducts),
                         persona:     p,
                       }),
                     });

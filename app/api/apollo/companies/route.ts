@@ -50,6 +50,7 @@ export async function POST(req: Request) {
     target_markets?: string[];
     page?:           number;
     icp?:            ICP;
+    filters?:        { industry?: string; location?: string; size?: string };
     // Legacy fallback — deprecated, kept for backwards compat
     persona?:        string;
   };
@@ -57,15 +58,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { role_id, target_markets, page, icp } = body;
+  const { role_id, target_markets, page, icp, filters } = body;
 
   // ── ICP-driven mode (B2B users) ──────────────────────────────────────────
-  if (icp && icp.industries?.length > 0) {
-    const employeeRanges = icpSizesToRanges(icp.company_sizes ?? []);
-    const locations      = icp.geography?.length ? icp.geography : ["United Kingdom"];
+  if (icp && (icp.industries?.length > 0 || filters)) {
+    const industries     = filters?.industry
+      ? [filters.industry]
+      : (icp?.industries ?? []);
+    const employeeRanges = filters?.size
+      ? icpSizesToRanges([filters.size])
+      : icpSizesToRanges(icp?.company_sizes ?? []);
+    const locations      = filters?.location
+      ? [filters.location]
+      : (icp?.geography?.length ? icp.geography : ["United Kingdom"]);
 
     const companies = await searchCompanies({
-      q_organization_keyword_tags:      icp.industries,
+      q_organization_keyword_tags:       industries.length ? industries : undefined,
       organization_num_employees_ranges: employeeRanges.length ? employeeRanges : undefined,
       organization_locations:            locations,
       per_page: 20,
