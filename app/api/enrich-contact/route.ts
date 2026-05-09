@@ -307,11 +307,10 @@ export async function POST(request: Request) {
             html = await response.text();
             if (html && html.length > 500) {
               fetchSuccess = true;
-              console.log("[v0] corsproxy.io fetch succeeded for", websiteUrl, "- got", html.length, "chars");
             }
           }
-        } catch (err) {
-          console.log("[v0] corsproxy.io failed for", websiteUrl, err instanceof Error ? err.message : "");
+        } catch {
+          /* corsproxy fetch failed — try next strategy */
         }
         
         // Strategy 2: Try allorigins if corsproxy failed
@@ -330,11 +329,10 @@ export async function POST(request: Request) {
               html = await response.text();
               if (html && html.length > 500) {
                 fetchSuccess = true;
-                console.log("[v0] allorigins fetch succeeded for", websiteUrl, "- got", html.length, "chars");
               }
             }
-          } catch (err) {
-            console.log("[v0] allorigins failed for", websiteUrl, err instanceof Error ? err.message : "");
+          } catch {
+            /* allorigins fetch failed — try next strategy */
           }
         }
         
@@ -357,11 +355,10 @@ export async function POST(request: Request) {
               html = await response.text();
               if (html && html.length > 500) {
                 fetchSuccess = true;
-                console.log("[v0] Direct fetch succeeded for", websiteUrl, "- got", html.length, "chars");
               }
             }
-          } catch (err) {
-            console.log("[v0] Direct fetch failed for", websiteUrl, err instanceof Error ? err.message : "");
+          } catch {
+            /* direct fetch failed */
           }
         }
         
@@ -375,10 +372,6 @@ export async function POST(request: Request) {
           Object.assign(contactInfo, socials);
           
           // Log summary of what was found
-          const foundSocials = Object.entries(socials).filter(([_, v]) => v).map(([k]) => k);
-          if (foundSocials.length > 0) {
-            console.log("[v0] Found socials for", websiteUrl, ":", foundSocials.join(", "));
-          }
           
           // Extract phone if not already found
           if (!contactInfo.phone) {
@@ -450,7 +443,6 @@ export async function POST(request: Request) {
             }
           }
         } else {
-          console.log("[v0] Could not fetch website content for", websiteUrl);
         }
       } catch (err) {
         console.error("[v0] Website scrape error:", err);

@@ -64,14 +64,8 @@ export function buildInitialEmailPrompt(ctx: CopyContext): string {
   const contactName  = ctx.recipient.contact_name;
   const contactTitle = ctx.recipient.contact_title ?? null;
 
-  // For Apollo records address the individual by first name.
-  // For venue records, use full contact name if known, or "there".
   const firstName = contactName ? contactName.split(" ")[0] : null;
-  const greeting  = isApollo && firstName
-    ? `Hi ${firstName},`
-    : contactName
-      ? `Hi ${contactName},`
-      : "Hi there,";
+  const greeting  = firstName ? `Hi ${firstName},` : "Hi there,";
 
   const specialityLine =
     ctx.sender.speciality_tags.length > 0
@@ -224,7 +218,7 @@ ${ctx.sender.voice_sample ? `WRITING VOICE (match this style):\n"""\n${ctx.sende
 
 INSTRUCTIONS:
 - Subject: "Re: ${previousSubject}" (reply in thread)
-- Greeting: Hi ${isApolloFollowUp && followUpFirstName ? followUpFirstName : (ctx.recipient.contact_name ?? "there")},
+- Greeting: Hi ${followUpFirstName ?? (ctx.recipient.contact_name ? ctx.recipient.contact_name.split(" ")[0] : null) ?? "there"},
 - Do NOT start with "just following up on my previous email" — add genuine new value
 - Maximum 100 words
 - UK English, no exclamation marks

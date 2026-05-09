@@ -14,20 +14,14 @@
 import { useState, useEffect, useRef } from "react";
 import { updateProfile } from "@/lib/actions";
 import { useKammie } from "./kammie-app";
+import { getRoleById } from "@/lib/roles";
+import { RolePickerModal } from "@/components/onboarding/RolePickerModal";
 import { Sparkles, Mail, Check, ChevronRight, Zap, MapPin, Building2 } from "lucide-react";
 
 /* ── Constants ─────────────────────────────────────────────── */
 const ACCENT  = "#7c6ef7";
 const ACCENT2 = "#9585f9";
 const LS_KEY  = "kammie_frw_v1";
-
-const PROFESSIONS = [
-  { id: "Wedding photographer",  label: "Wedding photographer",  icon: "💍" },
-  { id: "Events photographer",   label: "Events photographer",   icon: "📸" },
-  { id: "Makeup artist",         label: "Makeup artist",         icon: "💄" },
-  { id: "Startup founder",       label: "Startup founder",       icon: "🚀" },
-  { id: "Other",                 label: "Other",                 icon: "✨" },
-];
 
 const SCAN_MESSAGES = [
   "Scanning your area for venues…",
@@ -174,10 +168,9 @@ function ScanAnimation({ onDone }: { onDone: () => void }) {
 ════════════════════════════════════════════════════════════ */
 export function FirstRunWizard() {
   const { setActiveTab, profile } = useKammie();
-  const [visible,    setVisible]    = useState(false);
-  const [step,       setStep]       = useState(0);  // 0 | 1 | 2
-  const [profession, setProfession] = useState("");
-  const [isSaving,   setIsSaving]   = useState(false);
+  const [visible,     setVisible]     = useState(false);
+  const [step,        setStep]        = useState(0);  // 0 = role picker | 1 = email | 2 = scan
+  const [isSaving,    setIsSaving]    = useState(false);
   const [emailStatus, setEmailStatus] = useState<"unknown" | "connected" | "disconnected">("unknown");
 
   /* Show only if flag not set */
@@ -189,7 +182,12 @@ export function FirstRunWizard() {
     }
   }, []);
 
-  /* Fetch email status for Step 2 */
+  /* Skip role picker if profile already has a role set */
+  useEffect(() => {
+    if (profile?.roleId && step === 0) setStep(1);
+  }, [profile?.roleId]);
+
+  /* Fetch email status for Step 1 (email connect) */
   useEffect(() => {
     if (step === 1) {
       fetch("/api/email/status")
@@ -199,26 +197,17 @@ export function FirstRunWizard() {
     }
   }, [step]);
 
-  /* Pre-fill profession from profile if already set */
-  useEffect(() => {
-    if (profile?.businessType && !profession) {
-      setProfession(profile.businessType);
-    }
-  }, [profile?.businessType]);
-
-  const advanceStep = async () => {
-    if (step === 0) {
-      /* Save profession if it differs from what's in profile */
-      if (profession && profession !== profile?.businessType) {
-        setIsSaving(true);
-        await updateProfile({ businessType: profession }).catch(() => {});
-        setIsSaving(false);
-      }
-      setStep(1);
-    } else if (step === 1) {
-      setStep(2);
-    }
-    /* Step 2 auto-completes via ScanAnimation.onDone */
+  const handleRoleComplete = async (roleId: string, targetMarkets: string[]) => {
+    const role = getRoleById(roleId);
+    setIsSaving(true);
+    await updateProfile({
+      businessType:  role?.label ?? roleId,
+      roleId,
+      roleCategory:  role?.category ?? "",
+      targetMarkets,
+    }).catch(() => {});
+    setIsSaving(false);
+    setStep(1);
   };
 
   const handleConnectEmail = () => {
@@ -243,7 +232,12 @@ export function FirstRunWizard() {
 
   if (!visible) return null;
 
-  const TOTAL = 3;
+  /* Step 0 — full-screen role picker (RolePickerModal handles its own overlay) */
+  if (step === 0) {
+    return <RolePickerModal overlay onComplete={handleRoleComplete} />;
+  }
+
+  const TOTAL = 2; // email + scan (role picker was step 0, outside this modal)
 
   return (
     <div
@@ -276,75 +270,15 @@ export function FirstRunWizard() {
             </div>
 
             <div className="flex items-center gap-3">
-              <ProgressDots step={step} total={TOTAL} />
+              <ProgressDots step={step - 1} total={TOTAL} />
               <span className="text-[11px] font-bold text-muted-foreground">
-                {step + 1} / {TOTAL}
+                {step} / {TOTAL}
               </span>
             </div>
           </div>
 
           {/* ══════════════════════════
-              STEP 1 — Profession
-          ══════════════════════════ */}
-          {step === 0 && (
-            <>
-              <h2 className="text-xl font-extrabold mb-1.5 leading-snug" style={{ color: "#131b2e" }}>
-                What kind of work do you do?
-              </h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                Kammie tailors your leads and messages to your profession.
-              </p>
-
-              <div className="space-y-2 mb-8">
-                {PROFESSIONS.map(p => {
-                  const isActive = profession === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => setProfession(p.id)}
-                      className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border transition-all duration-150 text-left"
-                      style={isActive ? {
-                        background: `linear-gradient(135deg,rgba(124,110,247,0.10),rgba(149,133,249,0.06))`,
-                        borderColor: `rgba(124,110,247,0.45)`,
-                        boxShadow:   `0 0 0 1px rgba(124,110,247,0.15)`,
-                      } : {
-                        background:  "rgba(255,255,255,0.6)",
-                        borderColor: "rgba(0,0,0,0.09)",
-                      }}
-                    >
-                      <span className="text-xl shrink-0">{p.icon}</span>
-                      <span
-                        className="text-sm font-semibold flex-1"
-                        style={{ color: isActive ? ACCENT : "#131b2e" }}
-                      >
-                        {p.label}
-                      </span>
-                      {isActive && (
-                        <div
-                          className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                          style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
-                        >
-                          <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={advanceStep}
-                disabled={!profession || isSaving}
-                className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2"
-                style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 4px 18px rgba(124,110,247,0.35)` }}
-              >
-                {isSaving ? "Saving…" : <>Continue <ChevronRight className="w-4 h-4" /></>}
-              </button>
-            </>
-          )}
-
-          {/* ══════════════════════════
-              STEP 2 — Connect inbox
+              STEP 1 — Connect inbox
           ══════════════════════════ */}
           {step === 1 && (
             <>

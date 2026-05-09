@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         user_id:         user.id,
         name:            body.name,
         type:            body.type || "venue",
-        location:        body.location || null,
+        location:        body.location || "",
         description:     body.description || null,
         why_good_fit:    body.whyGoodFit || "",
         status:          body.status || "new",
@@ -94,6 +94,11 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!opportunity) {
+      console.error("[opportunities] Insert returned no row — RLS INSERT or SELECT policy may be missing on opportunities table");
+      return NextResponse.json({ error: "Insert blocked — check RLS policies on opportunities table" }, { status: 500 });
     }
 
     // ── Contact methods ───────────────────────────────────────────────────────

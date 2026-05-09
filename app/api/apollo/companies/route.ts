@@ -78,9 +78,6 @@ export async function POST(req: Request) {
   );
 
   // ── Apollo search ────────────────────────────────────────────────────────
-  console.log("[apollo/companies] role_id:", role_id);
-  console.log("[apollo/companies] Keywords:", allKeywords);
-  console.log("[apollo/companies] Location: United Kingdom");
   const companies = await searchCompanies({
     q_organization_keyword_tags: allKeywords,
     organization_locations:      ["United Kingdom"],

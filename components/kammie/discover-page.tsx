@@ -266,15 +266,6 @@ export function DiscoverPage() {
             ? userTargetMarkets
             : (role?.defaultTargetMarkets ?? []);
 
-        console.log("[discover] Companies fetch params:", {
-          role_id:               roleId,
-          target_markets:        effectiveTargetMarkets,
-          profile_roleId:        profile?.roleId,
-          persona:               getPersona(profile?.businessType),
-          location:              profile?.location,
-          used_default_markets:  userTargetMarkets.length === 0,
-        });
-
         const res = await fetch("/api/apollo/companies", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
@@ -624,7 +615,7 @@ export function DiscoverPage() {
                      style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 8px 24px ${ACCENT}40` }}>
                   <Loader2 className="w-5 h-5 animate-spin text-white" />
                 </div>
-                <p className="text-sm text-muted-foreground">Finding venues near you…</p>
+                <p className="text-sm text-muted-foreground">Finding leads near you…</p>
               </div>
             </div>
           ) : searchResults.length > 0 ? (
@@ -632,7 +623,7 @@ export function DiscoverPage() {
               <p className="text-sm text-muted-foreground">
                 {searchQuery
                   ? `${searchResults.length} results for "${searchQuery}"`
-                  : `${searchResults.length} venues near ${nearbyLocation || "you"}`}
+                  : `${searchResults.length} leads near ${nearbyLocation || "you"}`}
               </p>
 
               {/* Responsive card grid: 1 col mobile / 2 col tablet / 3 col desktop */}
@@ -758,7 +749,7 @@ export function DiscoverPage() {
             {/* Left 30% — scrollable card list */}
             <div className="w-[30%] shrink-0 overflow-y-auto space-y-3 pr-1">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
-                {searchResults.length} venues
+                {searchResults.length} leads
               </p>
               {searchResults.slice(0, 12).map((place) => (
                 <DiscoverCardCompact
@@ -803,7 +794,7 @@ export function DiscoverPage() {
                 src={mapSrc}
               />
             </div>
-            <p className="text-sm text-muted-foreground">{searchResults.length} venues</p>
+            <p className="text-sm text-muted-foreground">{searchResults.length} leads</p>
             {searchResults.slice(0, 5).map((place) => (
               <DiscoverCard
                 key={place.id}

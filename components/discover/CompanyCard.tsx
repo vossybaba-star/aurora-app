@@ -289,8 +289,6 @@ export function CompanyCard({
       whyGoodFit:    result?.suggested_angle ?? "",
     };
 
-    console.log("[CompanyCard] Connect → /api/opportunities payload:", payload);
-
     try {
       const res = await fetch("/api/opportunities", {
         method:  "POST",
@@ -300,12 +298,6 @@ export function CompanyCard({
 
       let resBody: unknown = null;
       try { resBody = await res.json(); } catch { /* body not JSON */ }
-
-      console.log("[CompanyCard] /api/opportunities response:", {
-        status: res.status,
-        ok:     res.ok,
-        body:   resBody,
-      });
 
       if (res.ok) {
         setConnectedIds((prev) => new Set([...prev, person.id]));

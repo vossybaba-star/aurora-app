@@ -71,19 +71,13 @@ export async function POST(req: Request) {
     per_page: 10,
     page:     1,
   };
-  console.log("[apollo/people] role_id:", role_id, "titles:", personTitles);
-  console.log("[apollo/people] Search params:", JSON.stringify(searchParams));
-
   let people = filterGeneric(await searchPeople(searchParams));
-  console.log("[apollo/people] Scoped result count (post-filter):", people.length);
 
   // Fallback: if company-scoped search returns nothing, broaden to title-only
   if (people.length === 0 && (company_name || domain)) {
-    console.log("[apollo/people] Falling back to title-only search (no org filter)");
     people = filterGeneric(
       await searchPeople({ person_titles: personTitles, per_page: 10, page: 1 })
     );
-    console.log("[apollo/people] Broad result count (post-filter):", people.length);
   }
 
   return NextResponse.json({ people });

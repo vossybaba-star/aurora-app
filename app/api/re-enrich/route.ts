@@ -29,8 +29,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No website to enrich" }, { status: 400 });
     }
     
-    console.log("[v0] Re-enriching opportunity:", opp.name, "website:", opp.website);
-    
     // Call the enrich-contact API
     const enrichRes = await fetch(new URL("/api/enrich-contact", request.url), {
       method: "POST",
@@ -40,12 +38,10 @@ export async function POST(request: Request) {
     
     if (!enrichRes.ok) {
       const errorText = await enrichRes.text();
-      console.log("[v0] Enrichment failed:", enrichRes.status, errorText);
       return NextResponse.json({ error: "Enrichment failed", details: errorText }, { status: 500 });
     }
-    
+
     const enrichData = await enrichRes.json();
-    console.log("[v0] Enrichment result:", JSON.stringify(enrichData, null, 2));
     
     const enrichedContacts = enrichData.contactInfo;
     
@@ -72,7 +68,6 @@ export async function POST(request: Request) {
     
     // Add Instagram
     if (enrichedContacts?.instagram) {
-      console.log("[v0] Adding Instagram:", enrichedContacts.instagram);
       contactMethods.push({
         opportunity_id: opportunityId,
         type: "instagram",
@@ -83,7 +78,6 @@ export async function POST(request: Request) {
     
     // Add Facebook
     if (enrichedContacts?.facebook) {
-      console.log("[v0] Adding Facebook:", enrichedContacts.facebook);
       contactMethods.push({
         opportunity_id: opportunityId,
         type: "facebook",
@@ -94,7 +88,6 @@ export async function POST(request: Request) {
     
     // Add LinkedIn
     if (enrichedContacts?.linkedin) {
-      console.log("[v0] Adding LinkedIn:", enrichedContacts.linkedin);
       contactMethods.push({
         opportunity_id: opportunityId,
         type: "linkedin",
@@ -125,7 +118,7 @@ export async function POST(request: Request) {
     if (contactMethods.length > 0) {
       const { error: insertError } = await supabase.from("contact_methods").insert(contactMethods);
       if (insertError) {
-        console.log("[v0] Insert error:", insertError);
+        console.error("[re-enrich] contact_methods insert error:", insertError);
       }
     }
     
