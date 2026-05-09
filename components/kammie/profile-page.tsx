@@ -473,7 +473,8 @@ function MyProfileSection({
   const ic = profile.icp;
   const [caDescription,     setCaDescription]     = useState(ca?.description       ?? "");
   const [caValueProp,       setCaValueProp]       = useState(ca?.value_proposition ?? "");
-  const [caKeyFeatures,     setCaKeyFeatures]     = useState<string[]>(ca?.key_features ?? []);
+  const [caKeyProducts,     setCaKeyProducts]     = useState<string[]>(ca?.key_products  ?? []);
+  const [caKeyFeatures,     setCaKeyFeatures]     = useState<string[]>(ca?.key_features  ?? []);
   const [caTone,            setCaTone]            = useState<CompanyAnalysis['tone']>(ca?.tone ?? "professional");
   const [icpIndustries,     setIcpIndustries]     = useState<string[]>(ic?.industries   ?? []);
   const [icpSizes,          setIcpSizes]          = useState<string[]>(ic?.company_sizes ?? []);
@@ -482,6 +483,8 @@ function MyProfileSection({
     ic?.pain_points && !Array.isArray(ic.pain_points) ? ic.pain_points as Record<string, string[]> : {}
   );
   const [icpGeography,      setIcpGeography]      = useState<string[]>(ic?.geography     ?? []);
+  const [activePainPersona, setActivePainPersona] = useState<string>("");
+  const [generatingPains,   setGeneratingPains]   = useState(false);
 
   // Reset CA/ICP state when a new company is selected
   useEffect(() => {
@@ -489,8 +492,10 @@ function MyProfileSection({
     const ic2  = profile.icp;
     setCaDescription(ca2?.description       ?? "");
     setCaValueProp  (ca2?.value_proposition ?? "");
+    setCaKeyProducts(ca2?.key_products      ?? []);
     setCaKeyFeatures(ca2?.key_features      ?? []);
     setCaTone       (ca2?.tone              ?? "professional");
+    setActivePainPersona("");
     setIcpIndustries(ic2?.industries        ?? []);
     setIcpSizes     (ic2?.company_sizes     ?? []);
     setIcpPersonas  (ic2?.personas          ?? []);
@@ -562,7 +567,7 @@ function MyProfileSection({
 
   const handleSaveCompany = () => {
     onSave({
-      companyAnalysis: { description: caDescription, value_proposition: caValueProp, key_features: caKeyFeatures, tone: caTone },
+      companyAnalysis: { description: caDescription, value_proposition: caValueProp, key_products: caKeyProducts, key_features: caKeyFeatures, tone: caTone },
     });
   };
 
@@ -675,6 +680,12 @@ function MyProfileSection({
               <GlassInput value={caValueProp} onChange={setCaValueProp}
                 placeholder="e.g. We help sales teams book 3× more meetings with warm intros" />
             </FieldRow>
+            <FieldRow label="Key products">
+              <PillInput pills={caKeyProducts}
+                onAdd={v => setCaKeyProducts(f => [...f, v])}
+                onRemove={v => setCaKeyProducts(f => f.filter(x => x !== v))}
+                placeholder="e.g. Kammie Pro, Growth Plan, API add-on…" />
+            </FieldRow>
             <FieldRow label="Key features / capabilities">
               <PillInput pills={caKeyFeatures}
                 onAdd={v => setCaKeyFeatures(f => [...f, v])}
@@ -720,32 +731,102 @@ function MyProfileSection({
             </FieldRow>
             <FieldRow label="Decision-maker personas">
               <PillInput pills={icpPersonas}
-                onAdd={v => setIcpPersonas(p => [...p, v])}
-                onRemove={v => setIcpPersonas(p => p.filter(x => x !== v))}
+                onAdd={v => { setIcpPersonas(p => [...p, v]); if (!activePainPersona) setActivePainPersona(v); }}
+                onRemove={v => {
+                  setIcpPersonas(p => p.filter(x => x !== v));
+                  if (activePainPersona === v) setActivePainPersona(icpPersonas.filter(x => x !== v)[0] ?? "");
+                }}
                 placeholder="e.g. VP Sales, Head of Marketing, Founder…" />
             </FieldRow>
             <FieldRow label="Pain points by persona">
               {icpPersonas.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground italic">
-                  Add decision-maker personas above, then define pain points per role.
+                  Add decision-maker personas above, then Kammie will suggest pain points per role.
                 </p>
-              ) : (
-                <div className="space-y-3">
-                  {icpPersonas.map(persona => (
-                    <div key={persona} className="rounded-xl border border-white/50 bg-white/30 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-widest mb-2.5" style={{ color: "#131b2e" }}>
-                        {persona}
-                      </p>
-                      <PillInput
-                        pills={icpPainPoints[persona] ?? []}
-                        onAdd={v => setIcpPainPoints(prev => ({ ...prev, [persona]: [...(prev[persona] ?? []), v] }))}
-                        onRemove={v => setIcpPainPoints(prev => ({ ...prev, [persona]: (prev[persona] ?? []).filter(x => x !== v) }))}
-                        placeholder={`e.g. pain point for ${persona}…`}
-                      />
+              ) : (() => {
+                const currentPersona = activePainPersona || icpPersonas[0];
+                const currentPains   = icpPainPoints[currentPersona] ?? [];
+                const hasAuto        = currentPains.length > 0;
+
+                const generateForPersona = async (p: string) => {
+                  if (icpPainPoints[p]?.length) return; // already filled
+                  setGeneratingPains(true);
+                  try {
+                    const res = await fetch("/api/generate-pain-points", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        companyName: profile.companyAnalysis?.name || profile.companyDomain,
+                        description: caDescription,
+                        valueProp:   caValueProp,
+                        keyProducts: caKeyProducts,
+                        persona:     p,
+                      }),
+                    });
+                    const data = await res.json();
+                    if (data.pain_points?.length) {
+                      setIcpPainPoints(prev => ({ ...prev, [p]: data.pain_points }));
+                    }
+                  } finally {
+                    setGeneratingPains(false);
+                  }
+                };
+
+                return (
+                  <div className="space-y-3">
+                    {/* Persona tab buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      {icpPersonas.map(p => {
+                        const isActive = (activePainPersona || icpPersonas[0]) === p;
+                        return (
+                          <button key={p}
+                            onClick={() => { setActivePainPersona(p); generateForPersona(p); }}
+                            className="px-3 py-1.5 rounded-full text-xs border font-semibold transition-all"
+                            style={isActive ? {
+                              background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
+                              borderColor: "transparent", color: "white",
+                            } : {
+                              background: "rgba(255,255,255,0.6)",
+                              borderColor: "rgba(255,255,255,0.7)", color: "var(--muted-foreground)",
+                            }}>
+                            {p}
+                            {(icpPainPoints[p]?.length ?? 0) > 0 && (
+                              <span className="ml-1.5 opacity-70">·{icpPainPoints[p].length}</span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    {/* Pain points for active persona */}
+                    <div className="rounded-xl border border-white/50 bg-white/30 p-3">
+                      {generatingPains && !hasAuto ? (
+                        <div className="flex items-center gap-2 py-1">
+                          <Spinner className="w-3.5 h-3.5" />
+                          <p className="text-[11px] text-muted-foreground">Kammie is generating pain points…</p>
+                        </div>
+                      ) : (
+                        <>
+                          <PillInput
+                            pills={currentPains}
+                            onAdd={v => setIcpPainPoints(prev => ({ ...prev, [currentPersona]: [...(prev[currentPersona] ?? []), v] }))}
+                            onRemove={v => setIcpPainPoints(prev => ({ ...prev, [currentPersona]: (prev[currentPersona] ?? []).filter(x => x !== v) }))}
+                            placeholder={`Pain point for ${currentPersona}…`}
+                          />
+                          {!hasAuto && !generatingPains && (
+                            <button
+                              onClick={() => generateForPersona(currentPersona)}
+                              className="mt-2 text-[11px] font-bold flex items-center gap-1"
+                              style={{ color: ACCENT }}>
+                              <Sparkles className="w-3 h-3" /> Generate with Kammie
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </FieldRow>
             <FieldRow label="Geography">
               <PillInput pills={icpGeography}

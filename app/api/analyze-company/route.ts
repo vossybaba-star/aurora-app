@@ -118,7 +118,8 @@ Return ONLY valid JSON — no markdown, no explanation:
 {
   "description": "2-3 sentence plain-language company description",
   "value_proposition": "single most compelling headline value prop (max 15 words)",
-  "key_features": ["up to 5 core product or service capabilities"],
+  "key_products": ["up to 5 specific named products or services this company sells"],
+  "key_features": ["up to 5 core capabilities or differentiators"],
   "tone": "professional|casual|technical|friendly",
   "icp_suggestion": {
     "industries": ["up to 5 industries they most likely sell to"],
@@ -154,7 +155,8 @@ Return ONLY valid JSON — no markdown, no explanation:
     const analysis: CompanyAnalysis = {
       description:       String(parsed.description || ""),
       value_proposition: String(parsed.value_proposition || ""),
-      key_features:      Array.isArray(parsed.key_features) ? parsed.key_features.map(String) : [],
+      key_products:      Array.isArray(parsed.key_products)  ? parsed.key_products.map(String)  : [],
+      key_features:      Array.isArray(parsed.key_features)  ? parsed.key_features.map(String)  : [],
       tone:              (["professional","casual","technical","friendly"] as const)
                            .includes(parsed.tone) ? parsed.tone : "professional",
     };

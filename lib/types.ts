@@ -52,6 +52,7 @@ export interface CompanyAnalysis {
   name?: string;
   description: string;
   value_proposition: string;
+  key_products?: string[];
   key_features: string[];
   tone: 'professional' | 'casual' | 'technical' | 'friendly';
 }
