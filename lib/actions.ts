@@ -75,6 +75,12 @@ export async function updateProfile(profileData: Partial<{
   roleId: string;
   roleCategory: string;
   targetMarkets: string[];
+  // Positioning / clients
+  positioning: string;
+  pastClients: string[];
+  // Notifications
+  notificationReplyAlerts: boolean;
+  notificationWeeklySummary: boolean;
   // B2B / Agency fields
   companyDomain: string;
   companyAnalysis: Record<string, unknown>;
@@ -106,6 +112,12 @@ export async function updateProfile(profileData: Partial<{
       role_id:              profileData.roleId,
       role_category:        profileData.roleCategory,
       target_markets:       profileData.targetMarkets,
+      // Positioning / clients
+      positioning:          profileData.positioning,
+      past_clients:         profileData.pastClients,
+      // Notifications
+      notification_reply_alerts:   profileData.notificationReplyAlerts,
+      notification_weekly_summary: profileData.notificationWeeklySummary,
       // B2B / Agency fields
       company_domain:       profileData.companyDomain,
       company_analysis:     profileData.companyAnalysis,

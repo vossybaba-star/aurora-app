@@ -119,7 +119,7 @@ export function KammieApp({ initialState, userId }: KammieAppProps) {
     const params = new URLSearchParams(window.location.search);
     if (params.get("email_connected") === "true") {
       toast.success("Email account connected!");
-      setActiveTab("outreach");
+      goToProfileSection("email");
       window.history.replaceState({}, "", "/");
     } else if (params.get("error")) {
       const errorMap: Record<string, string> = {

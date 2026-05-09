@@ -3,12 +3,11 @@
 /**
  * First-run onboarding wizard
  *
- * Shows once per browser (localStorage key kammie_frw_v1) on the
- * very first dashboard visit. Skipped entirely if the flag is already set.
- *
- * Step 1 — Profession picker (saves to profile.businessType)
- * Step 2 — Connect inbox (Nylas OAuth, with "Skip for now")
- * Step 3 — Animated scan → navigates to Discover
+ * Step 0 — "Creative or B2B?" role picker
+ * Step 0b — If Creative: RolePickerModal (profession details)
+ *           If B2B:      CompanySetupWizard (company + ICP)
+ * Step 1 — Connect inbox
+ * Step 2 — Animated scan → navigates to Discover
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -17,7 +16,7 @@ import { useKammie } from "./kammie-app";
 import { getRoleById } from "@/lib/roles";
 import { RolePickerModal } from "@/components/onboarding/RolePickerModal";
 import { CompanySetupWizard } from "@/components/onboarding/CompanySetupWizard";
-import { Sparkles, Mail, Check, ChevronRight, Zap, MapPin, Building2 } from "lucide-react";
+import { Sparkles, Mail, Check, ChevronRight, Zap, MapPin, Building2, Camera, Users } from "lucide-react";
 import type { CompanyAnalysis, ICP } from "@/lib/types";
 
 /* ── Constants ─────────────────────────────────────────────── */
@@ -25,14 +24,20 @@ const ACCENT  = "#7c6ef7";
 const ACCENT2 = "#9585f9";
 const LS_KEY  = "kammie_frw_v1";
 
-const SCAN_MESSAGES = [
+const SCAN_MESSAGES_B2B = [
   "Scanning for companies matching your ICP…",
   "Analysing contact opportunities…",
   "Building your lead pipeline…",
   "Almost there — lining up your first leads…",
 ];
 
-/* ── Mark wizard complete (localStorage) ───────────────────── */
+const SCAN_MESSAGES_CREATIVE = [
+  "Finding venues and brands in your area…",
+  "Scanning for collaboration opportunities…",
+  "Building your outreach pipeline…",
+  "Almost there — lining up your first leads…",
+];
+
 function markDone() {
   try { localStorage.setItem(LS_KEY, "done"); } catch { /* private mode */ }
 }
@@ -58,24 +63,23 @@ function ProgressDots({ step, total }: { step: number; total: number }) {
 }
 
 /* ── Scan animation ─────────────────────────────────────────── */
-function ScanAnimation({ onDone }: { onDone: () => void }) {
-  const [msgIdx, setMsgIdx]     = useState(0);
-  const [dots,   setDots]       = useState("");
-  const [done,   setDone]       = useState(false);
-  const calledDone               = useRef(false);
+function ScanAnimation({ onDone, isB2B }: { onDone: () => void; isB2B: boolean }) {
+  const messages = isB2B ? SCAN_MESSAGES_B2B : SCAN_MESSAGES_CREATIVE;
+  const [msgIdx, setMsgIdx]   = useState(0);
+  const [dots,   setDots]     = useState("");
+  const [done,   setDone]     = useState(false);
+  const calledDone             = useRef(false);
 
-  /* Cycle dot animation */
   useEffect(() => {
     const iv = setInterval(() => setDots(d => d.length >= 3 ? "" : d + "."), 400);
     return () => clearInterval(iv);
   }, []);
 
-  /* Cycle scan messages */
   useEffect(() => {
     let i = 0;
     const iv = setInterval(() => {
       i += 1;
-      if (i < SCAN_MESSAGES.length) {
+      if (i < messages.length) {
         setMsgIdx(i);
       } else {
         clearInterval(iv);
@@ -83,9 +87,8 @@ function ScanAnimation({ onDone }: { onDone: () => void }) {
       }
     }, 750);
     return () => clearInterval(iv);
-  }, []);
+  }, [messages.length]);
 
-  /* Trigger done callback after "done" flash */
   useEffect(() => {
     if (done && !calledDone.current) {
       calledDone.current = true;
@@ -96,7 +99,6 @@ function ScanAnimation({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="flex flex-col items-center gap-6 py-6">
-      {/* Pulsing icon ring */}
       <div className="relative">
         <div
           className="absolute inset-0 rounded-full animate-ping opacity-20"
@@ -113,7 +115,6 @@ function ScanAnimation({ onDone }: { onDone: () => void }) {
         </div>
       </div>
 
-      {/* Fake map / venue scan */}
       {!done && (
         <div className="w-full rounded-2xl overflow-hidden border border-white/50 bg-white/30 backdrop-blur-sm relative" style={{ height: 120 }}>
           <div className="absolute inset-0 flex items-center justify-center gap-4 p-4">
@@ -143,12 +144,11 @@ function ScanAnimation({ onDone }: { onDone: () => void }) {
         </div>
       )}
 
-      {/* Message */}
       <p
         className="text-sm font-semibold text-center transition-all duration-300"
         style={{ color: done ? "#16a34a" : "#131b2e" }}
       >
-        {done ? "✓ Ready! Taking you to Discover…" : `${SCAN_MESSAGES[msgIdx]}${dots}`}
+        {done ? "✓ Ready! Taking you to Discover…" : `${messages[msgIdx]}${dots}`}
       </p>
 
       <style>{`
@@ -168,10 +168,14 @@ function ScanAnimation({ onDone }: { onDone: () => void }) {
 /* ════════════════════════════════════════════════════════════
    Main wizard
 ════════════════════════════════════════════════════════════ */
+type Mode = "creative" | "b2b" | null;
+
 export function FirstRunWizard() {
   const { setActiveTab, profile } = useKammie();
   const [visible,     setVisible]     = useState(false);
-  const [step,        setStep]        = useState(0);  // 0 = role picker | 1 = email | 2 = scan
+  // step: "pick" | "setup" | "email" | "scan"
+  const [step,        setStep]        = useState<"pick" | "setup" | "email" | "scan">("pick");
+  const [mode,        setMode]        = useState<Mode>(null);
   const [isSaving,    setIsSaving]    = useState(false);
   const [emailStatus, setEmailStatus] = useState<"unknown" | "connected" | "disconnected">("unknown");
 
@@ -179,19 +183,24 @@ export function FirstRunWizard() {
   useEffect(() => {
     try {
       if (localStorage.getItem(LS_KEY) !== "done") setVisible(true);
-    } catch {
-      /* private mode — don't show */
-    }
+    } catch { /* private mode */ }
   }, []);
 
-  /* Skip role picker if profile already has a role set */
+  /* Skip if already set up */
   useEffect(() => {
-    if (profile?.roleId && step === 0) setStep(1);
-  }, [profile?.roleId]);
+    if (!visible) return;
+    if (profile?.companyAnalysis || profile?.icp) {
+      setMode("b2b");
+      setStep("email");
+    } else if (profile?.roleId) {
+      setMode("creative");
+      setStep("email");
+    }
+  }, [profile?.roleId, profile?.companyAnalysis, profile?.icp, visible]);
 
-  /* Fetch email status for Step 1 (email connect) */
+  /* Fetch email status for email step */
   useEffect(() => {
-    if (step === 1) {
+    if (step === "email") {
       fetch("/api/email/status")
         .then(r => r.json())
         .then(d => setEmailStatus(d.connected ? "connected" : "disconnected"))
@@ -199,7 +208,13 @@ export function FirstRunWizard() {
     }
   }, [step]);
 
-  const handleRoleComplete = async (roleId: string, targetMarkets: string[]) => {
+  /* ── Handlers ── */
+  const handleModeSelect = (m: Mode) => {
+    setMode(m);
+    setStep("setup");
+  };
+
+  const handleCreativeComplete = async (roleId: string, targetMarkets: string[]) => {
     const role = getRoleById(roleId);
     setIsSaving(true);
     await updateProfile({
@@ -209,10 +224,10 @@ export function FirstRunWizard() {
       targetMarkets,
     }).catch(() => {});
     setIsSaving(false);
-    setStep(1);
+    setStep("email");
   };
 
-  const handleSetupComplete = async (
+  const handleB2BComplete = async (
     companyDomain: string,
     companyAnalysis: CompanyAnalysis,
     icp: ICP,
@@ -220,16 +235,12 @@ export function FirstRunWizard() {
     setIsSaving(true);
     await updateProfile({ companyDomain, companyAnalysis, icp }).catch(() => {});
     setIsSaving(false);
-    setStep(1);
+    setStep("email");
   };
 
   const handleConnectEmail = () => {
-    markDone(); // mark before redirect so returning users skip wizard
+    markDone();
     window.location.href = "/api/email/connect";
-  };
-
-  const handleSkipEmail = () => {
-    setStep(2);
   };
 
   const handleScanDone = () => {
@@ -245,12 +256,25 @@ export function FirstRunWizard() {
 
   if (!visible) return null;
 
-  /* Step 0 — full-screen company setup wizard (primary B2B onboarding) */
-  if (step === 0) {
-    return <CompanySetupWizard onComplete={handleSetupComplete} />;
+  /* ── Step: setup (full-screen wizard, no modal chrome) ── */
+  if (step === "setup") {
+    if (mode === "b2b") {
+      return <CompanySetupWizard onComplete={handleB2BComplete} />;
+    }
+    if (mode === "creative") {
+      return (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ background: "rgba(10,8,25,0.72)", backdropFilter: "blur(8px)" }}
+        >
+          <RolePickerModal onComplete={handleCreativeComplete} />
+        </div>
+      );
+    }
   }
 
-  const TOTAL = 2; // email + scan (role picker was step 0, outside this modal)
+  /* ── Modal chrome for pick / email / scan steps ── */
+  const stepIndex = step === "email" ? 0 : step === "scan" ? 1 : -1;
 
   return (
     <div
@@ -261,14 +285,13 @@ export function FirstRunWizard() {
         className="relative w-full max-w-md rounded-3xl border border-white/50 shadow-2xl overflow-hidden"
         style={{ background: "rgba(255,255,255,0.96)" }}
       >
-        {/* Purple top accent bar */}
         <div
           className="h-1 w-full"
           style={{ background: `linear-gradient(90deg,${ACCENT},${ACCENT2})` }}
         />
 
         <div className="p-7 sm:p-9">
-          {/* ── Header ── */}
+          {/* Header */}
           <div className="flex items-center justify-between mb-7">
             <div className="flex items-center gap-2.5">
               <div
@@ -281,19 +304,82 @@ export function FirstRunWizard() {
                 Kammie
               </span>
             </div>
-
-            <div className="flex items-center gap-3">
-              <ProgressDots step={step - 1} total={TOTAL} />
-              <span className="text-[11px] font-bold text-muted-foreground">
-                {step} / {TOTAL}
-              </span>
-            </div>
+            {step !== "pick" && (
+              <div className="flex items-center gap-3">
+                <ProgressDots step={stepIndex} total={2} />
+                <span className="text-[11px] font-bold text-muted-foreground">
+                  {stepIndex + 1} / 2
+                </span>
+              </div>
+            )}
           </div>
 
           {/* ══════════════════════════
-              STEP 1 — Connect inbox
+              STEP: pick (Creative or B2B)
           ══════════════════════════ */}
-          {step === 1 && (
+          {step === "pick" && (
+            <>
+              <h2 className="text-xl font-extrabold mb-1.5 leading-snug" style={{ color: "#131b2e" }}>
+                How are you using Kammie?
+              </h2>
+              <p className="text-sm text-muted-foreground mb-7">
+                This helps Kammie tailor your experience — you can always change it later.
+              </p>
+
+              <div className="space-y-3">
+                {/* Creative */}
+                <button
+                  onClick={() => handleModeSelect("creative")}
+                  className="w-full flex items-start gap-4 p-4 rounded-2xl border-2 text-left transition-all hover:border-[#7c6ef7]/40 hover:bg-[#7c6ef7]/04 group"
+                  style={{ borderColor: "rgba(0,0,0,0.10)", background: "rgba(255,255,255,0.7)" }}
+                >
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ background: "rgba(124,110,247,0.10)" }}
+                  >
+                    <Camera className="w-5 h-5" style={{ color: ACCENT }} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm mb-1" style={{ color: "#131b2e" }}>
+                      Creative
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Photographer, MUA, videographer, or creative freelancer looking to land more clients and bookings.
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-3.5 ml-auto group-hover:text-[#7c6ef7] transition-colors" />
+                </button>
+
+                {/* B2B */}
+                <button
+                  onClick={() => handleModeSelect("b2b")}
+                  className="w-full flex items-start gap-4 p-4 rounded-2xl border-2 text-left transition-all hover:border-[#7c6ef7]/40 hover:bg-[#7c6ef7]/04 group"
+                  style={{ borderColor: "rgba(0,0,0,0.10)", background: "rgba(255,255,255,0.7)" }}
+                >
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ background: "rgba(124,110,247,0.10)" }}
+                  >
+                    <Users className="w-5 h-5" style={{ color: ACCENT }} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm mb-1" style={{ color: "#131b2e" }}>
+                      B2B / Sales
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Founder, SDR, or sales team doing cold outreach to other businesses. You're selling a product or service, not bookings.
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-3.5 ml-auto group-hover:text-[#7c6ef7] transition-colors" />
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ══════════════════════════
+              STEP: email
+          ══════════════════════════ */}
+          {step === "email" && (
             <>
               <h2 className="text-xl font-extrabold mb-1.5 leading-snug" style={{ color: "#131b2e" }}>
                 Connect your inbox
@@ -303,7 +389,6 @@ export function FirstRunWizard() {
               </p>
 
               {emailStatus === "connected" ? (
-                /* Already connected */
                 <div
                   className="flex items-center gap-3 px-4 py-4 rounded-2xl mb-8"
                   style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)" }}
@@ -322,27 +407,24 @@ export function FirstRunWizard() {
                   </div>
                 </div>
               ) : (
-                /* Not connected — show connect card */
                 <div
                   className="rounded-2xl p-5 mb-6 text-white relative overflow-hidden"
                   style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 8px 24px rgba(124,110,247,0.35)` }}
                 >
-                  {/* Decorative circles */}
                   <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full pointer-events-none"
                        style={{ background: "rgba(255,255,255,0.10)" }} />
                   <div className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full pointer-events-none"
                        style={{ background: "rgba(255,255,255,0.07)" }} />
-
                   <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
                            style={{ background: "rgba(255,255,255,0.20)" }}>
-                        <Mail className="w-4.5 h-4.5 text-white" />
+                        <Mail className="w-4 h-4 text-white" />
                       </div>
                       <p className="font-bold text-base">Connect your inbox</p>
                     </div>
                     <p className="text-sm opacity-80 mb-4 leading-relaxed">
-                      Works with Gmail, Outlook, and most email providers. Kammie uses Nylas — we never store your password.
+                      Works with Gmail, Outlook, and most email providers. We never store your password.
                     </p>
                     <button
                       onClick={handleConnectEmail}
@@ -355,7 +437,6 @@ export function FirstRunWizard() {
                 </div>
               )}
 
-              {/* Feature list */}
               <ul className="space-y-2 mb-8">
                 {[
                   "Emails sent from your real address — land in your Sent folder",
@@ -379,20 +460,17 @@ export function FirstRunWizard() {
                     Connect email <ChevronRight className="w-4 h-4" />
                   </button>
                 )}
-
                 {emailStatus === "connected" && (
                   <button
-                    onClick={() => setStep(2)}
+                    onClick={() => setStep("scan")}
                     className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-2"
                     style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 4px 18px rgba(124,110,247,0.35)` }}
                   >
                     Continue <ChevronRight className="w-4 h-4" />
                   </button>
                 )}
-
-                {/* Skip — intentionally de-emphasised */}
                 <button
-                  onClick={handleSkipEmail}
+                  onClick={() => setStep("scan")}
                   className="w-full py-3 rounded-2xl text-sm font-medium border transition-colors hover:bg-black/[0.03]"
                   style={{ color: "#9ca3af", borderColor: "rgba(0,0,0,0.10)" }}
                 >
@@ -403,23 +481,25 @@ export function FirstRunWizard() {
           )}
 
           {/* ══════════════════════════
-              STEP 3 — Scanning
+              STEP: scan
           ══════════════════════════ */}
-          {step === 2 && (
+          {step === "scan" && (
             <>
               <h2 className="text-xl font-extrabold mb-1.5 leading-snug" style={{ color: "#131b2e" }}>
-                Building your lead pipeline…
+                {mode === "b2b" ? "Building your lead pipeline…" : "Finding your first leads…"}
               </h2>
               <p className="text-sm text-muted-foreground mb-4">
-                Sit tight — finding companies that match your ICP.
+                {mode === "b2b"
+                  ? "Sit tight — finding companies that match your ICP."
+                  : "Sit tight — scanning for opportunities in your area."}
               </p>
-              <ScanAnimation onDone={handleScanDone} />
+              <ScanAnimation onDone={handleScanDone} isB2B={mode === "b2b"} />
             </>
           )}
         </div>
 
-        {/* Subtle dismiss link (only on steps 0-1) */}
-        {step < 2 && (
+        {/* Dismiss link (only on pick/email steps) */}
+        {(step === "pick" || step === "email") && (
           <div className="pb-5 text-center">
             <button
               onClick={handleClose}

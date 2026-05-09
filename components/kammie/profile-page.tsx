@@ -409,7 +409,7 @@ function MyProfileSection({
   const [voiceSample, setVoiceSample] = useState(profile.voiceSample || "");
   const [voiceSaved,  setVoiceSaved]  = useState(!!(profile.voiceSample));
   const [tags,        setTags]        = useState<string[]>(profile.specialityTags || []);
-  const [positioning, setPositioning] = useState("");
+  const [positioning, setPositioning] = useState(profile.positioning || "");
   const [portfolioUrl, setPortfolioUrl] = useState(profile.website || "");
   const [instagram,   setInstagram]   = useState(profile.instagram || "");
 
@@ -459,6 +459,7 @@ function MyProfileSection({
       workRadius,
       specialityTags: tags,
       voiceSample,
+      positioning,
     });
   };
 
@@ -991,8 +992,13 @@ function B2BWorkSection({
 /* ═══════════════════════════════════════════════
    SECTION: Past Clients
 ═══════════════════════════════════════════════ */
-function PastClientsSection({ isPending, isB2B }: { isPending: boolean; isB2B: boolean }) {
-  const [clients, setClients] = useState<string[]>([]);
+function PastClientsSection({
+  profile, isPending, isB2B, onSave,
+}: {
+  profile: UserProfile; isPending: boolean; isB2B: boolean;
+  onSave: (updates: Partial<UserProfile>) => void;
+}) {
+  const [clients, setClients] = useState<string[]>(profile.pastClients || []);
 
   return (
     <div className="space-y-5">
@@ -1012,11 +1018,9 @@ function PastClientsSection({ isPending, isB2B }: { isPending: boolean; isB2B: b
         />
       </SectionCard>
 
-      {clients.length > 0 && (
-        <div className="flex justify-end">
-          <SaveButton onClick={() => toast.success("Past clients saved!")} isPending={isPending} />
-        </div>
-      )}
+      <div className="flex justify-end">
+        <SaveButton onClick={() => onSave({ pastClients: clients })} isPending={isPending} />
+      </div>
     </div>
   );
 }
@@ -1025,23 +1029,57 @@ function PastClientsSection({ isPending, isB2B }: { isPending: boolean; isB2B: b
    SECTION: Email Connection
 ═══════════════════════════════════════════════ */
 function EmailSection() {
-  const [connected, setConnected] = useState(false);
+  const [connected,     setConnected]     = useState(false);
+  const [connectionId,  setConnectionId]  = useState<string | null>(null);
+  const [isLoading,     setIsLoading]     = useState(true);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
     fetch("/api/email/status")
       .then(r => r.json())
-      .then(d => setConnected(!!d.connected))
-      .catch(() => setConnected(false));
+      .then(d => {
+        setConnected(!!d.connected);
+        setConnectionId(d.connections?.[0]?.id ?? null);
+      })
+      .catch(() => setConnected(false))
+      .finally(() => setIsLoading(false));
   }, []);
 
   const handleConnect = () => { window.location.href = "/api/email/connect"; };
-  const handleDisconnect = () => {
-    toast("To disconnect your inbox, visit your email provider's app permissions.");
+
+  const handleDisconnect = async () => {
+    if (!connectionId) return;
+    setDisconnecting(true);
+    try {
+      const res = await fetch("/api/email/status", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId }),
+      });
+      if (res.ok) {
+        setConnected(false);
+        setConnectionId(null);
+        toast.success("Inbox disconnected");
+      } else {
+        toast.error("Failed to disconnect — try again");
+      }
+    } catch {
+      toast.error("Failed to disconnect — try again");
+    } finally {
+      setDisconnecting(false);
+    }
   };
 
   return (
     <div className="space-y-4">
-      {connected ? (
+      {isLoading ? (
+        <SectionCard>
+          <div className="flex items-center gap-3">
+            <Spinner className="w-5 h-5" />
+            <p className="text-sm text-muted-foreground">Checking connection…</p>
+          </div>
+        </SectionCard>
+      ) : connected ? (
         <SectionCard>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -1058,9 +1096,13 @@ function EmailSection() {
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-white/40">
-            <button onClick={handleDisconnect}
-              className="text-xs text-muted-foreground hover:text-red-500 transition-colors font-medium">
-              Disconnect inbox
+            <button
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-red-500 transition-colors font-medium disabled:opacity-50"
+            >
+              {disconnecting && <Spinner className="w-3 h-3" />}
+              {disconnecting ? "Disconnecting…" : "Disconnect inbox"}
             </button>
           </div>
         </SectionCard>
@@ -1125,11 +1167,8 @@ function OutreachSection({
   onSave: (updates: Partial<UserProfile>) => void;
   isPending: boolean;
 }) {
-  const [maxFollowUps,    setMaxFollowUps]    = useState(3);
-  const [dailySendLimit, setDailySendLimit]  = useState(10);
-  const [weekdaysOnly,   setWeekdaysOnly]    = useState(true);
-  const [tone,           setTone]            = useState<Tone>(profile.tone || "friendly");
-  const [oppsPerWeek,    setOppsPerWeek]     = useState(profile.opportunitiesPerWeek || 5);
+  const [tone,        setTone]        = useState<Tone>(profile.tone || "friendly");
+  const [oppsPerWeek, setOppsPerWeek] = useState(profile.opportunitiesPerWeek || 5);
 
   const handleSave = () => onSave({ tone, opportunitiesPerWeek: oppsPerWeek });
 
@@ -1167,34 +1206,10 @@ function OutreachSection({
 
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Max follow-ups per lead</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Kammie stops after this many follow-ups with no reply</p>
-          </div>
-          <Stepper value={maxFollowUps} min={1} max={7} onChange={setMaxFollowUps} />
-        </div>
-
-        <div className="flex items-center justify-between border-t border-white/40 pt-4">
-          <div>
-            <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Daily send limit</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Maximum emails sent per day across all leads</p>
-          </div>
-          <Stepper value={dailySendLimit} min={1} max={50} onChange={setDailySendLimit} />
-        </div>
-
-        <div className="flex items-center justify-between border-t border-white/40 pt-4">
-          <div>
             <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Leads per week</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">How many new leads Kammie finds each week</p>
           </div>
           <Stepper value={oppsPerWeek} min={1} max={20} onChange={setOppsPerWeek} />
-        </div>
-
-        <div className="flex items-center justify-between border-t border-white/40 pt-4">
-          <div>
-            <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>Weekdays only</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Don't send emails on Saturday or Sunday</p>
-          </div>
-          <Toggle on={weekdaysOnly} onChange={setWeekdaysOnly} />
         </div>
       </SectionCard>
 
@@ -1208,9 +1223,13 @@ function OutreachSection({
 /* ═══════════════════════════════════════════════
    SECTION: Notifications
 ═══════════════════════════════════════════════ */
-function NotificationsSection() {
-  const [replyAlerts,    setReplyAlerts]    = useState(true);
-  const [weeklySummary,  setWeeklySummary]  = useState(true);
+function NotificationsSection({
+  profile, onSave, isPending,
+}: {
+  profile: UserProfile; onSave: (updates: Partial<UserProfile>) => void; isPending: boolean;
+}) {
+  const [replyAlerts,   setReplyAlerts]   = useState(profile.notificationReplyAlerts   ?? true);
+  const [weeklySummary, setWeeklySummary] = useState(profile.notificationWeeklySummary ?? true);
 
   return (
     <div className="space-y-5">
@@ -1233,6 +1252,12 @@ function NotificationsSection() {
           <Toggle on={weeklySummary} onChange={setWeeklySummary} />
         </div>
       </SectionCard>
+      <div className="flex justify-end">
+        <SaveButton
+          onClick={() => onSave({ notificationReplyAlerts: replyAlerts, notificationWeeklySummary: weeklySummary })}
+          isPending={isPending}
+        />
+      </div>
     </div>
   );
 }
@@ -1250,16 +1275,16 @@ function BillingSection() {
             <CreditCard className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="font-bold text-sm" style={{ color: "#131b2e" }}>Kammie Pro</p>
-            <p className="text-xs text-muted-foreground">Active subscription</p>
+            <p className="font-bold text-sm" style={{ color: "#131b2e" }}>Kammie</p>
+            <p className="text-xs text-muted-foreground">Early access</p>
           </div>
           <span className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full text-white"
                 style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
-            Active
+            Beta
           </span>
         </div>
         <p className="text-[12px] text-muted-foreground">
-          Billing management is coming soon. To manage your subscription, contact{" "}
+          Billing management is coming soon. For any questions about your account, contact{" "}
           <a href="mailto:hello@kammie.com" className="underline" style={{ color: ACCENT }}>
             hello@kammie.com
           </a>
@@ -1424,10 +1449,10 @@ export function ProfilePage() {
       case "my-work":      return isB2B
                              ? <B2BWorkSection profile={profile} onSave={handleSave} isPending={isPending} />
                              : <MyWorkSection profile={profile} onSave={handleSave} isPending={isPending} />;
-      case "past-clients": return <PastClientsSection isPending={isPending} isB2B={isB2B} />;
+      case "past-clients": return <PastClientsSection profile={profile} isPending={isPending} isB2B={isB2B} onSave={handleSave} />;
       case "email":        return <EmailSection />;
       case "outreach":     return <OutreachSection profile={profile} onSave={handleSave} isPending={isPending} />;
-      case "notifications":return <NotificationsSection />;
+      case "notifications":return <NotificationsSection profile={profile} onSave={handleSave} isPending={isPending} />;
       case "billing":      return <BillingSection />;
     }
   };

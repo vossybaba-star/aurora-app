@@ -23,6 +23,12 @@ export interface DbProfile {
   role_id: string | null;
   role_category: string | null;
   target_markets: string[] | null;
+  // ── Positioning / clients ────────────────────────────────────────────────
+  positioning: string | null;
+  past_clients: string[] | null;
+  // ── Notifications ────────────────────────────────────────────────────────
+  notification_reply_alerts: boolean | null;
+  notification_weekly_summary: boolean | null;
   // ── B2B / Agency fields (added via 20260510_b2b_profile migration) ────────
   company_domain: string | null;
   company_analysis: Record<string, unknown> | null;
@@ -181,6 +187,12 @@ export function dbProfileToProfile(db: DbProfile): UserProfile {
     roleId: db.role_id || undefined,
     roleCategory: db.role_category || undefined,
     targetMarkets: db.target_markets || [],
+    // Positioning / clients
+    positioning: db.positioning || undefined,
+    pastClients: db.past_clients || [],
+    // Notifications
+    notificationReplyAlerts: db.notification_reply_alerts ?? true,
+    notificationWeeklySummary: db.notification_weekly_summary ?? true,
     // B2B / Agency fields
     companyDomain: db.company_domain || undefined,
     companyAnalysis: db.company_analysis as import('./types').CompanyAnalysis | undefined,

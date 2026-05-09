@@ -29,6 +29,12 @@ export interface UserProfile {
   roleCategory?: string;
   /** e.g. ["venues", "bridal_boutiques"] — from TargetMarket in lib/roles.ts */
   targetMarkets: string[];
+  // ── Positioning / clients ────────────────────────────────────────────────
+  positioning?: string;
+  pastClients?: string[];
+  // ── Notifications ────────────────────────────────────────────────────────
+  notificationReplyAlerts?: boolean;
+  notificationWeeklySummary?: boolean;
   // ── B2B / Agency fields ─────────────────────────────────────────────────
   /** Primary domain of the user's own company, e.g. "acme.com" */
   companyDomain?: string;
