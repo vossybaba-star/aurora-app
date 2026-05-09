@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PlacesAutocomplete } from "./places-autocomplete";
 import { useKammie } from "./kammie-app";
 import { updateProfile, signOut } from "@/lib/actions";
 import { toneLabels } from "@/lib/types";
 import type { Tone, UserProfile, CompanyAnalysis, ICP } from "@/lib/types";
+import type { ApolloCompany } from "@/lib/apollo";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import {
   Sparkles, MapPin, Instagram, Check, X, Mail, LogOut,
   Zap, User, Bell, CreditCard, Plus, AlertTriangle,
-  Trophy, Briefcase, Globe,
+  Trophy, Briefcase, Globe, Building2,
 } from "lucide-react";
 import { RolePickerInline } from "@/components/profile/RolePickerInline";
 import { getRoleById } from "@/lib/roles";
@@ -249,6 +250,141 @@ function SaveButton({ onClick, isPending, label = "Save changes" }: { onClick: (
 }
 
 /* ═══════════════════════════════════════════════
+   CompanyPicker — always-visible company search
+═══════════════════════════════════════════════ */
+function CompanyPicker({
+  currentDomain,
+  onSaved,
+}: {
+  currentDomain?: string | null;
+  onSaved: (companyDomain: string, companyAnalysis: CompanyAnalysis, icp: ICP) => void;
+}) {
+  const [query,       setQuery]       = useState(currentDomain ?? "");
+  const [suggestions, setSuggestions] = useState<ApolloCompany[]>([]);
+  const [searching,   setSearching]   = useState(false);
+  const [analysing,   setAnalysing]   = useState(false);
+  const [open,        setOpen]        = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const wrapperRef  = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Debounced search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (query.trim().length < 2) { setSuggestions([]); setOpen(false); return; }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch("/api/apollo/company-lookup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: query.trim() }),
+        });
+        const data = await res.json();
+        const companies = data.companies ?? [];
+        setSuggestions(companies);
+        setOpen(companies.length > 0);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query]);
+
+  const handleSelect = useCallback(async (company: ApolloCompany) => {
+    setQuery(company.name);
+    setSuggestions([]);
+    setOpen(false);
+    setAnalysing(true);
+    try {
+      const res = await fetch("/api/analyze-company", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyName:      company.name,
+          domain:           company.primary_domain ?? undefined,
+          websiteUrl:       company.website_url ?? undefined,
+          shortDescription: company.short_description ?? undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        onSaved(
+          company.primary_domain ?? company.name,
+          data.analysis as CompanyAnalysis,
+          data.icpSuggestion as ICP,
+        );
+        toast.success(`Company set to ${company.name}`);
+      } else {
+        toast.error("Couldn't analyse company — try again");
+      }
+    } catch {
+      toast.error("Couldn't analyse company — try again");
+    } finally {
+      setAnalysing(false);
+    }
+  }, [onSaved]);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Your company</p>
+      <div className="relative">
+        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <input
+          value={query}
+          onChange={e => { setQuery(e.target.value); }}
+          placeholder="Search your company name…"
+          className="w-full pl-9 pr-10 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
+                     focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
+        />
+        {(searching || analysing) && (
+          <Spinner className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4" />
+        )}
+      </div>
+
+      {/* Dropdown */}
+      {open && suggestions.length > 0 && (
+        <div className="absolute z-50 top-full mt-1.5 left-0 right-0 rounded-2xl border border-white/60 shadow-xl overflow-hidden"
+             style={{ background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)" }}>
+          {suggestions.slice(0, 6).map(c => (
+            <button
+              key={c.id}
+              onMouseDown={e => { e.preventDefault(); handleSelect(c); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#7c6ef7]/08 transition-colors text-left"
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-white"
+                   style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+                {c.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: "#131b2e" }}>{c.name}</p>
+                {(c.primary_domain || c.industry) && (
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    {[c.primary_domain, c.industry].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
    SECTION: My Profile
 ═══════════════════════════════════════════════ */
 function MyProfileSection({
@@ -257,12 +393,14 @@ function MyProfileSection({
   onRoleSaved,
   isPending,
   isB2B,
+  onCompanySaved,
 }: {
-  profile:      UserProfile;
-  onSave:       (updates: Partial<UserProfile>) => void;
-  onRoleSaved:  (roleId: string, roleCategory: string, targetMarkets: string[], businessType: string) => void;
-  isPending:    boolean;
-  isB2B:        boolean;
+  profile:         UserProfile;
+  onSave:          (updates: Partial<UserProfile>) => void;
+  onRoleSaved:     (roleId: string, roleCategory: string, targetMarkets: string[], businessType: string) => void;
+  isPending:       boolean;
+  isB2B:           boolean;
+  onCompanySaved:  (domain: string, analysis: CompanyAnalysis, icp: ICP) => void;
 }) {
   const [bizName,     setBizName]     = useState(profile.businessName || "");
   const [location,    setLocation]    = useState(profile.location || "");
@@ -380,6 +518,10 @@ function MyProfileSection({
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Identity</p>
         <div className="space-y-4">
+          <CompanyPicker
+            currentDomain={profile.companyDomain}
+            onSaved={onCompanySaved}
+          />
           <FieldRow label="Business name" incomplete={!bizName}>
             <GlassInput value={bizName} onChange={setBizName} placeholder="e.g., Luna & Light Photography" />
           </FieldRow>
@@ -1254,6 +1396,18 @@ export function ProfilePage() {
     setProfile({ ...profile, roleId, roleCategory, targetMarkets, businessType } as UserProfile);
   };
 
+  /* ── Company saved callback ── */
+  const handleCompanySaved = (companyDomain: string, companyAnalysis: CompanyAnalysis, icp: ICP) => {
+    startTransition(async () => {
+      const result = await updateProfile({ companyDomain, companyAnalysis, icp } as Parameters<typeof updateProfile>[0]);
+      if (result.success) {
+        setProfile({ ...profile, companyDomain, companyAnalysis, icp, updatedAt: new Date().toISOString() } as UserProfile);
+      } else {
+        toast.error(result.error || "Failed to save company");
+      }
+    });
+  };
+
   /* ── Sign out ── */
   const handleSignOut = () => {
     startTransition(async () => {
@@ -1266,7 +1420,7 @@ export function ProfilePage() {
   /* ── Active section renderer ── */
   const renderSection = () => {
     switch (activeSection) {
-      case "my-profile":   return <MyProfileSection profile={profile} onSave={handleSave} onRoleSaved={handleRoleSaved} isPending={isPending} isB2B={isB2B} />;
+      case "my-profile":   return <MyProfileSection profile={profile} onSave={handleSave} onRoleSaved={handleRoleSaved} isPending={isPending} isB2B={isB2B} onCompanySaved={handleCompanySaved} />;
       case "my-work":      return isB2B
                              ? <B2BWorkSection profile={profile} onSave={handleSave} isPending={isPending} />
                              : <MyWorkSection profile={profile} onSave={handleSave} isPending={isPending} />;
