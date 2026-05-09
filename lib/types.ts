@@ -49,6 +49,7 @@ export interface UserProfile {
 
 /** AI-extracted analysis of the user's own company website */
 export interface CompanyAnalysis {
+  name?: string;
   description: string;
   value_proposition: string;
   key_features: string[];

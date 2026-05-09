@@ -253,19 +253,24 @@ function SaveButton({ onClick, isPending, label = "Save changes" }: { onClick: (
    CompanyPicker — always-visible company search
 ═══════════════════════════════════════════════ */
 function CompanyPicker({
+  currentName,
   currentDomain,
   onSaved,
 }: {
+  currentName?: string | null;
   currentDomain?: string | null;
-  onSaved: (companyDomain: string, companyAnalysis: CompanyAnalysis, icp: ICP) => void;
+  onSaved: (companyDomain: string, companyName: string, companyAnalysis: CompanyAnalysis, icp: ICP, website?: string, linkedin?: string) => void;
 }) {
-  const [query,       setQuery]       = useState(currentDomain ?? "");
-  const [suggestions, setSuggestions] = useState<ApolloCompany[]>([]);
-  const [searching,   setSearching]   = useState(false);
-  const [analysing,   setAnalysing]   = useState(false);
-  const [open,        setOpen]        = useState(false);
+  const [query,        setQuery]        = useState("");
+  const [selectedName, setSelectedName] = useState(currentName || currentDomain || "");
+  const [suggestions,  setSuggestions]  = useState<ApolloCompany[]>([]);
+  const [searching,    setSearching]    = useState(false);
+  const [analysing,    setAnalysing]    = useState(false);
+  const [open,         setOpen]         = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
   const wrapperRef  = useRef<HTMLDivElement>(null);
+
+  const isConfirmed = !!selectedName && !analysing;
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -278,10 +283,10 @@ function CompanyPicker({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Debounced search
+  // Debounced search (only when not in confirmed state)
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (query.trim().length < 2) { setSuggestions([]); setOpen(false); return; }
+    if (!query.trim() || query.trim().length < 2) { setSuggestions([]); setOpen(false); return; }
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
@@ -304,9 +309,10 @@ function CompanyPicker({
   }, [query]);
 
   const handleSelect = useCallback(async (company: ApolloCompany) => {
-    setQuery(company.name);
+    setQuery("");
     setSuggestions([]);
     setOpen(false);
+    setSelectedName(company.name);
     setAnalysing(true);
     try {
       const res = await fetch("/api/analyze-company", {
@@ -323,14 +329,19 @@ function CompanyPicker({
       if (data.success) {
         onSaved(
           company.primary_domain ?? company.name,
+          company.name,
           data.analysis as CompanyAnalysis,
           data.icpSuggestion as ICP,
+          company.website_url ?? undefined,
+          company.linkedin_url ?? undefined,
         );
         toast.success(`Company set to ${company.name}`);
       } else {
+        setSelectedName("");
         toast.error("Couldn't analyse company — try again");
       }
     } catch {
+      setSelectedName("");
       toast.error("Couldn't analyse company — try again");
     } finally {
       setAnalysing(false);
@@ -340,19 +351,44 @@ function CompanyPicker({
   return (
     <div ref={wrapperRef} className="relative">
       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Your company</p>
-      <div className="relative">
-        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-        <input
-          value={query}
-          onChange={e => { setQuery(e.target.value); }}
-          placeholder="Search your company name…"
-          className="w-full pl-9 pr-10 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
-                     focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
-        />
-        {(searching || analysing) && (
-          <Spinner className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4" />
-        )}
-      </div>
+
+      {/* Confirmed state — show badge + Change link */}
+      {isConfirmed ? (
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-white/50 bg-white/60">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-white"
+               style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+            {selectedName.charAt(0).toUpperCase()}
+          </div>
+          <p className="flex-1 text-sm font-semibold" style={{ color: "#131b2e" }}>{selectedName}</p>
+          <button onClick={() => { setSelectedName(""); setQuery(""); }}
+            className="text-[11px] font-bold shrink-0" style={{ color: ACCENT }}>
+            Change
+          </button>
+        </div>
+      ) : (
+        /* Search input */
+        <div className="relative">
+          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search your company name…"
+            className="w-full pl-9 pr-10 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
+                       focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
+          />
+          {(searching || analysing) && (
+            <Spinner className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4" />
+          )}
+        </div>
+      )}
+
+      {/* Analysing overlay */}
+      {analysing && (
+        <div className="flex items-center gap-2 mt-2 px-1">
+          <Spinner className="w-3.5 h-3.5" />
+          <p className="text-[11px] text-muted-foreground">Analysing company & building ICP…</p>
+        </div>
+      )}
 
       {/* Dropdown */}
       {open && suggestions.length > 0 && (
@@ -417,7 +453,7 @@ function MyProfileSection({
   onRoleSaved:     (roleId: string, roleCategory: string, targetMarkets: string[], businessType: string) => void;
   isPending:       boolean;
   isB2B:           boolean;
-  onCompanySaved:  (domain: string, analysis: CompanyAnalysis, icp: ICP) => void;
+  onCompanySaved:  (domain: string, name: string, analysis: CompanyAnalysis, icp: ICP, website?: string, linkedin?: string) => void;
 }) {
   const [bizName,     setBizName]     = useState(profile.businessName || "");
   const [location,    setLocation]    = useState(profile.location || "");
@@ -521,7 +557,15 @@ function MyProfileSection({
       <SectionCard>
         <div className="space-y-4">
           {/* Company picker — full width */}
-          <CompanyPicker currentDomain={profile.companyDomain} onSaved={onCompanySaved} />
+          <CompanyPicker
+            currentName={profile.companyAnalysis?.name || undefined}
+            currentDomain={profile.companyDomain}
+            onSaved={(domain, name, analysis, icp, website, linkedin) => {
+              if (website) setPortfolioUrl(website);
+              if (linkedin) setLinkedin(linkedin);
+              onCompanySaved(domain, name, analysis, icp, website, linkedin);
+            }}
+          />
 
           {/* Your role — chip grid */}
           <div>
@@ -556,7 +600,7 @@ function MyProfileSection({
                 value={location}
                 onChange={setLocation}
                 placeholder="Your city or area"
-                className="px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
+                className="py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
                            focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-full"
               />
             </FieldRow>
@@ -590,14 +634,11 @@ function MyProfileSection({
 
       {/* ── B2B: Company analysis + ICP ── */}
       <div className="mt-2">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Your company</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          {profile.companyAnalysis?.name || profile.companyDomain || "Your company"}
+        </p>
         <SectionCard>
           <div className="space-y-4">
-            {profile.companyDomain && (
-              <FieldRow label="Company">
-                <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>{profile.companyDomain}</p>
-              </FieldRow>
-            )}
             <FieldRow label="Description" incomplete={!caDescription}>
               <textarea value={caDescription} onChange={e => setCaDescription(e.target.value)}
                 placeholder="What does your company do? Who do you serve?"
@@ -614,26 +655,6 @@ function MyProfileSection({
                 onAdd={v => setCaKeyFeatures(f => [...f, v])}
                 onRemove={v => setCaKeyFeatures(f => f.filter(x => x !== v))}
                 placeholder="e.g. AI outreach, CRM sync, analytics…" />
-            </FieldRow>
-            <FieldRow label="Brand tone">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {B2B_TONE_OPTIONS.map(opt => {
-                  const isActive = caTone === opt.id;
-                  return (
-                    <button key={opt.id} onClick={() => setCaTone(opt.id)}
-                      className="py-2.5 rounded-xl border text-sm font-bold transition-all"
-                      style={isActive ? {
-                        background: `linear-gradient(135deg,rgba(124,110,247,0.13),rgba(149,133,249,0.07))`,
-                        borderColor: "rgba(124,110,247,0.4)", color: ACCENT,
-                      } : {
-                        background: "rgba(255,255,255,0.5)",
-                        borderColor: "rgba(255,255,255,0.6)", color: "var(--muted-foreground)",
-                      }}>
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
             </FieldRow>
           </div>
         </SectionCard>
@@ -1740,11 +1761,27 @@ export function ProfilePage() {
   };
 
   /* ── Company saved callback ── */
-  const handleCompanySaved = (companyDomain: string, companyAnalysis: CompanyAnalysis, icp: ICP) => {
+  const handleCompanySaved = (companyDomain: string, companyName: string, companyAnalysis: CompanyAnalysis, icp: ICP, website?: string, linkedin?: string) => {
     startTransition(async () => {
-      const result = await updateProfile({ companyDomain, companyAnalysis, icp } as Parameters<typeof updateProfile>[0]);
+      const namedAnalysis = { ...companyAnalysis, name: companyName };
+      const updates: Parameters<typeof updateProfile>[0] = {
+        companyDomain,
+        companyAnalysis: namedAnalysis,
+        icp,
+        ...(website  ? { website  } : {}),
+        ...(linkedin ? { linkedin } : {}),
+      } as Parameters<typeof updateProfile>[0];
+      const result = await updateProfile(updates);
       if (result.success) {
-        setProfile({ ...profile, companyDomain, companyAnalysis, icp, updatedAt: new Date().toISOString() } as UserProfile);
+        setProfile({
+          ...profile,
+          companyDomain,
+          companyAnalysis: namedAnalysis,
+          icp,
+          ...(website  ? { website  } : {}),
+          ...(linkedin ? { linkedin } : {}),
+          updatedAt: new Date().toISOString(),
+        } as UserProfile);
       } else {
         toast.error(result.error || "Failed to save company");
       }
