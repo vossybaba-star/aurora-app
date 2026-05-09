@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import {
   Sparkles, MapPin, Instagram, Check, X, Mail, LogOut,
   Zap, User, Bell, CreditCard, Plus, AlertTriangle,
-  Trophy, Briefcase, Globe, Building2,
+  Trophy, Briefcase, Globe, Building2, Linkedin,
 } from "lucide-react";
 import { RolePickerInline } from "@/components/profile/RolePickerInline";
 import { getRoleById } from "@/lib/roles";
@@ -32,8 +32,8 @@ function getNavGroups(isB2B: boolean) {
       label: "Profile",
       items: [
         { id: "my-profile"   as Section, label: "My profile",  icon: User },
-        ...(!isB2B ? [{ id: "my-work" as Section, label: "My work", icon: Briefcase }] : []),
-        { id: "past-clients" as Section, label: "Past clients", icon: Trophy },
+        ...(!isB2B ? [{ id: "my-work"      as Section, label: "My work",      icon: Briefcase }] : []),
+        ...(!isB2B ? [{ id: "past-clients" as Section, label: "Past clients", icon: Trophy    }] : []),
       ],
     },
     {
@@ -384,6 +384,15 @@ function CompanyPicker({
   );
 }
 
+const B2B_ROLES = [
+  { id: "founder",  label: "Founder / CEO" },
+  { id: "sdr",      label: "SDR"           },
+  { id: "ae",       label: "AE"            },
+  { id: "marketer", label: "Marketer"      },
+  { id: "vp_sales", label: "VP Sales"      },
+  { id: "cs",       label: "CS Manager"    },
+];
+
 const B2B_TONE_OPTIONS: { id: CompanyAnalysis['tone']; label: string }[] = [
   { id: "professional", label: "Professional" },
   { id: "friendly",     label: "Friendly" },
@@ -420,6 +429,8 @@ function MyProfileSection({
   const [positioning, setPositioning] = useState(profile.positioning || "");
   const [portfolioUrl, setPortfolioUrl] = useState(profile.website || "");
   const [instagram,   setInstagram]   = useState(profile.instagram || "");
+  const [linkedin,    setLinkedin]    = useState(profile.linkedin || "");
+  const [b2bRole,     setB2bRole]     = useState(profile.businessType || "");
 
   // B2B — company analysis state (inlined from B2BWorkSection)
   const ca = profile.companyAnalysis;
@@ -474,7 +485,12 @@ function MyProfileSection({
   };
 
   const handleSave = () => {
-    onSave({
+    onSave(isB2B ? {
+      location,
+      website:      portfolioUrl,
+      linkedin,
+      businessType: b2bRole,
+    } : {
       businessName:   bizName,
       location,
       pitch,
@@ -499,11 +515,196 @@ function MyProfileSection({
     });
   };
 
+  /* ── B2B layout ── */
+  if (isB2B) return (
+    <div className="space-y-5">
+      <SectionCard>
+        <div className="space-y-4">
+          {/* Company picker — full width */}
+          <CompanyPicker currentDomain={profile.companyDomain} onSaved={onCompanySaved} />
+
+          {/* Your role — chip grid */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Your role</p>
+            <div className="flex flex-wrap gap-2">
+              {B2B_ROLES.map(r => {
+                const isActive = b2bRole === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => setB2bRole(isActive ? "" : r.id)}
+                    className="px-3 py-1.5 rounded-full text-sm border font-medium transition-all"
+                    style={isActive ? {
+                      background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
+                      borderColor: "transparent", color: "white",
+                    } : {
+                      background: "rgba(255,255,255,0.6)",
+                      borderColor: "rgba(255,255,255,0.7)", color: "var(--muted-foreground)",
+                    }}
+                  >
+                    {r.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Based in + Company website — 2 col */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FieldRow label="Based in">
+              <PlacesAutocomplete
+                value={location}
+                onChange={setLocation}
+                placeholder="Your city or area"
+                className="px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
+                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-full"
+              />
+            </FieldRow>
+            <FieldRow label="Company website">
+              <div className="relative">
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input type="url" value={portfolioUrl} onChange={e => setPortfolioUrl(e.target.value)}
+                  placeholder="https://yourcompany.com"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
+                             focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground" />
+              </div>
+            </FieldRow>
+          </div>
+
+          {/* LinkedIn — full width */}
+          <FieldRow label="LinkedIn">
+            <div className="relative">
+              <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input value={linkedin} onChange={e => setLinkedin(e.target.value)}
+                placeholder="https://linkedin.com/in/yourprofile"
+                className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
+                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground" />
+            </div>
+          </FieldRow>
+        </div>
+      </SectionCard>
+
+      <div className="flex justify-end">
+        <SaveButton onClick={handleSave} isPending={isPending} />
+      </div>
+
+      {/* ── B2B: Company analysis + ICP ── */}
+      <div className="mt-2">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Your company</p>
+        <SectionCard>
+          <div className="space-y-4">
+            {profile.companyDomain && (
+              <FieldRow label="Company">
+                <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>{profile.companyDomain}</p>
+              </FieldRow>
+            )}
+            <FieldRow label="Description" incomplete={!caDescription}>
+              <textarea value={caDescription} onChange={e => setCaDescription(e.target.value)}
+                placeholder="What does your company do? Who do you serve?"
+                rows={3}
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
+                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground" />
+            </FieldRow>
+            <FieldRow label="Value proposition" incomplete={!caValueProp}>
+              <GlassInput value={caValueProp} onChange={setCaValueProp}
+                placeholder="e.g. We help sales teams book 3× more meetings with warm intros" />
+            </FieldRow>
+            <FieldRow label="Key features / capabilities">
+              <PillInput pills={caKeyFeatures}
+                onAdd={v => setCaKeyFeatures(f => [...f, v])}
+                onRemove={v => setCaKeyFeatures(f => f.filter(x => x !== v))}
+                placeholder="e.g. AI outreach, CRM sync, analytics…" />
+            </FieldRow>
+            <FieldRow label="Brand tone">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {B2B_TONE_OPTIONS.map(opt => {
+                  const isActive = caTone === opt.id;
+                  return (
+                    <button key={opt.id} onClick={() => setCaTone(opt.id)}
+                      className="py-2.5 rounded-xl border text-sm font-bold transition-all"
+                      style={isActive ? {
+                        background: `linear-gradient(135deg,rgba(124,110,247,0.13),rgba(149,133,249,0.07))`,
+                        borderColor: "rgba(124,110,247,0.4)", color: ACCENT,
+                      } : {
+                        background: "rgba(255,255,255,0.5)",
+                        borderColor: "rgba(255,255,255,0.6)", color: "var(--muted-foreground)",
+                      }}>
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </FieldRow>
+          </div>
+        </SectionCard>
+        <div className="flex justify-end mt-3">
+          <SaveButton onClick={handleSaveCompany} isPending={isPending} label="Save company" />
+        </div>
+      </div>
+
+      <div className="mt-2">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Your ideal customer (ICP)</p>
+        <SectionCard>
+          <div className="space-y-4">
+            <FieldRow label="Target industries">
+              <PillInput pills={icpIndustries}
+                onAdd={v => setIcpIndustries(i => [...i, v])}
+                onRemove={v => setIcpIndustries(i => i.filter(x => x !== v))}
+                placeholder="e.g. SaaS, FinTech, E-commerce…" />
+            </FieldRow>
+            <FieldRow label="Company size">
+              <div className="flex flex-wrap gap-2">
+                {ICP_SIZE_OPTIONS.map(s => {
+                  const isOn = icpSizes.includes(s);
+                  return (
+                    <button key={s} onClick={() => toggleIcpSize(s)}
+                      className="px-3 py-1.5 rounded-full text-sm border font-medium transition-all"
+                      style={isOn ? {
+                        background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
+                        borderColor: "transparent", color: "white",
+                      } : {
+                        background: "rgba(255,255,255,0.6)",
+                        borderColor: "rgba(255,255,255,0.7)", color: "var(--muted-foreground)",
+                      }}>
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+            </FieldRow>
+            <FieldRow label="Decision-maker personas">
+              <PillInput pills={icpPersonas}
+                onAdd={v => setIcpPersonas(p => [...p, v])}
+                onRemove={v => setIcpPersonas(p => p.filter(x => x !== v))}
+                placeholder="e.g. VP Sales, Head of Marketing, Founder…" />
+            </FieldRow>
+            <FieldRow label="Pain points you solve">
+              <PillInput pills={icpPainPoints}
+                onAdd={v => setIcpPainPoints(p => [...p, v])}
+                onRemove={v => setIcpPainPoints(p => p.filter(x => x !== v))}
+                placeholder="e.g. Low reply rates, manual prospecting…" />
+            </FieldRow>
+            <FieldRow label="Geography">
+              <PillInput pills={icpGeography}
+                onAdd={v => setIcpGeography(g => [...g, v])}
+                onRemove={v => setIcpGeography(g => g.filter(x => x !== v))}
+                placeholder="e.g. UK, US, EMEA…" />
+            </FieldRow>
+          </div>
+        </SectionCard>
+        <div className="flex justify-end mt-3">
+          <SaveButton onClick={handleSaveIcp} isPending={isPending} label="Save ICP" />
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ── Creative layout (unchanged) ── */
   return (
     <div className="space-y-5">
 
-      {/* ── Import from website banner (Creative only) ── */}
-      {!isB2B && <div className="rounded-2xl p-4 border"
+      {/* Import from website banner */}
+      <div className="rounded-2xl p-4 border"
            style={{ background: "rgba(124,110,247,0.07)", borderColor: "rgba(124,110,247,0.22)" }}>
         <div className="flex items-start gap-3 mb-3">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
@@ -518,22 +719,15 @@ function MyProfileSection({
           </div>
         </div>
         <div className="flex gap-2">
-          <input
-            type="url"
-            value={importUrl}
-            onChange={e => setImportUrl(e.target.value)}
+          <input type="url" value={importUrl} onChange={e => setImportUrl(e.target.value)}
             placeholder="https://yourwebsite.com"
             className="flex-1 px-3 py-2 text-sm rounded-xl border border-white/50 bg-white/70
                        focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
-            onKeyDown={e => { if (e.key === "Enter") handleImport(); }}
-          />
-          <button
-            onClick={handleImport}
-            disabled={isImporting || !importUrl.trim()}
+            onKeyDown={e => { if (e.key === "Enter") handleImport(); }} />
+          <button onClick={handleImport} disabled={isImporting || !importUrl.trim()}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white
                        disabled:opacity-50 transition-opacity hover:opacity-90 shrink-0"
-            style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
-          >
+            style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
             {isImporting ? <Spinner className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
             {isImporting ? "Importing…" : "Import"}
           </button>
@@ -549,166 +743,111 @@ function MyProfileSection({
             ))}
           </div>
         )}
-      </div>}
+      </div>
 
-      {/* ── Identity fields ── */}
+      {/* Identity */}
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Identity</p>
         <div className="space-y-4">
-          <CompanyPicker
-            currentDomain={profile.companyDomain}
-            onSaved={onCompanySaved}
-          />
           <FieldRow label="Business name" incomplete={!bizName}>
             <GlassInput value={bizName} onChange={setBizName} placeholder="e.g., Luna & Light Photography" />
           </FieldRow>
           <FieldRow label="Role">
-            <RolePickerInline
-              currentRoleId={profile.roleId}
-              currentTargetMarkets={profile.targetMarkets}
-              onSaved={onRoleSaved}
-            />
+            <RolePickerInline currentRoleId={profile.roleId} currentTargetMarkets={profile.targetMarkets} onSaved={onRoleSaved} />
           </FieldRow>
-          <div className={`grid grid-cols-1 ${isB2B ? "" : "sm:grid-cols-2"} gap-4`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FieldRow label="Based in" incomplete={!location}>
-              <PlacesAutocomplete
-                value={location}
-                onChange={setLocation}
-                placeholder="Your city or area"
+              <PlacesAutocomplete value={location} onChange={setLocation} placeholder="Your city or area"
                 className="px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
-                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-full"
-              />
+                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-full" />
             </FieldRow>
-            {!isB2B && (
-              <FieldRow label="Work radius" incomplete={!workRadius}>
-                <GlassInput value={workRadius} onChange={setWorkRadius} placeholder="e.g., 50 miles, UK-wide" />
-              </FieldRow>
-            )}
+            <FieldRow label="Work radius" incomplete={!workRadius}>
+              <GlassInput value={workRadius} onChange={setWorkRadius} placeholder="e.g., 50 miles, UK-wide" />
+            </FieldRow>
           </div>
         </div>
       </SectionCard>
 
-      {/* ── About you / About your company ── */}
+      {/* About you */}
       <SectionCard>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
-          {isB2B ? "About your company" : "About you"}
-        </p>
-        <p className="text-[11px] text-muted-foreground">
-          {isB2B
-            ? "Kammie uses this to personalise your B2B outreach"
-            : "Write in your own voice — Kammie uses this in emails"}
-        </p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">About you</p>
+        <p className="text-[11px] text-muted-foreground">Write in your own voice — Kammie uses this in emails</p>
         {pitch.length < 30 && (
           <p className="text-[10px] font-medium mt-0.5 mb-3" style={{ color: ACCENT }}>
             Kammie uses this to personalise your outreach — the more detail the better.
           </p>
         )}
         {pitch.length >= 30 && <div className="mb-3" />}
-        <textarea
-          value={pitch}
-          onChange={e => setPitch(e.target.value)}
-          placeholder={isB2B
-            ? "Describe what your company does and why customers choose you…"
-            : "Describe your style, what you specialise in, and what makes you different…"}
+        <textarea value={pitch} onChange={e => setPitch(e.target.value)}
+          placeholder="Describe your style, what you specialise in, and what makes you different…"
           rows={5}
           className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
-                     focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
-        />
+                     focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground" />
       </SectionCard>
 
-      {/* ── My writing voice ── */}
+      {/* My writing voice */}
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">My writing voice</p>
         <p className="text-[11px] text-muted-foreground mb-3">
-          {isB2B
-            ? "Paste 1–2 sales emails you've previously sent. Kammie will learn your tone and use it when drafting outreach."
-            : "Paste 1–2 emails you've previously sent to clients. Kammie will learn your tone and use it when drafting outreach."}
+          Paste 1–2 emails you've previously sent to clients. Kammie will learn your tone and use it when drafting outreach.
         </p>
-
         {voiceSaved && !!voiceSample.trim() && (
           <div className="flex items-center justify-between mb-3 px-3 py-2 rounded-xl"
                style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)" }}>
             <p className="text-[11px] font-semibold" style={{ color: "#16a34a" }}>
               Voice saved — Kammie will use this when drafting your emails
             </p>
-            <button
-              onClick={() => setVoiceSaved(false)}
-              className="text-[11px] font-bold underline ml-3 shrink-0"
-              style={{ color: ACCENT }}
-            >
+            <button onClick={() => setVoiceSaved(false)}
+              className="text-[11px] font-bold underline ml-3 shrink-0" style={{ color: ACCENT }}>
               Update
             </button>
           </div>
         )}
-
         {(!voiceSaved || !voiceSample.trim()) && (
           <>
-            <textarea
-              value={voiceSample}
+            <textarea value={voiceSample}
               onChange={e => { setVoiceSample(e.target.value); setVoiceSaved(false); }}
-              placeholder={isB2B
-                ? "Paste a sales email you've sent before…\n\nHi [Name],\n\nI wanted to reach out about…"
-                : "Paste an email you've sent before…\n\nHi [Name],\n\nI came across your venue and loved…"}
+              placeholder={"Paste an email you've sent before…\n\nHi [Name],\n\nI came across your venue and loved…"}
               rows={6}
               className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
-                         focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground mb-3"
-            />
-            <button
-              onClick={() => {
-                if (!voiceSample.trim()) return;
-                onSave({ voiceSample });
-                setVoiceSaved(true);
-              }}
+                         focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground mb-3" />
+            <button onClick={() => { if (!voiceSample.trim()) return; onSave({ voiceSample }); setVoiceSaved(true); }}
               disabled={!voiceSample.trim() || isPending}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white
                          disabled:opacity-40 transition-opacity hover:opacity-90"
-              style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
-            >
+              style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
               Save my voice
             </button>
           </>
         )}
       </SectionCard>
 
-      {/* ── Speciality tags / Capabilities ── */}
+      {/* Speciality tags */}
       <SectionCard>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
-          {isB2B ? "Capabilities / services" : "Speciality tags"}
-        </p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Speciality tags</p>
         {tags.length === 0 && (
           <p className="text-[10px] font-medium mt-0.5 mb-3" style={{ color: ACCENT }}>
             Kammie uses this to personalise your outreach — the more detail the better.
           </p>
         )}
         {tags.length > 0 && <div className="mb-3" />}
-        <PillInput
-          pills={tags}
-          onAdd={v => setTags(t => [...t, v])}
-          onRemove={v => setTags(t => t.filter(x => x !== v))}
-          placeholder={isB2B ? "e.g. Enterprise sales, SaaS, Outbound…" : "e.g. Black weddings, Natural light, Documentary…"}
-        />
+        <PillInput pills={tags} onAdd={v => setTags(t => [...t, v])} onRemove={v => setTags(t => t.filter(x => x !== v))}
+          placeholder="e.g. Black weddings, Natural light, Documentary…" />
       </SectionCard>
 
-      {/* ── Positioning ── */}
+      {/* Positioning */}
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Positioning</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {POSITIONING_OPTIONS.map(opt => {
             const isActive = positioning === opt.id;
             return (
-              <button
-                key={opt.id}
-                onClick={() => setPositioning(isActive ? "" : opt.id)}
+              <button key={opt.id} onClick={() => setPositioning(isActive ? "" : opt.id)}
                 className="flex flex-col items-center gap-0.5 px-3 py-3 rounded-xl border text-center transition-all"
                 style={isActive ? {
                   background: `linear-gradient(135deg,rgba(124,110,247,0.12),rgba(149,133,249,0.06))`,
-                  borderColor: "rgba(124,110,247,0.4)",
-                  color: ACCENT,
-                } : {
-                  background: "rgba(255,255,255,0.5)",
-                  borderColor: "rgba(255,255,255,0.6)",
-                }}
-              >
+                  borderColor: "rgba(124,110,247,0.4)", color: ACCENT,
+                } : { background: "rgba(255,255,255,0.5)", borderColor: "rgba(255,255,255,0.6)" }}>
                 <span className={`text-sm font-bold ${isActive ? "" : "text-muted-foreground"}`}>{opt.label}</span>
                 <span className="text-[10px] text-muted-foreground">{opt.sub}</span>
               </button>
@@ -717,33 +856,25 @@ function MyProfileSection({
         </div>
       </SectionCard>
 
-      {/* ── Links ── */}
+      {/* Links */}
       <SectionCard>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Links</p>
         <div className="space-y-3">
-          <FieldRow label={isB2B ? "Company website" : "Portfolio / website"}>
+          <FieldRow label="Portfolio / website">
             <div className="relative">
               <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="url"
-                value={portfolioUrl}
-                onChange={e => setPortfolioUrl(e.target.value)}
-                placeholder={isB2B ? "https://yourcompany.com" : "https://yourportfolio.com"}
+              <input type="url" value={portfolioUrl} onChange={e => setPortfolioUrl(e.target.value)}
+                placeholder="https://yourportfolio.com"
                 className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
-                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
-              />
+                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground" />
             </div>
           </FieldRow>
           <FieldRow label="Instagram">
             <div className="relative">
               <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                value={instagram}
-                onChange={e => setInstagram(e.target.value)}
-                placeholder="@yourhandle"
+              <input value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="@yourhandle"
                 className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60
-                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
-              />
+                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground" />
             </div>
           </FieldRow>
         </div>
@@ -1306,18 +1437,61 @@ function OutreachSection({
   profile,
   onSave,
   isPending,
+  isB2B,
 }: {
   profile: UserProfile;
   onSave: (updates: Partial<UserProfile>) => void;
   isPending: boolean;
+  isB2B?: boolean;
 }) {
   const [tone,        setTone]        = useState<Tone>(profile.tone || "friendly");
   const [oppsPerWeek, setOppsPerWeek] = useState(profile.opportunitiesPerWeek || 5);
+  const [voiceSample, setVoiceSample] = useState(profile.voiceSample || "");
+  const [voiceSaved,  setVoiceSaved]  = useState(!!(profile.voiceSample));
 
   const handleSave = () => onSave({ tone, opportunitiesPerWeek: oppsPerWeek });
 
   return (
     <div className="space-y-5">
+
+      {/* My writing voice — B2B only */}
+      {isB2B && (
+        <SectionCard>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">My writing voice</p>
+          <p className="text-[11px] text-muted-foreground mb-3">
+            Paste 1–2 sales emails you've previously sent. Kammie will learn your tone and use it when drafting outreach.
+          </p>
+          {voiceSaved && !!voiceSample.trim() && (
+            <div className="flex items-center justify-between mb-3 px-3 py-2 rounded-xl"
+                 style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)" }}>
+              <p className="text-[11px] font-semibold" style={{ color: "#16a34a" }}>
+                Voice saved — Kammie will use this when drafting your emails
+              </p>
+              <button onClick={() => setVoiceSaved(false)}
+                className="text-[11px] font-bold underline ml-3 shrink-0" style={{ color: ACCENT }}>
+                Update
+              </button>
+            </div>
+          )}
+          {(!voiceSaved || !voiceSample.trim()) && (
+            <>
+              <textarea value={voiceSample}
+                onChange={e => { setVoiceSample(e.target.value); setVoiceSaved(false); }}
+                placeholder={"Paste a sales email you've sent before…\n\nHi [Name],\n\nI wanted to reach out about…"}
+                rows={6}
+                className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
+                           focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground mb-3" />
+              <button onClick={() => { if (!voiceSample.trim()) return; onSave({ voiceSample }); setVoiceSaved(true); }}
+                disabled={!voiceSample.trim() || isPending}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white
+                           disabled:opacity-40 transition-opacity hover:opacity-90"
+                style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+                Save my voice
+              </button>
+            </>
+          )}
+        </SectionCard>
+      )}
 
       {/* Tone */}
       <SectionCard>
@@ -1595,7 +1769,7 @@ export function ProfilePage() {
                              : <MyWorkSection profile={profile} onSave={handleSave} isPending={isPending} />;
       case "past-clients": return <PastClientsSection profile={profile} isPending={isPending} isB2B={isB2B} onSave={handleSave} />;
       case "email":        return <EmailSection />;
-      case "outreach":     return <OutreachSection profile={profile} onSave={handleSave} isPending={isPending} />;
+      case "outreach":     return <OutreachSection profile={profile} onSave={handleSave} isPending={isPending} isB2B={isB2B} />;
       case "notifications":return <NotificationsSection profile={profile} onSave={handleSave} isPending={isPending} />;
       case "billing":      return <BillingSection />;
     }
