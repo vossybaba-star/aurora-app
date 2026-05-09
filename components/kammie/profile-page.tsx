@@ -31,9 +31,9 @@ function getNavGroups(isB2B: boolean) {
     {
       label: "Profile",
       items: [
-        { id: "my-profile"   as Section, label: "My profile",              icon: User },
-        { id: "my-work"      as Section, label: isB2B ? "My company" : "My work", icon: Briefcase },
-        { id: "past-clients" as Section, label: "Past clients",             icon: Trophy },
+        { id: "my-profile"   as Section, label: "My profile",  icon: User },
+        ...(!isB2B ? [{ id: "my-work" as Section, label: "My work", icon: Briefcase }] : []),
+        { id: "past-clients" as Section, label: "Past clients", icon: Trophy },
       ],
     },
     {
@@ -384,6 +384,14 @@ function CompanyPicker({
   );
 }
 
+const B2B_TONE_OPTIONS: { id: CompanyAnalysis['tone']; label: string }[] = [
+  { id: "professional", label: "Professional" },
+  { id: "friendly",     label: "Friendly" },
+  { id: "technical",    label: "Technical" },
+  { id: "casual",       label: "Casual" },
+];
+const ICP_SIZE_OPTIONS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
+
 /* ═══════════════════════════════════════════════
    SECTION: My Profile
 ═══════════════════════════════════════════════ */
@@ -412,6 +420,22 @@ function MyProfileSection({
   const [positioning, setPositioning] = useState(profile.positioning || "");
   const [portfolioUrl, setPortfolioUrl] = useState(profile.website || "");
   const [instagram,   setInstagram]   = useState(profile.instagram || "");
+
+  // B2B — company analysis state (inlined from B2BWorkSection)
+  const ca = profile.companyAnalysis;
+  const ic = profile.icp;
+  const [caDescription,     setCaDescription]     = useState(ca?.description       ?? "");
+  const [caValueProp,       setCaValueProp]       = useState(ca?.value_proposition ?? "");
+  const [caKeyFeatures,     setCaKeyFeatures]     = useState<string[]>(ca?.key_features ?? []);
+  const [caTone,            setCaTone]            = useState<CompanyAnalysis['tone']>(ca?.tone ?? "professional");
+  const [icpIndustries,     setIcpIndustries]     = useState<string[]>(ic?.industries   ?? []);
+  const [icpSizes,          setIcpSizes]          = useState<string[]>(ic?.company_sizes ?? []);
+  const [icpPersonas,       setIcpPersonas]       = useState<string[]>(ic?.personas      ?? []);
+  const [icpPainPoints,     setIcpPainPoints]     = useState<string[]>(ic?.pain_points   ?? []);
+  const [icpGeography,      setIcpGeography]      = useState<string[]>(ic?.geography     ?? []);
+
+  const toggleIcpSize = (s: string) =>
+    setIcpSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
 
   // Import state
   const [importUrl,    setImportUrl]    = useState("");
@@ -463,11 +487,23 @@ function MyProfileSection({
     });
   };
 
+  const handleSaveCompany = () => {
+    onSave({
+      companyAnalysis: { description: caDescription, value_proposition: caValueProp, key_features: caKeyFeatures, tone: caTone },
+    });
+  };
+
+  const handleSaveIcp = () => {
+    onSave({
+      icp: { industries: icpIndustries, company_sizes: icpSizes, personas: icpPersonas, pain_points: icpPainPoints, geography: icpGeography },
+    });
+  };
+
   return (
     <div className="space-y-5">
 
-      {/* ── Import from website banner ── */}
-      <div className="rounded-2xl p-4 border"
+      {/* ── Import from website banner (Creative only) ── */}
+      {!isB2B && <div className="rounded-2xl p-4 border"
            style={{ background: "rgba(124,110,247,0.07)", borderColor: "rgba(124,110,247,0.22)" }}>
         <div className="flex items-start gap-3 mb-3">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
@@ -513,7 +549,7 @@ function MyProfileSection({
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* ── Identity fields ── */}
       <SectionCard>
@@ -716,6 +752,122 @@ function MyProfileSection({
       <div className="flex justify-end">
         <SaveButton onClick={handleSave} isPending={isPending} />
       </div>
+
+      {/* ── B2B: Company analysis + ICP (inlined, no separate tab) ── */}
+      {isB2B && (
+        <>
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Your company</p>
+            <SectionCard>
+              <div className="space-y-4">
+                {profile.companyDomain && (
+                  <FieldRow label="Company">
+                    <p className="text-sm font-semibold" style={{ color: "#131b2e" }}>{profile.companyDomain}</p>
+                  </FieldRow>
+                )}
+                <FieldRow label="Description" incomplete={!caDescription}>
+                  <textarea
+                    value={caDescription}
+                    onChange={e => setCaDescription(e.target.value)}
+                    placeholder="What does your company do? Who do you serve?"
+                    rows={3}
+                    className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
+                               focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
+                  />
+                </FieldRow>
+                <FieldRow label="Value proposition" incomplete={!caValueProp}>
+                  <GlassInput value={caValueProp} onChange={setCaValueProp}
+                    placeholder="e.g. We help sales teams book 3× more meetings with warm intros" />
+                </FieldRow>
+                <FieldRow label="Key features / capabilities">
+                  <PillInput pills={caKeyFeatures}
+                    onAdd={v => setCaKeyFeatures(f => [...f, v])}
+                    onRemove={v => setCaKeyFeatures(f => f.filter(x => x !== v))}
+                    placeholder="e.g. AI outreach, CRM sync, analytics…" />
+                </FieldRow>
+                <FieldRow label="Brand tone">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {B2B_TONE_OPTIONS.map(opt => {
+                      const isActive = caTone === opt.id;
+                      return (
+                        <button key={opt.id} onClick={() => setCaTone(opt.id)}
+                          className="py-2.5 rounded-xl border text-sm font-bold transition-all"
+                          style={isActive ? {
+                            background: `linear-gradient(135deg,rgba(124,110,247,0.13),rgba(149,133,249,0.07))`,
+                            borderColor: "rgba(124,110,247,0.4)", color: ACCENT,
+                          } : {
+                            background: "rgba(255,255,255,0.5)",
+                            borderColor: "rgba(255,255,255,0.6)", color: "var(--muted-foreground)",
+                          }}>
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </FieldRow>
+              </div>
+            </SectionCard>
+            <div className="flex justify-end mt-3">
+              <SaveButton onClick={handleSaveCompany} isPending={isPending} label="Save company" />
+            </div>
+          </div>
+
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Your ideal customer (ICP)</p>
+            <SectionCard>
+              <div className="space-y-4">
+                <FieldRow label="Target industries">
+                  <PillInput pills={icpIndustries}
+                    onAdd={v => setIcpIndustries(i => [...i, v])}
+                    onRemove={v => setIcpIndustries(i => i.filter(x => x !== v))}
+                    placeholder="e.g. SaaS, FinTech, E-commerce…" />
+                </FieldRow>
+                <FieldRow label="Company size">
+                  <div className="flex flex-wrap gap-2">
+                    {ICP_SIZE_OPTIONS.map(s => {
+                      const isOn = icpSizes.includes(s);
+                      return (
+                        <button key={s} onClick={() => toggleIcpSize(s)}
+                          className="px-3 py-1.5 rounded-full text-sm border font-medium transition-all"
+                          style={isOn ? {
+                            background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
+                            borderColor: "transparent", color: "white",
+                          } : {
+                            background: "rgba(255,255,255,0.6)",
+                            borderColor: "rgba(255,255,255,0.7)", color: "var(--muted-foreground)",
+                          }}>
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </FieldRow>
+                <FieldRow label="Decision-maker personas">
+                  <PillInput pills={icpPersonas}
+                    onAdd={v => setIcpPersonas(p => [...p, v])}
+                    onRemove={v => setIcpPersonas(p => p.filter(x => x !== v))}
+                    placeholder="e.g. VP Sales, Head of Marketing, Founder…" />
+                </FieldRow>
+                <FieldRow label="Pain points you solve">
+                  <PillInput pills={icpPainPoints}
+                    onAdd={v => setIcpPainPoints(p => [...p, v])}
+                    onRemove={v => setIcpPainPoints(p => p.filter(x => x !== v))}
+                    placeholder="e.g. Low reply rates, manual prospecting…" />
+                </FieldRow>
+                <FieldRow label="Geography">
+                  <PillInput pills={icpGeography}
+                    onAdd={v => setIcpGeography(g => [...g, v])}
+                    onRemove={v => setIcpGeography(g => g.filter(x => x !== v))}
+                    placeholder="e.g. UK, US, EMEA…" />
+                </FieldRow>
+              </div>
+            </SectionCard>
+            <div className="flex justify-end mt-3">
+              <SaveButton onClick={handleSaveIcp} isPending={isPending} label="Save ICP" />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -783,14 +935,6 @@ function MyWorkSection({
 /* ═══════════════════════════════════════════════
    SECTION: B2B Work (Company analysis + ICP)
 ═══════════════════════════════════════════════ */
-const B2B_TONE_OPTIONS: { id: CompanyAnalysis['tone']; label: string }[] = [
-  { id: "professional", label: "Professional" },
-  { id: "friendly",     label: "Friendly" },
-  { id: "technical",    label: "Technical" },
-  { id: "casual",       label: "Casual" },
-];
-
-const ICP_SIZE_OPTIONS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 
 function B2BWorkSection({
   profile,
