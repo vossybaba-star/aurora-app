@@ -164,7 +164,7 @@ Return ONLY valid JSON — no markdown, no explanation:
       industries:    Array.isArray(icpRaw.industries)    ? icpRaw.industries.map(String)    : [],
       company_sizes: Array.isArray(icpRaw.company_sizes) ? icpRaw.company_sizes.map(String) : ["11-50", "51-200"],
       personas:      Array.isArray(icpRaw.personas)      ? icpRaw.personas.map(String)      : [],
-      pain_points:   Array.isArray(icpRaw.pain_points)   ? icpRaw.pain_points.map(String)   : [],
+      pain_points:   {},  // populated per-persona in the profile page after personas are set
       geography:     Array.isArray(icpRaw.geography)     ? icpRaw.geography.map(String)     : ["United Kingdom"],
     };
 

@@ -82,7 +82,7 @@ export async function buildCopyContext(opportunityId: string, userId: string) {
       product_description: (prof.company_analysis as any)?.description ?? null,
       value_proposition:   (prof.company_analysis as any)?.value_proposition ?? null,
       key_features:        (prof.company_analysis as any)?.key_features ?? [],
-      icp_pain_points:     (prof.icp as any)?.pain_points ?? [],
+      icp_pain_points:     Object.values((prof.icp as any)?.pain_points ?? {}).flat(),
     },
     recipient: {
       venue_name:                 opp.name,

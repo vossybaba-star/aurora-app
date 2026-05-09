@@ -247,7 +247,8 @@ export function CompanySetupWizard({ onComplete }: Props) {
         setIndustries(icp.industries ?? []);
         setCompanySizes(icp.company_sizes ?? []);
         setPersonas(icp.personas ?? []);
-        setPainPoints(icp.pain_points ?? []);
+        // pain_points is now Record<string,string[]> — flatten for wizard display
+        setPainPoints(Object.values(icp.pain_points ?? {}).flat());
         setGeography(icp.geography?.length ? icp.geography : ["United Kingdom"]);
 
         setPartial(!!data.partial);
@@ -305,7 +306,7 @@ export function CompanySetupWizard({ onComplete }: Props) {
       industries,
       company_sizes: companySizes,
       personas,
-      pain_points: painPoints,
+      pain_points: painPoints.length ? { General: painPoints } : {},
       geography,
     };
 

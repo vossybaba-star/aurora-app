@@ -61,7 +61,8 @@ export interface ICP {
   industries: string[];
   company_sizes: string[];
   personas: string[];
-  pain_points: string[];
+  /** Keyed by persona name — each persona has its own list of pain points */
+  pain_points: Record<string, string[]>;
   geography: string[];
 }
 

@@ -478,8 +478,29 @@ function MyProfileSection({
   const [icpIndustries,     setIcpIndustries]     = useState<string[]>(ic?.industries   ?? []);
   const [icpSizes,          setIcpSizes]          = useState<string[]>(ic?.company_sizes ?? []);
   const [icpPersonas,       setIcpPersonas]       = useState<string[]>(ic?.personas      ?? []);
-  const [icpPainPoints,     setIcpPainPoints]     = useState<string[]>(ic?.pain_points   ?? []);
+  const [icpPainPoints,     setIcpPainPoints]     = useState<Record<string, string[]>>(
+    ic?.pain_points && !Array.isArray(ic.pain_points) ? ic.pain_points as Record<string, string[]> : {}
+  );
   const [icpGeography,      setIcpGeography]      = useState<string[]>(ic?.geography     ?? []);
+
+  // Reset CA/ICP state when a new company is selected
+  useEffect(() => {
+    const ca2 = profile.companyAnalysis;
+    const ic2  = profile.icp;
+    setCaDescription(ca2?.description       ?? "");
+    setCaValueProp  (ca2?.value_proposition ?? "");
+    setCaKeyFeatures(ca2?.key_features      ?? []);
+    setCaTone       (ca2?.tone              ?? "professional");
+    setIcpIndustries(ic2?.industries        ?? []);
+    setIcpSizes     (ic2?.company_sizes     ?? []);
+    setIcpPersonas  (ic2?.personas          ?? []);
+    const pp = ic2?.pain_points;
+    setIcpPainPoints(!pp || Array.isArray(pp) ? {} : pp as Record<string, string[]>);
+    setIcpGeography (ic2?.geography         ?? []);
+    if (profile.website)  setPortfolioUrl(profile.website);
+    if (profile.linkedin) setLinkedin(profile.linkedin);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.companyDomain]);
 
   const toggleIcpSize = (s: string) =>
     setIcpSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -546,8 +567,12 @@ function MyProfileSection({
   };
 
   const handleSaveIcp = () => {
+    // Drop pain-point entries for personas that no longer exist
+    const filteredPains = Object.fromEntries(
+      Object.entries(icpPainPoints).filter(([k]) => icpPersonas.includes(k))
+    );
     onSave({
-      icp: { industries: icpIndustries, company_sizes: icpSizes, personas: icpPersonas, pain_points: icpPainPoints, geography: icpGeography },
+      icp: { industries: icpIndustries, company_sizes: icpSizes, personas: icpPersonas, pain_points: filteredPains, geography: icpGeography },
     });
   };
 
@@ -699,11 +724,28 @@ function MyProfileSection({
                 onRemove={v => setIcpPersonas(p => p.filter(x => x !== v))}
                 placeholder="e.g. VP Sales, Head of Marketing, Founder…" />
             </FieldRow>
-            <FieldRow label="Pain points you solve">
-              <PillInput pills={icpPainPoints}
-                onAdd={v => setIcpPainPoints(p => [...p, v])}
-                onRemove={v => setIcpPainPoints(p => p.filter(x => x !== v))}
-                placeholder="e.g. Low reply rates, manual prospecting…" />
+            <FieldRow label="Pain points by persona">
+              {icpPersonas.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground italic">
+                  Add decision-maker personas above, then define pain points per role.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {icpPersonas.map(persona => (
+                    <div key={persona} className="rounded-xl border border-white/50 bg-white/30 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-widest mb-2.5" style={{ color: "#131b2e" }}>
+                        {persona}
+                      </p>
+                      <PillInput
+                        pills={icpPainPoints[persona] ?? []}
+                        onAdd={v => setIcpPainPoints(prev => ({ ...prev, [persona]: [...(prev[persona] ?? []), v] }))}
+                        onRemove={v => setIcpPainPoints(prev => ({ ...prev, [persona]: (prev[persona] ?? []).filter(x => x !== v) }))}
+                        placeholder={`e.g. pain point for ${persona}…`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </FieldRow>
             <FieldRow label="Geography">
               <PillInput pills={icpGeography}
