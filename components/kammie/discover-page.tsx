@@ -102,7 +102,13 @@ function resolveRoleId(
   return null;
 }
 
-function getSearchPrompts(businessType: string | undefined): string[] {
+function getSearchPrompts(businessType: string | undefined, isB2B?: boolean, icpIndustries?: string[]): string[] {
+  if (isB2B) {
+    const fromIcp = (icpIndustries ?? []).slice(0, 6);
+    return fromIcp.length >= 2
+      ? fromIcp
+      : ["SaaS & software", "Fintech", "E-commerce", "Marketing agencies", "Healthcare tech", "Professional services"];
+  }
   switch (getPersona(businessType)) {
     case "photographer":
       return ["Wedding venues", "Luxury hotels", "Event planners", "Florists", "Caterers"];
@@ -115,7 +121,8 @@ function getSearchPrompts(businessType: string | undefined): string[] {
   }
 }
 
-function getSearchPlaceholder(businessType: string | undefined): string {
+function getSearchPlaceholder(businessType: string | undefined, isB2B?: boolean): string {
+  if (isB2B) return "Search companies or tap a suggestion…";
   switch (getPersona(businessType)) {
     case "photographer": return "Search venues and event suppliers…";
     case "mua":          return "Search beauty brands and agencies…";
@@ -615,7 +622,7 @@ export function DiscoverPage() {
             : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           }
           <Input
-            placeholder={getSearchPlaceholder(profile?.businessType)}
+            placeholder={getSearchPlaceholder(profile?.businessType, isB2B)}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -626,38 +633,51 @@ export function DiscoverPage() {
 
       {/* Suggestion chips */}
       <div className="flex flex-wrap gap-1.5">
-        {getSearchPrompts(profile?.businessType).map((prompt) => (
-          <button
-            key={prompt}
-            onClick={() => { setSearchQuery(prompt); handleSearch(prompt); }}
-            className={`px-3 py-1 text-xs rounded-full border font-semibold transition-all ${
-              searchQuery === prompt
-                ? "text-white border-transparent shadow-sm"
-                : "glass-card border-white/60 text-foreground hover:border-primary/30"
-            }`}
-            style={searchQuery === prompt ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 2px 8px ${ACCENT}40` } : {}}
-          >
-            {prompt}
-          </button>
-        ))}
+        {getSearchPrompts(profile?.businessType, isB2B, profile?.icp?.industries).map((prompt) => {
+          const isActive = isB2B ? filterIndustry === prompt : searchQuery === prompt;
+          return (
+            <button
+              key={prompt}
+              onClick={() => {
+                if (isB2B) {
+                  // Set industry filter — Apollo useEffect re-fires automatically
+                  setFilterIndustry((prev) => prev === prompt ? "" : prompt);
+                } else {
+                  setSearchQuery(prompt);
+                  handleSearch(prompt);
+                }
+              }}
+              className={`px-3 py-1 text-xs rounded-full border font-semibold transition-all ${
+                isActive
+                  ? "text-white border-transparent shadow-sm"
+                  : "glass-card border-white/60 text-foreground hover:border-primary/30"
+              }`}
+              style={isActive ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 2px 8px ${ACCENT}40` } : {}}
+            >
+              {prompt}
+            </button>
+          );
+        })}
       </div>
 
       {/* Filter + view toggle row */}
       <div className="flex items-center gap-2">
-        <Select value={selectedType} onValueChange={(v) => setSelectedType(v)}>
-          <SelectTrigger className="w-[130px] shrink-0">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            {opportunityTypes.filter((t) => t !== "all").map((type) => (
-              <SelectItem key={type} value={type}>
-                {typeLabels[type as OpportunityType] || type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!isB2B && (
+          <Select value={selectedType} onValueChange={(v) => setSelectedType(v)}>
+            <SelectTrigger className="w-[130px] shrink-0">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {opportunityTypes.filter((t) => t !== "all").map((type) => (
+                <SelectItem key={type} value={type}>
+                  {typeLabels[type as OpportunityType] || type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as "score" | "rating" | "newest")}>
           <SelectTrigger className="w-[150px] shrink-0">
@@ -743,7 +763,7 @@ export function DiscoverPage() {
                      style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 8px 24px ${ACCENT}40` }}>
                   <Loader2 className="w-5 h-5 animate-spin text-white" />
                 </div>
-                <p className="text-sm text-muted-foreground">Finding leads near you…</p>
+                <p className="text-sm text-muted-foreground">{isB2B ? "Finding companies for you…" : "Finding leads near you…"}</p>
               </div>
             </div>
           ) : searchResults.length > 0 ? (
