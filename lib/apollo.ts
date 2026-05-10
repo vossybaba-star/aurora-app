@@ -25,6 +25,7 @@ export interface ApolloCompany {
   short_description: string | null;
   primary_domain: string | null;
   phone: string | null;
+  logo_url: string | null;
 }
 
 export interface ApolloPerson {
@@ -108,6 +109,7 @@ interface RawOrganization {
   primary_domain: string | null;
   sanitized_phone: string | null;
   phone: string | null;
+  logo_url?: string | null;
 }
 
 export async function searchCompanies(params: SearchCompaniesParams): Promise<ApolloCompany[] | null> {
@@ -130,6 +132,7 @@ export async function searchCompanies(params: SearchCompaniesParams): Promise<Ap
     short_description: o.short_description ?? null,
     primary_domain: o.primary_domain ?? null,
     phone: o.sanitized_phone ?? o.phone ?? null,
+    logo_url: o.logo_url ?? null,
   }));
 }
 

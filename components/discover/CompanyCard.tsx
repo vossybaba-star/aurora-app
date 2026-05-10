@@ -47,21 +47,49 @@ function scoreBadge(score: number) {
 }
 
 /* ─── CompanyLogo ─────────────────────────────────────────────── */
-function CompanyLogo({ name, domain, size = "md" }: { name: string; domain?: string | null; size?: "sm" | "md" }) {
-  const [imgFailed, setImgFailed] = useState(false);
+function CompanyLogo({
+  name, domain, logoUrl, size = "md",
+}: {
+  name: string;
+  domain?: string | null;
+  logoUrl?: string | null;
+  size?: "sm" | "md";
+}) {
+  // Track failures for each source independently
+  const [apolloFailed,   setApolloFailed]   = useState(false);
+  const [clearbitFailed, setClearbitFailed] = useState(false);
+
   const sz = size === "sm" ? "w-7 h-7 text-[10px]" : "w-9 h-9 text-xs";
-  if (domain && !imgFailed) {
+
+  // 1️⃣ Apollo logo_url
+  if (logoUrl && !apolloFailed) {
+    return (
+      <div className={`${sz} rounded-xl overflow-hidden shrink-0 bg-white border border-white/60 flex items-center justify-center`}>
+        <img
+          src={logoUrl}
+          alt={name}
+          className="w-full h-full object-contain p-0.5"
+          onError={() => setApolloFailed(true)}
+        />
+      </div>
+    );
+  }
+
+  // 2️⃣ Clearbit (domain-based)
+  if (domain && !clearbitFailed) {
     return (
       <div className={`${sz} rounded-xl overflow-hidden shrink-0 bg-white border border-white/60 flex items-center justify-center`}>
         <img
           src={`https://logo.clearbit.com/${domain}`}
           alt={name}
           className="w-full h-full object-contain p-0.5"
-          onError={() => setImgFailed(true)}
+          onError={() => setClearbitFailed(true)}
         />
       </div>
     );
   }
+
+  // 3️⃣ Initials fallback
   return (
     <div
       className={`${sz} rounded-xl flex items-center justify-center shrink-0 font-bold text-white`}
@@ -373,7 +401,7 @@ export function CompanyCard({
       {/* ── Header ────────────────────────────────────────────── */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-start gap-3">
-          <CompanyLogo name={company.name} domain={domain} />
+          <CompanyLogo name={company.name} domain={domain} logoUrl={company.logo_url} />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
