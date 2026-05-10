@@ -182,6 +182,7 @@ export function CompanySetupWizard({ onComplete }: Props) {
   const [description,      setDescription]      = useState("");
   const [valueProp,        setValueProp]         = useState("");
   const [keyFeatures,      setKeyFeatures]       = useState<string[]>([]);
+  const [keyProducts,      setKeyProducts]       = useState<Record<string, string>>({});
   const [tone,             setTone]              = useState<CompanyAnalysis["tone"]>("professional");
 
   // ── Step 3 state ──────────────────────────────────────────────────────────
@@ -241,6 +242,7 @@ export function CompanySetupWizard({ onComplete }: Props) {
         setDescription(a.description);
         setValueProp(a.value_proposition);
         setKeyFeatures(a.key_features ?? []);
+        setKeyProducts(a.key_products ?? {});
         setTone(a.tone ?? "professional");
 
         const icp = data.icpSuggestion as ICP;
@@ -299,6 +301,7 @@ export function CompanySetupWizard({ onComplete }: Props) {
       description,
       value_proposition: valueProp,
       key_features: keyFeatures,
+      key_products: keyProducts,
       tone,
     };
 

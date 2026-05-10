@@ -220,6 +220,8 @@ export function DiscoverPage() {
   const [contactLocation,      setContactLocation]      = useState("");
   const [apolloContacts,       setApolloContacts]       = useState<ApolloPerson[]>([]);
   const [isLoadingContacts,    setIsLoadingContacts]    = useState(false);
+  const [contactsError,        setContactsError]        = useState<string | null>(null);
+  const [contactsSearched,     setContactsSearched]     = useState(false);
   const toastCounter = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -338,7 +340,10 @@ export function DiscoverPage() {
 
   // Load Apollo contacts (B2B contacts mode)
   const fetchContacts = useCallback(async () => {
+    if (!contactCompany && !contactTitle && !contactLocation) return;
     setIsLoadingContacts(true);
+    setContactsError(null);
+    setContactsSearched(true);
     try {
       const res = await fetch("/api/apollo/contacts", {
         method:  "POST",
@@ -352,9 +357,12 @@ export function DiscoverPage() {
       if (res.ok) {
         const data = await res.json();
         setApolloContacts(data.contacts ?? []);
+      } else {
+        setContactsError("Could not load contacts — try different filters");
       }
     } catch (err) {
       console.error("[apollo] contacts fetch error:", err);
+      setContactsError("Network error — check your connection");
     } finally {
       setIsLoadingContacts(false);
     }
@@ -604,8 +612,9 @@ export function DiscoverPage() {
                 />
                 {contactLocation && <button onClick={() => setContactLocation("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
               </div>
-              <button onClick={fetchContacts} disabled={isLoadingContacts}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-60"
+              <button onClick={fetchContacts}
+                disabled={isLoadingContacts || (!contactCompany && !contactTitle && !contactLocation)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-40"
                 style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
                 {isLoadingContacts ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserSearch className="w-3 h-3" />}
                 Search
@@ -783,6 +792,13 @@ export function DiscoverPage() {
                       Searching contacts…
                     </div>
                   </div>
+                ) : contactsError ? (
+                  <div className="glass-panel rounded-3xl p-8 text-center space-y-2">
+                    <p className="text-sm font-semibold text-amber-600 flex items-center justify-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4" />
+                      {contactsError}
+                    </p>
+                  </div>
                 ) : apolloContacts.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {apolloContacts.map(person => (
@@ -793,9 +809,9 @@ export function DiscoverPage() {
                   <div className="glass-panel rounded-3xl p-8 text-center">
                     <UserSearch className="w-8 h-8 mx-auto mb-3 opacity-30" />
                     <p className="text-sm text-muted-foreground">
-                      {contactCompany || contactTitle || contactLocation
+                      {contactsSearched
                         ? "No contacts found — try different filters"
-                        : "Set filters above and click Search to find contacts"}
+                        : "Enter a company, role, or location above to search contacts"}
                     </p>
                   </div>
                 )
