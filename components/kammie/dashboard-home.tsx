@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import type { ApolloCompany } from "@/lib/apollo";
 import {
   Dialog,
   DialogContent,
@@ -306,6 +307,90 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
    Main Dashboard Home
 ═══════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════
+   B2BSuggestedTile — Apollo ICP result on homepage
+═══════════════════════════════════════════════ */
+function B2BSuggestedTile({
+  company,
+  onDiscover,
+}: {
+  company: ApolloCompany;
+  onDiscover: () => void;
+}) {
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  const domain = company.primary_domain
+    ?? (company.website_url
+      ? (() => { try { return new URL(company.website_url!).hostname.replace(/^www\./, ""); } catch { return null; } })()
+      : null);
+
+  const logoSrc = !logoFailed && (company.logo_url || (domain ? `https://logo.clearbit.com/${domain}` : null));
+
+  const initStr = company.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(w => w[0]?.toUpperCase() ?? "")
+    .join("");
+
+  return (
+    <div
+      className="glass-card glass-card-hover rounded-2xl overflow-hidden flex flex-col cursor-pointer border border-white/60"
+      onClick={onDiscover}
+    >
+      {/* Logo area */}
+      <div className="relative h-[88px] shrink-0 bg-gradient-to-br from-violet-50 to-purple-50/30 flex items-center justify-center p-3">
+        {logoSrc ? (
+          <img
+            src={logoSrc}
+            alt={company.name}
+            className="max-h-12 max-w-[140px] object-contain"
+            onError={() => setLogoFailed(true)}
+          />
+        ) : (
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-base shrink-0"
+            style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
+          >
+            {initStr}
+          </div>
+        )}
+        {/* Suggested badge */}
+        <span
+          className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+          style={{ background: `rgba(124,110,247,0.12)`, color: ACCENT }}
+        >
+          Suggested
+        </span>
+      </div>
+
+      {/* Info */}
+      <div className="p-3 flex flex-col gap-2 flex-1">
+        <div className="min-w-0">
+          <h3 className="font-bold text-xs leading-tight line-clamp-1" style={{ color: "#131b2e" }}>
+            {company.name}
+          </h3>
+          {company.industry && (
+            <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{company.industry}</p>
+          )}
+          {company.short_description && (
+            <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+              {company.short_description}
+            </p>
+          )}
+        </div>
+
+        <button
+          onClick={e => { e.stopPropagation(); onDiscover(); }}
+          className="mt-auto flex-1 h-7 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all active:scale-[0.97] border"
+          style={{ color: ACCENT, borderColor: `${ACCENT}30` }}
+        >
+          View in Discover →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
    B2BLeadTile — company logo + name + CTA
 ═══════════════════════════════════════════════ */
 function B2BLeadTile({
@@ -428,6 +513,8 @@ export function DashboardHome() {
   const [isOutreachDialogOpen,  setIsOutreachDialogOpen]  = useState(false);
   const [greeting,              setGreeting]              = useState("Welcome");
   const [emailConnected,        setEmailConnected]        = useState<boolean | null>(null);
+  const [suggestedCompanies,    setSuggestedCompanies]    = useState<ApolloCompany[]>([]);
+  const [loadingSuggestions,    setLoadingSuggestions]    = useState(false);
 
   useEffect(() => {
     const h = new Date().getHours();
@@ -442,6 +529,29 @@ export function DashboardHome() {
       .then(d => setEmailConnected(d.connected))
       .catch(() => setEmailConnected(false));
   }, []);
+
+  // B2B: fetch ICP-matched company suggestions to show on homepage
+  useEffect(() => {
+    if (!isB2B || !profile?.icp) return;
+    let cancelled = false;
+    const load = async () => {
+      setLoadingSuggestions(true);
+      try {
+        const res = await fetch("/api/apollo/companies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ icp: profile.icp }),
+        });
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setSuggestedCompanies((data.companies ?? []).slice(0, 4));
+        }
+      } catch { /* non-fatal */ }
+      finally { if (!cancelled) setLoadingSuggestions(false); }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [isB2B, profile?.icp]);
 
   const now       = Date.now();
   const firstName = profile?.businessName?.split(" ")[0] || "";
@@ -639,7 +749,9 @@ export function DashboardHome() {
           {/* Section header */}
           <div className="flex items-center justify-between px-0.5">
             <h2 className="font-extrabold text-base" style={{ color: "#131b2e" }}>
-              {isB2B ? "Saved companies" : (profile?.icp ? "Suggested leads" : "Suggested venues")}
+              {isB2B
+                ? (venueTiles.length > 0 ? "Saved companies" : "Suggested for you")
+                : (profile?.icp ? "Suggested leads" : "Suggested venues")}
             </h2>
             <button
               className="text-xs font-bold hover:underline transition-colors"
@@ -650,56 +762,87 @@ export function DashboardHome() {
             </button>
           </div>
 
-          {venueTiles.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3">
-              {venueTiles.map(opp => (
-                isB2B ? (
+          {/* ── B2B: saved leads OR ICP suggestions ── */}
+          {isB2B ? (
+            venueTiles.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {venueTiles.map(opp => (
                   <B2BLeadTile
                     key={opp.id}
                     opportunity={opp}
                     onClick={() => setViewingOpp(opp)}
                     onRefresh={refreshData}
                   />
-                ) : (
+                ))}
+              </div>
+            ) : loadingSuggestions ? (
+              <div className="grid grid-cols-2 gap-3">
+                {[0,1,2,3].map(i => (
+                  <div key={i} className="glass-card rounded-2xl h-[160px] animate-pulse"
+                       style={{ background: "rgba(124,110,247,0.05)" }} />
+                ))}
+              </div>
+            ) : suggestedCompanies.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {suggestedCompanies.map(co => (
+                  <B2BSuggestedTile
+                    key={co.id}
+                    company={co}
+                    onDiscover={() => setActiveTab("discover")}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="glass-panel rounded-3xl p-10 text-center">
+                <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3 shadow-lg"
+                     style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 8px 24px rgba(124,110,247,0.28)` }}>
+                  <Compass className="w-7 h-7 text-white" />
+                </div>
+                <p className="font-bold text-sm mb-1" style={{ color: "#131b2e" }}>No suggestions yet</p>
+                <p className="text-xs text-muted-foreground mb-4 max-w-[200px] mx-auto leading-relaxed">
+                  Complete your ICP in your profile to get matched companies
+                </p>
+                <button onClick={() => goToProfileSection("my-profile")}
+                  className="rounded-2xl font-bold text-white px-5 py-2 text-sm hover:opacity-90 transition-all"
+                  style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+                  Set up ICP
+                </button>
+              </div>
+            )
+          ) : (
+            /* ── Freelancer: venue tiles ── */
+            venueTiles.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {venueTiles.map(opp => (
                   <VenueTile
                     key={opp.id}
                     opportunity={opp}
                     onClick={() => setViewingOpp(opp)}
                     onRefresh={refreshData}
                   />
-                )
-              ))}
-            </div>
-          ) : (
-            /* ── Empty state ── */
-            <div className="glass-panel rounded-3xl p-10 text-center">
-              <div
-                className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3 shadow-lg"
-                style={{
-                  background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
-                  boxShadow: `0 8px 24px rgba(124,110,247,0.28)`,
-                }}
-              >
-                <Compass className="w-7 h-7 text-white" />
+                ))}
               </div>
-              <p className="font-bold text-sm mb-1" style={{ color: "#131b2e" }}>
-                {isB2B ? "No saved companies yet" : (profile?.icp ? "No prospects yet" : "No venues yet")}
-              </p>
-              <p className="text-xs text-muted-foreground mb-4 max-w-[200px] mx-auto leading-relaxed">
-                {isB2B
-                  ? "Discover companies matching your ICP and save contacts"
-                  : (profile?.icp
+            ) : (
+              <div className="glass-panel rounded-3xl p-10 text-center">
+                <div className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3 shadow-lg"
+                     style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 8px 24px rgba(124,110,247,0.28)` }}>
+                  <Compass className="w-7 h-7 text-white" />
+                </div>
+                <p className="font-bold text-sm mb-1" style={{ color: "#131b2e" }}>
+                  {profile?.icp ? "No prospects yet" : "No venues yet"}
+                </p>
+                <p className="text-xs text-muted-foreground mb-4 max-w-[200px] mx-auto leading-relaxed">
+                  {profile?.icp
                     ? "Discover companies matching your ICP and start outreach"
-                    : "Find your first opportunities and grow your business")}
-              </p>
-              <button
-                onClick={() => setActiveTab("discover")}
-                className="rounded-2xl font-bold text-white px-5 py-2 text-sm hover:opacity-90 transition-all"
-                style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
-              >
-                {isB2B ? "Discover Companies" : "Discover Opportunities"}
-              </button>
-            </div>
+                    : "Find your first opportunities and grow your business"}
+                </p>
+                <button onClick={() => setActiveTab("discover")}
+                  className="rounded-2xl font-bold text-white px-5 py-2 text-sm hover:opacity-90 transition-all"
+                  style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+                  Discover Opportunities
+                </button>
+              </div>
+            )
           )}
         </div>
 
