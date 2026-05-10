@@ -323,7 +323,13 @@ function B2BSuggestedTile({
       ? (() => { try { return new URL(company.website_url!).hostname.replace(/^www\./, ""); } catch { return null; } })()
       : null);
 
-  const logoSrc = !logoFailed && (company.logo_url || (domain ? `https://logo.clearbit.com/${domain}` : null));
+  const logoSrc = !logoFailed && (
+    company.logo_url
+      ? `/api/logo?url=${encodeURIComponent(company.logo_url)}`
+      : domain
+        ? `/api/logo?domain=${encodeURIComponent(domain)}`
+        : null
+  );
 
   const initStr = company.name
     .split(/\s+/)
@@ -423,7 +429,7 @@ function B2BLeadTile({
       <div className="relative h-[88px] shrink-0 bg-gradient-to-br from-violet-50 to-purple-50/30 flex items-center justify-center p-3">
         {domain && !imgFailed ? (
           <img
-            src={`https://logo.clearbit.com/${domain}`}
+            src={`/api/logo?domain=${encodeURIComponent(domain)}`}
             alt={opportunity.name}
             className="max-h-12 max-w-[140px] object-contain"
             onError={() => setImgFailed(true)}

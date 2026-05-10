@@ -61,12 +61,12 @@ function CompanyLogo({
 
   const sz = size === "sm" ? "w-7 h-7 text-[10px]" : "w-9 h-9 text-xs";
 
-  // 1️⃣ Apollo logo_url
+  // 1️⃣ Apollo logo_url (proxied)
   if (logoUrl && !apolloFailed) {
     return (
       <div className={`${sz} rounded-xl overflow-hidden shrink-0 bg-white border border-white/60 flex items-center justify-center`}>
         <img
-          src={logoUrl}
+          src={`/api/logo?url=${encodeURIComponent(logoUrl)}`}
           alt={name}
           className="w-full h-full object-contain p-0.5"
           onError={() => setApolloFailed(true)}
@@ -75,12 +75,12 @@ function CompanyLogo({
     );
   }
 
-  // 2️⃣ Clearbit (domain-based)
+  // 2️⃣ Clearbit via proxy (avoids CORS)
   if (domain && !clearbitFailed) {
     return (
       <div className={`${sz} rounded-xl overflow-hidden shrink-0 bg-white border border-white/60 flex items-center justify-center`}>
         <img
-          src={`https://logo.clearbit.com/${domain}`}
+          src={`/api/logo?domain=${encodeURIComponent(domain)}`}
           alt={name}
           className="w-full h-full object-contain p-0.5"
           onError={() => setClearbitFailed(true)}
