@@ -216,8 +216,9 @@ export function DiscoverPage() {
   const [filterLocation,       setFilterLocation]       = useState("");
   const [filterSize,           setFilterSize]           = useState("");
   const [contactCompany,       setContactCompany]       = useState("");
-  const [contactTitle,         setContactTitle]         = useState("");
+  const [contactTitles,        setContactTitles]        = useState<string[]>([]);
   const [contactLocation,      setContactLocation]      = useState("");
+  const [rolePickerOpen,       setRolePickerOpen]       = useState(false);
   const [apolloContacts,       setApolloContacts]       = useState<ApolloPerson[]>([]);
   const [isLoadingContacts,    setIsLoadingContacts]    = useState(false);
   const [contactsError,        setContactsError]        = useState<string | null>(null);
@@ -340,7 +341,7 @@ export function DiscoverPage() {
 
   // Load Apollo contacts (B2B contacts mode)
   const fetchContacts = useCallback(async () => {
-    if (!contactCompany && !contactTitle && !contactLocation) return;
+    if (!contactCompany && !contactLocation) return;
     setIsLoadingContacts(true);
     setContactsError(null);
     setContactsSearched(true);
@@ -349,9 +350,9 @@ export function DiscoverPage() {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          company:  contactCompany  || undefined,
-          title:    contactTitle    || undefined,
-          location: contactLocation || undefined,
+          company:  contactCompany       || undefined,
+          titles:   contactTitles.length ? contactTitles : undefined,
+          location: contactLocation      || undefined,
         }),
       });
       if (res.ok) {
@@ -366,7 +367,7 @@ export function DiscoverPage() {
     } finally {
       setIsLoadingContacts(false);
     }
-  }, [contactCompany, contactTitle, contactLocation]);
+  }, [contactCompany, contactTitles, contactLocation]);
 
   // Infinite scroll
   useEffect(() => {
@@ -590,35 +591,97 @@ export function DiscoverPage() {
 
           {/* Contact filters */}
           {searchMode === "contacts" && (
-            <div className="flex flex-wrap gap-2 items-center">
-              <div className="relative">
-                <input value={contactCompany} onChange={e => setContactCompany(e.target.value)}
-                  placeholder="Company"
-                  className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
-                />
-                {contactCompany && <button onClick={() => setContactCompany("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
+            <div className="space-y-2">
+              {/* Row 1: Company + Country + Search */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="relative">
+                  <input value={contactCompany} onChange={e => setContactCompany(e.target.value)}
+                    placeholder="Company"
+                    className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-36"
+                  />
+                  {contactCompany && <button onClick={() => setContactCompany("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
+                </div>
+                <div className="relative">
+                  <input value={contactLocation} onChange={e => setContactLocation(e.target.value)}
+                    placeholder="Country"
+                    className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
+                  />
+                  {contactLocation && <button onClick={() => setContactLocation("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
+                </div>
+                <button onClick={fetchContacts}
+                  disabled={isLoadingContacts || (!contactCompany && !contactLocation)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-40"
+                  style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+                  {isLoadingContacts ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserSearch className="w-3 h-3" />}
+                  Search
+                </button>
               </div>
-              <div className="relative">
-                <input value={contactTitle} onChange={e => setContactTitle(e.target.value)}
-                  placeholder="Title / role"
-                  className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
-                />
-                {contactTitle && <button onClick={() => setContactTitle("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
+              {/* Row 2: Role selector */}
+              <div className="space-y-1.5">
+                <button
+                  onClick={() => setRolePickerOpen(o => !o)}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-white/60 glass-card hover:border-primary/30 transition-colors"
+                  style={{ color: ACCENT }}
+                >
+                  <UserSearch className="w-3 h-3" />
+                  {contactTitles.length > 0 ? `${contactTitles.length} role${contactTitles.length > 1 ? "s" : ""} selected` : "Filter by role"}
+                  <ChevronDown className={`w-3 h-3 transition-transform ${rolePickerOpen ? "rotate-180" : ""}`} />
+                </button>
+                {/* Selected roles as removable chips */}
+                {contactTitles.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {contactTitles.map(t => (
+                      <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold text-white"
+                        style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+                        {t}
+                        <button onClick={() => setContactTitles(prev => prev.filter(x => x !== t))}><X className="w-2.5 h-2.5" /></button>
+                      </span>
+                    ))}
+                    <button onClick={() => setContactTitles([])} className="text-[11px] text-muted-foreground hover:text-foreground">Clear all</button>
+                  </div>
+                )}
+                {/* Role picker dropdown */}
+                {rolePickerOpen && (
+                  <div className="glass-card rounded-2xl border border-white/60 p-3 space-y-2 shadow-lg">
+                    {[
+                      { group: "C-Suite", roles: ["CEO","COO","CFO","CTO","CMO","CPO","CRO","CHRO","CSO"] },
+                      { group: "VP level", roles: ["VP of Sales","VP of Marketing","VP of Engineering","VP of Product","VP of Operations","VP of Business Development"] },
+                      { group: "Director", roles: ["Sales Director","Marketing Director","Growth Director","Operations Director","Business Development Director","IT Director"] },
+                      { group: "Manager / Head", roles: ["Head of Sales","Head of Marketing","Head of Growth","Head of Product","Head of Engineering","Sales Manager","Account Manager"] },
+                      { group: "Individual contributor", roles: ["Account Executive","SDR","BDR","Sales Representative","Marketing Manager","Product Manager","Software Engineer"] },
+                      { group: "Founder", roles: ["Founder","Co-Founder","Managing Director","General Manager","Owner"] },
+                    ].map(({ group, roles }) => (
+                      <div key={group}>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1">{group}</p>
+                        <div className="flex flex-wrap gap-1">
+                          {roles.map(role => {
+                            const active = contactTitles.includes(role);
+                            return (
+                              <button key={role}
+                                onClick={() => setContactTitles(prev =>
+                                  active ? prev.filter(x => x !== role) : [...prev, role]
+                                )}
+                                className="px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all"
+                                style={active
+                                  ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, color: "white", borderColor: "transparent" }
+                                  : { background: "rgba(0,0,0,0.04)", color: "#374151", borderColor: "rgba(0,0,0,0.08)" }
+                                }
+                              >
+                                {role}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={() => setRolePickerOpen(false)}
+                      className="w-full mt-1 py-1.5 rounded-xl text-xs font-bold text-white"
+                      style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+                      Done
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="relative">
-                <input value={contactLocation} onChange={e => setContactLocation(e.target.value)}
-                  placeholder="Location"
-                  className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
-                />
-                {contactLocation && <button onClick={() => setContactLocation("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
-              </div>
-              <button onClick={fetchContacts}
-                disabled={isLoadingContacts || (!contactCompany && !contactTitle && !contactLocation)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-40"
-                style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
-                {isLoadingContacts ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserSearch className="w-3 h-3" />}
-                Search
-              </button>
             </div>
           )}
         </div>

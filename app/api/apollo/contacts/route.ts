@@ -5,16 +5,25 @@ export async function POST(req: Request) {
   try {
     const {
       company,
-      title,
+      titles,   // string[] — preferred
+      title,    // string   — legacy fallback
       location,
       page     = 1,
       per_page = 18,
     } = await req.json();
 
+    // Merge legacy single-title with new multi-title array
+    const resolvedTitles: string[] | undefined =
+      Array.isArray(titles) && titles.length > 0
+        ? titles
+        : title
+          ? [title]
+          : undefined;
+
     const people = await searchPeople({
-      q_organization_name: company  || undefined,
-      person_titles:       title    ? [title]    : undefined,
-      person_locations:    location ? [location] : undefined,
+      q_organization_name: company         || undefined,
+      person_titles:       resolvedTitles,
+      person_locations:    location        ? [location] : undefined,
       per_page,
       page,
     });
