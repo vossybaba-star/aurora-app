@@ -373,7 +373,7 @@ export function CompanyCard({
       {/* ── Header ────────────────────────────────────────────── */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-start gap-3">
-          <CompanyLogo name={company.name} domain={company.primary_domain} />
+          <CompanyLogo name={company.name} domain={domain} />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">

@@ -305,8 +305,122 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
 /* ═══════════════════════════════════════════════
    Main Dashboard Home
 ═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   B2BLeadTile — company logo + name + CTA
+═══════════════════════════════════════════════ */
+function B2BLeadTile({
+  opportunity,
+  onClick,
+  onRefresh,
+}: {
+  opportunity: Opportunity;
+  onClick: () => void;
+  onRefresh: () => Promise<void>;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  const domain = opportunity.website
+    ? (() => { try { return new URL(opportunity.website!).hostname.replace(/^www\./, ""); } catch { return null; } })()
+    : null;
+
+  const initStr = opportunity.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(w => w[0]?.toUpperCase() ?? "")
+    .join("");
+
+  return (
+    <div
+      className="glass-card glass-card-hover rounded-2xl overflow-hidden flex flex-col cursor-pointer border border-white/60"
+      onClick={onClick}
+    >
+      {/* Logo area */}
+      <div className="relative h-[88px] shrink-0 bg-gradient-to-br from-violet-50 to-purple-50/30 flex items-center justify-center p-3">
+        {domain && !imgFailed ? (
+          <img
+            src={`https://logo.clearbit.com/${domain}`}
+            alt={opportunity.name}
+            className="max-h-12 max-w-[140px] object-contain"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-base shrink-0"
+            style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
+          >
+            {initStr}
+          </div>
+        )}
+
+        {opportunity.priority === "high" && (
+          <span
+            className="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white shadow-sm"
+            style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
+          >
+            🔥 Hot
+          </span>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="p-3 flex flex-col gap-2 flex-1">
+        <div className="min-w-0">
+          <h3
+            className="font-bold text-xs leading-tight line-clamp-2"
+            style={{ color: "#131b2e" }}
+          >
+            {opportunity.name}
+          </h3>
+          {opportunity.contactTitle && (
+            <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+              {opportunity.contactTitle}
+            </p>
+          )}
+          {opportunity.whyGoodFit && (
+            <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+              {opportunity.whyGoodFit}
+            </p>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 mt-auto">
+          <button
+            onClick={e => { e.stopPropagation(); onClick(); }}
+            className="flex-1 h-7 rounded-xl text-[11px] font-bold text-white flex items-center justify-center gap-1 transition-all active:scale-[0.97] hover:opacity-90"
+            style={{
+              background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`,
+              boxShadow: `0 3px 10px rgba(124,110,247,0.28)`,
+            }}
+          >
+            <Send className="w-2.5 h-2.5" />
+            Reach out
+          </button>
+          <button
+            onClick={async e => {
+              e.stopPropagation();
+              await updateOpportunity(opportunity.id, { liked: !opportunity.liked });
+              await onRefresh();
+            }}
+            className="w-7 h-7 rounded-xl glass-card border border-white/70 flex items-center justify-center transition-all hover:bg-primary/10"
+          >
+            <Heart
+              className={`w-3 h-3 ${opportunity.liked ? "fill-primary text-primary" : "text-muted-foreground"}`}
+            />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   Main Dashboard Home
+═══════════════════════════════════════════════ */
 export function DashboardHome() {
   const { setActiveTab, profile, opportunities, refreshData, goToProfileSection, goToOutreachStage } = useKammie();
+
+  const isB2B = !!(profile?.companyAnalysis || profile?.icp);
 
   const [selectedOpp,          setSelectedOpp]          = useState<Opportunity | null>(null);
   const [viewingOpp,            setViewingOpp]            = useState<Opportunity | null>(null);
@@ -364,9 +478,12 @@ export function DashboardHome() {
   const newLeads       = opportunities.filter(o => o.status === "new" || o.status === "outreach_ready").length;
   const readyToContact = opportunities.filter(o => o.status === "outreach_ready").length;
 
-  /* ── Venue tiles: photos-first, then priority ── */
+  /* ── Venue tiles: photos-first for freelancers; priority-first for B2B ── */
   const venueTiles = [...opportunities]
     .sort((a, b) => {
+      if (isB2B) {
+        return ({ high: 3, medium: 2, low: 1 }[b.priority]) - ({ high: 3, medium: 2, low: 1 }[a.priority]);
+      }
       const aScore = (a.photoReference ? 100 : 0) + ({ high: 3, medium: 2, low: 1 }[a.priority]);
       const bScore = (b.photoReference ? 100 : 0) + ({ high: 3, medium: 2, low: 1 }[b.priority]);
       return bScore - aScore;
@@ -522,7 +639,7 @@ export function DashboardHome() {
           {/* Section header */}
           <div className="flex items-center justify-between px-0.5">
             <h2 className="font-extrabold text-base" style={{ color: "#131b2e" }}>
-              {profile?.icp ? "Suggested leads" : "Suggested venues"}
+              {isB2B ? "Saved companies" : (profile?.icp ? "Suggested leads" : "Suggested venues")}
             </h2>
             <button
               className="text-xs font-bold hover:underline transition-colors"
@@ -536,12 +653,21 @@ export function DashboardHome() {
           {venueTiles.length > 0 ? (
             <div className="grid grid-cols-2 gap-3">
               {venueTiles.map(opp => (
-                <VenueTile
-                  key={opp.id}
-                  opportunity={opp}
-                  onClick={() => setViewingOpp(opp)}
-                  onRefresh={refreshData}
-                />
+                isB2B ? (
+                  <B2BLeadTile
+                    key={opp.id}
+                    opportunity={opp}
+                    onClick={() => setViewingOpp(opp)}
+                    onRefresh={refreshData}
+                  />
+                ) : (
+                  <VenueTile
+                    key={opp.id}
+                    opportunity={opp}
+                    onClick={() => setViewingOpp(opp)}
+                    onRefresh={refreshData}
+                  />
+                )
               ))}
             </div>
           ) : (
@@ -557,19 +683,21 @@ export function DashboardHome() {
                 <Compass className="w-7 h-7 text-white" />
               </div>
               <p className="font-bold text-sm mb-1" style={{ color: "#131b2e" }}>
-                {profile?.icp ? "No prospects yet" : "No venues yet"}
+                {isB2B ? "No saved companies yet" : (profile?.icp ? "No prospects yet" : "No venues yet")}
               </p>
               <p className="text-xs text-muted-foreground mb-4 max-w-[200px] mx-auto leading-relaxed">
-                {profile?.icp
-                  ? "Discover companies matching your ICP and start outreach"
-                  : "Find your first opportunities and grow your business"}
+                {isB2B
+                  ? "Discover companies matching your ICP and save contacts"
+                  : (profile?.icp
+                    ? "Discover companies matching your ICP and start outreach"
+                    : "Find your first opportunities and grow your business")}
               </p>
               <button
                 onClick={() => setActiveTab("discover")}
                 className="rounded-2xl font-bold text-white px-5 py-2 text-sm hover:opacity-90 transition-all"
                 style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
               >
-                Discover Opportunities
+                {isB2B ? "Discover Companies" : "Discover Opportunities"}
               </button>
             </div>
           )}
