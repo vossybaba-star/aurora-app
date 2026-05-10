@@ -1,8 +1,10 @@
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { transformPlaceDetail } from "@/lib/places/transformPlaceDetail";
 import type { PlaceReview } from "@/lib/places/transformPlaceDetail";
+import { calculateSignalScore, signalScoreToPriority } from "@/lib/scoring";
+import type { AiAnalysis } from "@/lib/scoring";
+import { callClaude, parseClaudeJson } from "@/lib/anthropic/client";
 
 // Google Places API types
 interface PlaceResult {
@@ -215,7 +217,7 @@ export async function POST() {
     // Get user profile for context
     const { data: profile } = await supabase
       .from("profiles")
-      .select("*")
+      .select("id, full_name, business_name, business_type, location, pitch, speciality_tags, positioning, target_markets, role_id, work_radius, icp, opportunity_types")
       .eq("id", user.id)
       .single();
 
@@ -314,58 +316,82 @@ export async function POST() {
       });
     }
 
+    // Build profile context string for the AI prompt
+    const specialityTags: string[] = profile?.speciality_tags ?? [];
+    const targetMarkets: string[] = profile?.target_markets ?? [];
+    const positioning: string = profile?.positioning ?? "";
+    const roleId: string = profile?.role_id ?? "";
+    const workRadius: string = profile?.work_radius ?? "";
+
+    const profileContext = [
+      `Business: ${profile?.business_name || businessType}`,
+      `Service: ${profile?.pitch || `Professional ${businessType} services`}`,
+      `Location: ${location}`,
+      specialityTags.length ? `Specialities: ${specialityTags.join(", ")}` : null,
+      positioning ? `Market positioning: ${positioning}` : null,
+      targetMarkets.length ? `Target markets: ${targetMarkets.join(", ")}` : null,
+      roleId ? `Role: ${roleId}` : null,
+      workRadius ? `Work radius: ${workRadius}` : null,
+      `Looking for: ${opportunityTypes.join(", ")}`,
+    ].filter(Boolean).join("\n");
+
     // Use AI to evaluate and rank opportunities via Anthropic
-    let aiOutput = null;
+    // Returns structured AiAnalysis fields so we can compute a real signal_score
+    let aiOutput: { opportunities: Array<{
+      index: number;
+      opportunity_type: string;
+      why_good_fit: string;
+      recommended_angle: string;
+      wedding_relevance: number;
+      cultural_relevance: number;
+      photographer_opportunity: number;
+      has_exclusive_photographer: boolean;
+      positioning_match: number;
+      venue_vibe_tags: string[];
+      confidence: "high" | "medium" | "low";
+    }> } | null = null;
+
     try {
-      const aiPrompt = `You are an AI assistant helping a ${businessType} find the best business opportunities for outreach.
+      const aiPrompt = `You are an expert business development analyst. Evaluate these real businesses as outreach opportunities for the user below.
 
 USER PROFILE:
-- Business: ${profile.business_name || businessType}
-- Service: ${profile.pitch || `Professional ${businessType} services`}
-- Location: ${location}
-- Looking for: ${opportunityTypes.join(", ")}
+${profileContext}
 
-REAL BUSINESSES FOUND FROM GOOGLE (these are real places!):
+BUSINESSES FROM GOOGLE:
 ${placesWithDetails.map((p, i) => `
 ${i + 1}. ${p.name}
    - Address: ${p.formatted_address || "N/A"}
+   - Google types: ${p.types?.slice(0, 5).join(", ") || "N/A"}
    - Rating: ${p.rating || "N/A"} (${p.user_ratings_total || 0} reviews)
-   - Website: ${p.website || "None listed"}
-   - Phone: ${p.formatted_phone_number || "None listed"}
-   - Business Types: ${p.types?.slice(0, 5).join(", ") || "N/A"}
-`).join("\n")}
+   - Price level: ${p.price_level != null ? p.price_level : "N/A"} (0=free, 4=very expensive)
+   - Editorial summary: ${p.google_editorial_summary || "None"}
+   - Website: ${p.website ? "Yes" : "No"}
+   - Phone: ${p.formatted_phone_number ? "Yes" : "No"}
+`).join("")}
 
-Select the TOP 5 most promising opportunities for this ${businessType}. Consider:
-1. How well the venue/business matches their service type
-2. Business quality indicators (rating, review count)
-3. Whether they have contact info available (website/phone)
-4. Likelihood they would hire a ${businessType}
+Select the TOP 5 most promising opportunities. For each, return structured scoring fields so a signal score can be computed.
 
-For each selected opportunity, provide:
-- index: The number (1, 2, 3, etc.) of the business from the list above
-- relevance_score: 1-10 (higher = better fit)
-- opportunity_type: Best category from the allowed types
-- priority: high/medium/low
-- why_good_fit: Why it's a good fit (1-2 sentences)
-- suggested_approach: Suggested approach for outreach (1 sentence)`;
-      const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": process.env.ANTHROPIC_API_KEY!,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 2000,
-          messages: [{ role: "user", content: aiPrompt + "\n\nRespond ONLY with valid JSON matching this schema: {\"opportunities\": [{\"index\": number, \"relevance_score\": number, \"opportunity_type\": string, \"priority\": string, \"why_good_fit\": string, \"suggested_approach\": string}]}" }],
-        }),
-      });
-      if (anthropicRes.ok) {
-        const aiData = await anthropicRes.json();
-        const text = aiData.content?.[0]?.text || "{}";
-        aiOutput = JSON.parse(text.replace(/```json|```/g, "").trim());
-      }
+Return ONLY valid JSON:
+{
+  "opportunities": [
+    {
+      "index": <1-based integer from the list above>,
+      "opportunity_type": <one of: venue, event_organiser, market, wedding_planner, agency, brand, publication, other>,
+      "why_good_fit": "<1-2 sentences — specific reason this business suits the user's profile>",
+      "recommended_angle": "<1 sentence — best outreach hook for this specific business>",
+      "wedding_relevance": <0-100 — how likely this business hosts weddings>,
+      "cultural_relevance": <0-100 — likelihood of Black/African diaspora or multicultural events>,
+      "photographer_opportunity": <0-100 — genuine opportunity for a freelance creative professional>,
+      "has_exclusive_photographer": <boolean — true if likely to have exclusive supplier arrangements>,
+      "positioning_match": <0-100 — how well this business matches the user's market positioning (price level, specialities, target markets)>,
+      "venue_vibe_tags": ["<2-4 short style descriptors e.g. luxury, garden, rustic, corporate>"],
+      "confidence": "<high|medium|low — confidence given available data>"
+    }
+  ]
+}`;
+
+      const text = await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 2000, prompt: aiPrompt });
+      aiOutput = parseClaudeJson(text);
     } catch (e) {
       console.error("AI ranking failed:", e);
     }
@@ -375,12 +401,39 @@ For each selected opportunity, provide:
     let createdCount = 0;
 
     for (const opp of selectedOpps) {
-      // Use index (1-based from AI) to get place details
-      const placeIndex = opp.index - 1; // Convert to 0-based
+      const placeIndex = opp.index - 1;
       if (placeIndex < 0 || placeIndex >= placesWithDetails.length) {
         continue;
       }
       const placeDetails = placesWithDetails[placeIndex];
+
+      // Build a partial AiAnalysis so calculateSignalScore can produce a real score
+      const partialAnalysis: AiAnalysis = {
+        wedding_relevance:         Math.max(0, Math.min(100, opp.wedding_relevance ?? 0)),
+        cultural_relevance:        Math.max(0, Math.min(100, opp.cultural_relevance ?? 0)),
+        photographer_opportunity:  Math.max(0, Math.min(100, opp.photographer_opportunity ?? 0)),
+        has_exclusive_photographer: opp.has_exclusive_photographer ?? false,
+        positioning_match:         Math.max(0, Math.min(100, opp.positioning_match ?? 0)),
+        venue_vibe_tags:           Array.isArray(opp.venue_vibe_tags) ? opp.venue_vibe_tags : [],
+        recommended_angle:         opp.recommended_angle ?? "",
+        why_good_lead:             opp.why_good_fit ?? "",
+        confidence:                ["high","medium","low"].includes(opp.confidence) ? opp.confidence : "medium",
+        // Fields not available without website scrape — left as null/empty
+        contact_name:              null,
+        contact_email:             null,
+        venue_capacity:            null,
+        key_phrases_for_email:     [],
+        why_bad_lead:              null,
+      };
+
+      const { signal_score, score_breakdown } = calculateSignalScore(
+        partialAnalysis,
+        placeDetails.rating ?? null,
+        placeDetails.user_ratings_total ?? null,
+        0
+      );
+
+      const priority = signalScoreToPriority(signal_score);
 
       // Upsert the opportunity — onConflict requires a unique constraint on
       // (google_place_id, user_id). The existing duplicate-check above means
@@ -389,23 +442,21 @@ For each selected opportunity, provide:
         .from("opportunities")
         .upsert(
           {
-            // ── Existing fields — unchanged ──────────────────────────────
             user_id: user.id,
             name: placeDetails.name,
             type: opp.opportunity_type,
             location: placeDetails.formatted_address || location,
             status: "new",
-            priority: opp.priority,
+            priority,
             tags: ["aurora_ai", "google_places"],
             why_good_fit: opp.why_good_fit,
-            notes: `Suggested approach: ${opp.suggested_approach}`,
+            notes: `Suggested angle: ${opp.recommended_angle}`,
             website: placeDetails.website || null,
             google_place_id: placeDetails.place_id,
             rating: placeDetails.rating || null,
             rating_count: placeDetails.user_ratings_total || null,
             photo_reference: placeDetails.photo_reference || null,
             source: "aurora_ai",
-            // ── New deep fields from AI engine migration ─────────────────
             price_level: placeDetails.price_level ?? null,
             google_editorial_summary: placeDetails.google_editorial_summary ?? null,
             google_website_url: placeDetails.website ?? null,
@@ -413,7 +464,12 @@ For each selected opportunity, provide:
             full_reviews: placeDetails.full_reviews?.length
               ? placeDetails.full_reviews
               : null,
-            // Mark as pending so the enrichment pipeline picks this up next
+            // Pre-computed score — enrich-venue will refine once website is scraped.
+            // last_enriched_at intentionally NOT set here — leaving it null means
+            // enrich-venue's 48hr cache check won't skip the full Firecrawl pass.
+            signal_score,
+            score_breakdown,
+            ai_analysis: partialAnalysis,
             enrichment_status: "pending",
           },
           { onConflict: "google_place_id,user_id" }

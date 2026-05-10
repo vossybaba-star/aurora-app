@@ -17,6 +17,7 @@
 import { NextResponse } from "next/server";
 import { createClient }        from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { callClaude, parseClaudeJson } from "@/lib/anthropic/client";
 
 // ─── POST handler ─────────────────────────────────────────────────────────────
 
@@ -181,28 +182,11 @@ Provide a personalised assessment. Return ONLY this JSON (no markdown):
   let personalScore: number | null = null;
 
   try {
-    const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key":         process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type":      "application/json",
-      },
-      body: JSON.stringify({
-        model:      "claude-haiku-4-5-20251001",
-        max_tokens: 600,
-        messages:   [{ role: "user", content: personalPrompt }],
-      }),
-    });
-
-    if (aiRes.ok) {
-      const aiData = await aiRes.json();
-      const text   = (aiData.content?.[0]?.text ?? "{}").replace(/```json|```/g, "").trim();
-      personalAnalysis = JSON.parse(text);
-      personalScore    = typeof personalAnalysis?.fit_score === "number"
-        ? Math.max(0, Math.min(100, personalAnalysis.fit_score as number))
-        : null;
-    }
+    const text       = await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 600, prompt: personalPrompt });
+    personalAnalysis = parseClaudeJson(text);
+    personalScore    = typeof personalAnalysis?.fit_score === "number"
+      ? Math.max(0, Math.min(100, personalAnalysis.fit_score as number))
+      : null;
   } catch (err) {
     console.warn("[enrich-venue-personal] Claude personal analysis failed (non-fatal):", err);
   }

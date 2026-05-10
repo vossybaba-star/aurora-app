@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient }  from "@/lib/supabase/server";
+import { callClaude, parseClaudeJson } from "@/lib/anthropic/client";
 
 interface NurtureEmail {
   subject: string;
@@ -115,32 +116,11 @@ Return ONLY valid JSON (no markdown):
 
   let sequence: NurtureSequence;
   try {
-    const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key":         process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type":      "application/json",
-      },
-      body: JSON.stringify({
-        model:      "claude-sonnet-4-5-20251001",
-        max_tokens: 1500,
-        messages:   [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!aiRes.ok) {
-      const err = await aiRes.json();
-      console.error("[generate-nurture] Claude error:", err);
-      return NextResponse.json({ error: "AI generation failed" }, { status: 502 });
-    }
-
-    const aiData  = await aiRes.json();
-    const rawText = (aiData.content?.[0]?.text ?? "{}").replace(/```json|```/g, "").trim();
-    sequence = JSON.parse(rawText) as NurtureSequence;
+    const rawText = await callClaude({ model: "claude-sonnet-4-5-20251001", maxTokens: 1500, prompt });
+    sequence = parseClaudeJson<NurtureSequence>(rawText);
   } catch (err) {
-    console.error("[generate-nurture] Parse error:", err);
-    return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
+    console.error("[generate-nurture] Claude error:", err);
+    return NextResponse.json({ error: "AI generation failed" }, { status: 500 });
   }
 
   // ── Schedule times ────────────────────────────────────────────────────────

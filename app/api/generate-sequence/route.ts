@@ -28,40 +28,9 @@ import {
   buildFollowUpPrompt,
 } from "@/lib/copy-engine/buildPrompt";
 import { NextResponse }         from "next/server";
+import { callClaude, parseClaudeJson } from "@/lib/anthropic/client";
 
-// ─── Anthropic raw fetch helper ───────────────────────────────────────────────
-
-const MODEL = "claude-opus-4-5";
-
-async function callClaude(system: string, userMessage: string): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key":         process.env.ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-      "content-type":      "application/json",
-    },
-    body: JSON.stringify({
-      model:     MODEL,
-      max_tokens: 1200,
-      system,
-      messages:  [{ role: "user", content: userMessage }],
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Anthropic API ${res.status}: ${err}`);
-  }
-
-  const data = await res.json();
-  return data.content?.[0]?.text ?? "";
-}
-
-function parseJson(raw: string): Record<string, unknown> {
-  const cleaned = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-  return JSON.parse(cleaned);
-}
+const MODEL = "claude-opus-4-5" as const;
 
 // ─── POST handler ─────────────────────────────────────────────────────────────
 
@@ -106,7 +75,11 @@ export async function POST(req: Request) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const o = opp as any;
-    if (o?.generated_initial_email && o?.copy_generated_at) {
+    const COPY_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+    const copyAge = o?.copy_generated_at
+      ? Date.now() - new Date(o.copy_generated_at).getTime()
+      : Infinity;
+    if (o?.generated_initial_email && copyAge < COPY_TTL_MS) {
       return NextResponse.json({
         status:    "cached",
         cached_at: o.copy_generated_at,
@@ -129,8 +102,8 @@ export async function POST(req: Request) {
   // ── Step A: Initial email ──────────────────────────────────────────────
   let initialEmail: Record<string, unknown>;
   try {
-    const raw = await callClaude(system, buildInitialEmailPrompt(ctx));
-    initialEmail = parseJson(raw);
+    const raw = await callClaude({ model: MODEL, maxTokens: 1200, system, prompt: buildInitialEmailPrompt(ctx) });
+    initialEmail = parseClaudeJson(raw);
     if (process.env.NODE_ENV === "development") {
       console.log("[Copy Engine] Initial email generated:", {
         subject:              initialEmail.subject,
@@ -167,8 +140,8 @@ export async function POST(req: Request) {
         ...followUps.map((f) => ({ subject: f.subject, body: f.body })),
       ];
 
-      const raw  = await callClaude(system, buildFollowUpPrompt(ctx, i, previousEmails));
-      const parsed = parseJson(raw);
+      const raw  = await callClaude({ model: MODEL, maxTokens: 1200, system, prompt: buildFollowUpPrompt(ctx, i, previousEmails) });
+      const parsed = parseClaudeJson(raw);
 
       const followUp = {
         subject:         String(parsed.subject ?? `Re: ${initialSubject}`),

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { callClaude, parseClaudeJson } from "@/lib/anthropic/client";
 
 export async function POST(req: Request) {
   try {
@@ -26,25 +27,8 @@ Return ONLY valid JSON — no markdown, no explanation:
   "pain_points": ["4 to 6 specific, concrete pain points a ${persona} faces that this company solves"]
 }`;
 
-    const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key":         process.env.ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-        "content-type":      "application/json",
-      },
-      body: JSON.stringify({
-        model:      "claude-haiku-4-5-20251001",
-        max_tokens: 300,
-        messages:   [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!aiRes.ok) throw new Error(`AI error: ${aiRes.status}`);
-
-    const aiData = await aiRes.json();
-    const raw = (aiData.content?.[0]?.text ?? "{}").replace(/```json\n?|```/g, "").trim();
-    const parsed = JSON.parse(raw);
+    const raw = await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 300, prompt });
+    const parsed = parseClaudeJson(raw);
 
     const pain_points: string[] = Array.isArray(parsed.pain_points)
       ? parsed.pain_points.map(String)

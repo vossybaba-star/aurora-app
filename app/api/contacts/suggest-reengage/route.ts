@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient }  from "@/lib/supabase/server";
+import { callClaude } from "@/lib/anthropic/client";
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -68,24 +69,7 @@ ${interactionSummary}
 Suggest something concrete and timely — e.g., "Send them your winter wedding portfolio since it's been 3 months" or "Check in ahead of the Christmas party season." No generic advice.`;
 
   try {
-    const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key":         process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type":      "application/json",
-      },
-      body: JSON.stringify({
-        model:      "claude-haiku-4-5-20251001",
-        max_tokens: 200,
-        messages:   [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!aiRes.ok) return NextResponse.json({ error: "AI failed" }, { status: 502 });
-
-    const aiData   = await aiRes.json();
-    const suggestion = (aiData.content?.[0]?.text ?? "").trim();
+    const suggestion = (await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 200, prompt })).trim();
 
     // Cache result
     await supabase.from("contacts").update({

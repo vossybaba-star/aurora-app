@@ -183,31 +183,21 @@ export async function getOpportunities(): Promise<Opportunity[]> {
 
   const { data: opportunities, error } = await supabase
     .from("opportunities")
-    .select("*")
+    .select("*, contact_methods(*)")
     .eq("user_id", user.id)
+    .order("signal_score", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (error || !opportunities) return [];
 
-  // Get all contact methods for these opportunities
-  const oppIds = opportunities.map(o => o.id);
-  const { data: contactMethods } = await supabase
-    .from("contact_methods")
-    .select("*")
-    .in("opportunity_id", oppIds);
-
-  const contactMethodsMap = new Map<string, DbContactMethod[]>();
-  (contactMethods || []).forEach(cm => {
-    const existing = contactMethodsMap.get(cm.opportunity_id) || [];
-    contactMethodsMap.set(cm.opportunity_id, [...existing, cm as DbContactMethod]);
+  return opportunities.map(opp => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { contact_methods, ...rest } = opp as typeof opp & { contact_methods: DbContactMethod[] };
+    return converters.dbOpportunityToOpportunity(
+      rest as unknown as DbOpportunity,
+      (contact_methods || []) as DbContactMethod[]
+    );
   });
-
-  return opportunities.map(opp => 
-    converters.dbOpportunityToOpportunity(
-      opp as DbOpportunity, 
-      contactMethodsMap.get(opp.id) || []
-    )
-  );
 }
 
 export async function createOpportunity(data: {

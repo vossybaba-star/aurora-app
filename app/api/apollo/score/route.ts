@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import type { ICP, CompanyAnalysis } from "@/lib/types";
+import { callClaude, parseClaudeJson } from "@/lib/anthropic/client";
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -17,6 +18,7 @@ export async function POST(req: Request) {
     user_location:        string;
     icp?:                 ICP;
     company_analysis?:    CompanyAnalysis;
+    opportunity_id?:      string;
   };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
@@ -24,7 +26,7 @@ export async function POST(req: Request) {
   const {
     company, contacts,
     user_profession, user_about, user_speciality_tags, user_location,
-    icp, company_analysis,
+    icp, company_analysis, opportunity_id,
   } = body;
   if (!company) return NextResponse.json({ error: "company is required" }, { status: 400 });
 
@@ -118,35 +120,38 @@ Return as JSON only.
 }`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key":         process.env.ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-        "content-type":      "application/json",
-      },
-      body: JSON.stringify({
-        model:      "claude-haiku-4-5-20251001",
-        max_tokens: 512,
-        messages:   [{ role: "user", content: prompt }],
-      }),
-    });
+    const raw = await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 512, prompt });
+    const parsed = parseClaudeJson<Record<string, any>>(raw);
 
-    if (!res.ok) throw new Error(`Anthropic error: ${res.status}`);
+    const score       = Math.max(0, Math.min(100, Number(parsed.score) || 0));
+    const score_label = (["Strong lead", "Good lead", "Weak lead"] as const).includes(parsed.score_label)
+      ? parsed.score_label as "Strong lead" | "Good lead" | "Weak lead"
+      : "Good lead";
+    const account_tier: "T1" | "T2" | "T3" = score >= 75 ? "T1" : score >= 50 ? "T2" : "T3";
 
-    const aiData = await res.json();
-    const raw = (aiData.content?.[0]?.text ?? "{}").replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(raw);
-
-    return NextResponse.json({
-      score:           Math.max(0, Math.min(100, Number(parsed.score) || 0)),
-      score_label:     (["Strong lead", "Good lead", "Weak lead"] as const).includes(parsed.score_label)
-                         ? parsed.score_label
-                         : "Good lead",
+    const result = {
+      score,
+      score_label,
+      account_tier,
       suggested_angle: String(parsed.suggested_angle || ""),
       caution:         parsed.caution ?? null,
       why_good:        Array.isArray(parsed.why_good) ? parsed.why_good : [],
-    });
+    };
+
+    // Persist score to opportunity row if caller provides opportunity_id
+    if (opportunity_id) {
+      await supabase
+        .from("opportunities")
+        .update({
+          signal_score:    score,
+          score_breakdown: { account_tier, score_label, why_good: result.why_good, caution: result.caution },
+          ai_analysis:     { suggested_angle: result.suggested_angle, scored_at: new Date().toISOString() },
+        })
+        .eq("id", opportunity_id)
+        .eq("user_id", user.id);
+    }
+
+    return NextResponse.json(result);
   } catch (err) {
     console.error("[apollo/score] Claude failed:", err);
     return NextResponse.json({ error: "Scoring failed" }, { status: 500 });

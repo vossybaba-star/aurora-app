@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { CompanyAnalysis, ICP } from "@/lib/types";
+import { callClaude, parseClaudeJson } from "@/lib/anthropic/client";
 
 // ── HTML helpers ────────────────────────────────────────────────────────────
 
@@ -130,27 +131,8 @@ Return ONLY valid JSON — no markdown, no explanation:
   }
 }`;
 
-    const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key":         process.env.ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-        "content-type":      "application/json",
-      },
-      body: JSON.stringify({
-        model:      "claude-haiku-4-5-20251001",
-        max_tokens: 700,
-        messages:   [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!aiRes.ok) {
-      throw new Error(`Anthropic error: ${aiRes.status}`);
-    }
-
-    const aiData = await aiRes.json();
-    const raw = (aiData.content?.[0]?.text ?? "{}").replace(/```json\n?|```/g, "").trim();
-    const parsed = JSON.parse(raw);
+    const raw = await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 700, prompt });
+    const parsed = parseClaudeJson<Record<string, any>>(raw);
 
     const analysis: CompanyAnalysis = {
       description:       String(parsed.description || ""),

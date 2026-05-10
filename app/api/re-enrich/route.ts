@@ -44,14 +44,15 @@ export async function POST(request: Request) {
     const enrichData = await enrichRes.json();
     
     const enrichedContacts = enrichData.contactInfo;
-    
-    // Delete existing contact methods (except those manually added)
-    await supabase
+
+    // Capture existing IDs before touching anything — delete happens AFTER insert succeeds
+    const { data: existingMethods } = await supabase
       .from("contact_methods")
-      .delete()
+      .select("id")
       .eq("opportunity_id", opportunityId);
-    
-    // Add new contact methods
+    const oldIds = (existingMethods || []).map(cm => cm.id);
+
+    // Build new contact methods
     const contactMethods: { opportunity_id: string; type: string; value: string; is_primary: boolean }[] = [];
     
     // Add emails
@@ -114,12 +115,18 @@ export async function POST(request: Request) {
       is_primary: contactMethods.length === 0,
     });
     
-    // Insert contact methods
+    // Insert new contact methods first — only delete old ones if insert succeeds
     if (contactMethods.length > 0) {
       const { error: insertError } = await supabase.from("contact_methods").insert(contactMethods);
       if (insertError) {
         console.error("[re-enrich] contact_methods insert error:", insertError);
+        return NextResponse.json({ error: "Failed to save contact methods" }, { status: 500 });
       }
+    }
+
+    // Now safe to remove old contact methods
+    if (oldIds.length > 0) {
+      await supabase.from("contact_methods").delete().in("id", oldIds);
     }
     
     // Update opportunity with contact form if found

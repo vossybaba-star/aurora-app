@@ -27,6 +27,7 @@ import {
   extractContactFormRegex,
   buildContactExtractionPrompt,
 } from "@/lib/venues/extractContact";
+import { callClaude, parseClaudeJson } from "@/lib/anthropic/client";
 
 // ─── Instagram search fallback ────────────────────────────────────────────────
 
@@ -201,27 +202,11 @@ export async function POST(req: Request) {
   if (!emailAddr)  missing.push("email");
   if (!formUrl)    missing.push("contact_form");
 
-  if (missing.length > 0 && websiteMarkdown && process.env.ANTHROPIC_API_KEY) {
+  if (missing.length > 0 && websiteMarkdown) {
     try {
       const prompt = buildContactExtractionPrompt(websiteMarkdown, name, missing);
-      const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key":         process.env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "content-type":      "application/json",
-        },
-        body: JSON.stringify({
-          model:      "claude-haiku-4-5-20251001",
-          max_tokens: 400,
-          messages:   [{ role: "user", content: prompt }],
-        }),
-      });
-      if (aiRes.ok) {
-        const aiData = await aiRes.json();
-        const text = (aiData.content?.[0]?.text ?? "{}").replace(/```json|```/g, "").trim();
-        claudeContact = JSON.parse(text);
-      }
+      const text = await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 400, prompt });
+      claudeContact = parseClaudeJson(text);
     } catch (err) {
       console.warn("[enrich-venue-global] Claude contact gap-fill failed (non-fatal):", err);
     }
@@ -230,7 +215,7 @@ export async function POST(req: Request) {
   // ── Claude generic venue analysis ─────────────────────────────────────────
   let venueAnalysis: Record<string, unknown> = {};
 
-  if (websiteMarkdown && process.env.ANTHROPIC_API_KEY) {
+  if (websiteMarkdown) {
     try {
       const analysisPrompt = `Analyse this venue from its website content and return a JSON object (no markdown).
 
@@ -249,26 +234,8 @@ Return ONLY this JSON:
   "hosts_weddings": <boolean>,
   "hosts_corporate": <boolean>
 }`;
-
-      const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key":         process.env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "content-type":      "application/json",
-        },
-        body: JSON.stringify({
-          model:      "claude-haiku-4-5-20251001",
-          max_tokens: 600,
-          messages:   [{ role: "user", content: analysisPrompt }],
-        }),
-      });
-
-      if (aiRes.ok) {
-        const aiData = await aiRes.json();
-        const text = (aiData.content?.[0]?.text ?? "{}").replace(/```json|```/g, "").trim();
-        venueAnalysis = JSON.parse(text);
-      }
+      const text = await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 600, prompt: analysisPrompt });
+      venueAnalysis = parseClaudeJson(text);
     } catch (err) {
       console.warn("[enrich-venue-global] Claude venue analysis failed (non-fatal):", err);
     }

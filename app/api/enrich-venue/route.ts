@@ -19,6 +19,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { extractEmailRegex, extractContactFormRegex } from "@/lib/venues/extractContact";
+import { calculateSignalScore } from "@/lib/scoring";
+import type { AiAnalysis } from "@/lib/scoring";
+import { callClaude, parseClaudeJson } from "@/lib/anthropic/client";
 
 // ─── Shared Instagram handle extractor ───────────────────────────────────────
 
@@ -35,94 +38,6 @@ function extractIgHandleFromText(text: string): string | null {
   const candidate = match[1].replace(/\.$/, "");
   if (IG_NON_HANDLES.has(candidate.toLowerCase())) return null;
   return `@${candidate}`;
-}
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface AiAnalysis {
-  wedding_relevance: number;
-  cultural_relevance: number;
-  photographer_opportunity: number;
-  has_exclusive_photographer: boolean;
-  contact_name: string | null;
-  contact_email: string | null;
-  venue_capacity: number | null;
-  positioning_match: number;
-  key_phrases_for_email: string[];
-  why_good_lead: string;
-  why_bad_lead: string | null;
-  recommended_angle: string;
-  confidence: "high" | "medium" | "low";
-  venue_vibe_tags: string[];
-}
-
-// ─── Score calculator ─────────────────────────────────────────────────────────
-
-function calculateSignalScore(
-  ai: AiAnalysis,
-  rating: number | null,
-  ratingCount: number | null,
-  networkContactedCount: number
-): { signal_score: number; score_breakdown: Record<string, number> } {
-  // Rating component (0–25)
-  const ratingScore = (() => {
-    if (!rating) return 0;
-    if (rating >= 4.5) return 25;
-    if (rating >= 4.0) return 18;
-    if (rating >= 3.5) return 10;
-    return 3;
-  })();
-
-  // Review volume component (0–10)
-  const reviewScore = (() => {
-    const rc = ratingCount ?? 0;
-    if (rc >= 200) return 10;
-    if (rc >= 100) return 7;
-    if (rc >= 50) return 4;
-    return 0;
-  })();
-
-  // AI-scored components (weighted)
-  const weddingScore      = Math.round((ai.wedding_relevance    / 100) * 25);
-  const culturalScore     = Math.round((ai.cultural_relevance   / 100) * 20);
-  const photographerScore = Math.round((ai.photographer_opportunity / 100) * 15);
-  const positioningScore  = Math.round((ai.positioning_match    / 100) * 10);
-
-  // Exclusive photographer penalty (–40 — significant blocker)
-  const exclusivePenalty = ai.has_exclusive_photographer ? -40 : 0;
-
-  // Kammie network signal (aggregate, max 10)
-  const networkScore = Math.min(networkContactedCount * 2, 10);
-
-  const total = Math.max(
-    0,
-    Math.min(
-      100,
-      ratingScore +
-        reviewScore +
-        weddingScore +
-        culturalScore +
-        photographerScore +
-        positioningScore +
-        exclusivePenalty +
-        networkScore
-    )
-  );
-
-  return {
-    signal_score: total,
-    score_breakdown: {
-      rating_score:                   ratingScore,
-      review_volume_score:            reviewScore,
-      wedding_relevance_score:        weddingScore,
-      cultural_relevance_score:       culturalScore,
-      photographer_opportunity_score: photographerScore,
-      positioning_match_score:        positioningScore,
-      exclusive_penalty:              exclusivePenalty,
-      network_score:                  networkScore,
-      total,
-    },
-  };
 }
 
 // ─── POST handler ─────────────────────────────────────────────────────────────
@@ -377,34 +292,10 @@ Return ONLY this JSON (all fields required):
   // Stage 3: Claude analysis via REST API (same pattern as find-opportunities)
   // ──────────────────────────────────────────────────────────────────────────
   let aiAnalysis: AiAnalysis | null = null;
-  let tokensUsed = 0;
 
   try {
-    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key":         process.env.ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-        "content-type":      "application/json",
-      },
-      body: JSON.stringify({
-        model:      "claude-opus-4-5",
-        max_tokens: 1024,
-        messages:   [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!anthropicRes.ok) {
-      throw new Error(`Anthropic API error: ${anthropicRes.status}`);
-    }
-
-    const aiData = await anthropicRes.json();
-    tokensUsed =
-      (aiData.usage?.input_tokens ?? 0) + (aiData.usage?.output_tokens ?? 0);
-
-    const rawText: string = aiData.content?.[0]?.text ?? "{}";
-    const cleaned = rawText.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    const rawText = await callClaude({ model: "claude-opus-4-5", maxTokens: 1024, prompt });
+    const parsed  = parseClaudeJson<Record<string, any>>(rawText);
 
     aiAnalysis = {
       wedding_relevance:         Math.max(0, Math.min(100, Number(parsed.wedding_relevance)    || 0)),
@@ -441,6 +332,11 @@ Return ONLY this JSON (all fields required):
   // ──────────────────────────────────────────────────────────────────────────
   // Stage 4: Signal score
   // ──────────────────────────────────────────────────────────────────────────
+  // Guard: catch block above always returns, but TypeScript can't narrow across try/catch
+  if (!aiAnalysis) {
+    return NextResponse.json({ error: "AI analysis failed." }, { status: 500 });
+  }
+
   const { signal_score, score_breakdown } = calculateSignalScore(
     aiAnalysis,
     opportunity?.rating       ?? null,
@@ -461,6 +357,8 @@ Return ONLY this JSON (all fields required):
       score_breakdown,
       enrichment_status: "complete",
       last_enriched_at:  new Date().toISOString(),
+      // Invalidate copy cache — re-enrichment means better context is available
+      copy_generated_at: null,
     };
 
     if (firecrawlSuccess && websiteMarkdown) {
@@ -513,7 +411,6 @@ Return ONLY this JSON (all fields required):
         claude_analysis: true,
         signal_score:    true,
       },
-      tokens_used: tokensUsed,
       model_used:  "claude-opus-4-5",
       duration_ms: durationMs,
     });

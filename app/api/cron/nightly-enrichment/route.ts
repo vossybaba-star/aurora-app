@@ -109,148 +109,27 @@ export async function GET(req: Request) {
     await new Promise(r => setTimeout(r, 500));
   }
 
-  // ── Nurture sequence: send due steps ─────────────────────────────────────
+  // ── Nurture sequence: delegate to dedicated route ─────────────────────────
   let nurturesSent = 0;
 
-  if (process.env.NYLAS_API_KEY) {
-    const now = new Date().toISOString();
-
-    // Step 2: due today
-    const { data: step2Due } = await service
-      .from("nurture_sequences")
-      .select(`
-        id, contact_id, user_id,
-        step2_subject, step2_body, step2_send_at, step2_sent_at
-      `)
-      .eq("status", "active")
-      .lte("step2_send_at", now)
-      .is("step2_sent_at", null)
-      .limit(20);
-
-    // Step 3: due today
-    const { data: step3Due } = await service
-      .from("nurture_sequences")
-      .select(`
-        id, contact_id, user_id,
-        step3_subject, step3_body, step3_send_at, step3_sent_at
-      `)
-      .eq("status", "active")
-      .lte("step3_send_at", now)
-      .is("step3_sent_at", null)
-      .limit(20);
-
-    const sendNurture = async (
-      seqId:     string,
-      contactId: string,
-      userId:    string,
-      subject:   string,
-      body:      string,
-      step:      2 | 3
-    ) => {
-      // Load contact email
-      const { data: contact } = await service
-        .from("contacts")
-        .select("email, name, unsubscribed_at")
-        .eq("id", contactId)
-        .single();
-
-      if (!contact?.email || contact.unsubscribed_at) return false;
-
-      // Load user's Nylas grant from email_connections
-      const { data: emailConn } = await service
-        .from("email_connections")
-        .select("grant_id, email")
-        .eq("user_id", userId)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (!emailConn?.grant_id) {
-        console.warn(`[nightly-enrichment] No active email connection for user ${userId} — skipping nurture`);
-        return false;
-      }
-
-      // Load user profile for display name
-      const { data: profile } = await service
-        .from("profiles")
-        .select("business_name")
-        .eq("id", userId)
-        .single();
-
-      const nylasApiUri = process.env.NYLAS_API_URI ?? "https://api.us.nylas.com";
-
-      // Send via Nylas using the user's own grant ID
-      try {
-        const res = await fetch(
-          `${nylasApiUri}/v3/grants/${emailConn.grant_id}/messages/send`,
-          {
-            method:  "POST",
-            headers: {
-              Authorization:  `Bearer ${process.env.NYLAS_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              subject,
-              body,
-              to: [{ name: contact.name, email: contact.email }],
-              from: emailConn.email
-                ? [{ name: profile?.business_name ?? "Kammie", email: emailConn.email }]
-                : undefined,
-            }),
-          }
-        );
-
-        if (!res.ok) {
-          console.error("[nightly-enrichment] Nylas send failed", await res.text());
-          return false;
-        }
-
-        // Mark as sent
-        const sentCol = step === 2 ? "step2_sent_at" : "step3_sent_at";
-        await service
-          .from("nurture_sequences")
-          .update({ [sentCol]: now })
-          .eq("id", seqId);
-
-        // If step 3 sent → mark sequence complete
-        if (step === 3) {
-          await service.from("nurture_sequences").update({ status: "completed" }).eq("id", seqId);
-        }
-
-        // Log interaction
-        await service.from("contact_interactions").insert({
-          user_id:      userId,
-          contact_id:   contactId,
-          type:         "nurture_sent",
-          subject,
-          body,
-          direction:    "outbound",
-          nurture_step: step,
-          occurred_at:  now,
-        });
-
-        return true;
-      } catch (err) {
-        console.error("[nightly-enrichment] Nylas error:", err);
-        return false;
-      }
-    };
-
-    for (const seq of step2Due ?? []) {
-      const sent = await sendNurture(seq.id, seq.contact_id, seq.user_id, seq.step2_subject ?? "", seq.step2_body ?? "", 2);
-      if (sent) nurturesSent++;
+  try {
+    const nurtureRes = await fetch(`${appUrl}/api/nurture/send-due`, {
+      method:  "POST",
+      headers: { Authorization: `Bearer ${cronSecret}` },
+    });
+    if (nurtureRes.ok) {
+      const nurtureData = await nurtureRes.json();
+      nurturesSent = nurtureData.sent ?? 0;
     }
-
-    for (const seq of step3Due ?? []) {
-      const sent = await sendNurture(seq.id, seq.contact_id, seq.user_id, seq.step3_subject ?? "", seq.step3_body ?? "", 3);
-      if (sent) nurturesSent++;
-    }
+  } catch (err) {
+    console.error("[nightly-enrichment] Nurture send-due failed (non-fatal):", err);
   }
 
   return NextResponse.json({
-    status:       "complete",
+    status:        "complete",
     processed,
     failed,
-    total:        toProcess.length,
+    total:         toProcess.length,
     nurtures_sent: nurturesSent,
   });
 }

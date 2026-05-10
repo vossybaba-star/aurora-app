@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { searchPeople } from "@/lib/apollo";
 import { getRoleById }  from "@/lib/roles";
+import type { ICP }     from "@/lib/types";
 
 export async function POST(req: Request) {
   let body: {
     company_name?: string;
     domain?:       string;
     role_id?:      string;
+    icp?:          ICP;
     // Legacy fallback — deprecated
     persona?:      string;
   };
@@ -14,35 +16,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { company_name, domain, role_id } = body;
+  const { company_name, domain, role_id, icp } = body;
 
-  // ── Resolve person_titles from role config ───────────────────────────────
-  const role = role_id ? getRoleById(role_id) : undefined;
-
+  // ── Resolve person_titles: ICP personas > role config > legacy ───────────
   let personTitles: string[] = [];
 
-  if (role?.contactKeywords) {
-    // contactKeywords is comma-separated → split into array for person_titles
-    personTitles = role.contactKeywords
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+  if (icp?.personas?.length) {
+    // B2B mode: user-defined personas from ICP settings
+    personTitles = icp.personas;
   } else {
-    // Legacy persona fallback so existing callers don't break during rollout
-    const legacyTitles: Record<string, string[]> = {
-      makeup_artist: [
-        "Head of Talent", "Casting", "Creative Director", "Brand Manager",
-        "Campaign Producer", "PR Manager", "Bookings", "Production Manager",
-        "Partnerships", "Marketing Manager", "Founder", "Director",
-      ],
-      startup_founder: [
-        "CEO", "Co-founder", "CTO", "Head of Partnerships", "VP Sales",
-        "Business Development", "Head of Growth", "Investor",
-        "Managing Director", "General Partner",
-      ],
-    };
-    const persona = body.persona ?? "";
-    personTitles = legacyTitles[persona] ?? [];
+    const role = role_id ? getRoleById(role_id) : undefined;
+    if (role?.contactKeywords) {
+      personTitles = role.contactKeywords
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+    } else {
+      // Legacy persona fallback so existing callers don't break during rollout
+      const legacyTitles: Record<string, string[]> = {
+        makeup_artist: [
+          "Head of Talent", "Casting", "Creative Director", "Brand Manager",
+          "Campaign Producer", "PR Manager", "Bookings", "Production Manager",
+          "Partnerships", "Marketing Manager", "Founder", "Director",
+        ],
+        startup_founder: [
+          "CEO", "Co-founder", "CTO", "Head of Partnerships", "VP Sales",
+          "Business Development", "Head of Growth", "Investor",
+          "Managing Director", "General Partner",
+        ],
+      };
+      const persona = body.persona ?? "";
+      personTitles = legacyTitles[persona] ?? [];
+    }
   }
 
   if (personTitles.length === 0) {

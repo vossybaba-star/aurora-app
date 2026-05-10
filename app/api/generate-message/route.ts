@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-// Using Anthropic directly
+import { callClaude } from "@/lib/anthropic/client";
 
 export async function POST(request: Request) {
   try {
@@ -73,23 +73,7 @@ IMPORTANT RULES:
 
 Write the outreach message now:`;
 
-    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": process.env.ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 500,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!anthropicRes.ok) throw new Error("AI generation failed");
-    const anthropicData = await anthropicRes.json();
-    const generatedText = anthropicData.content?.[0]?.text || "";
+    const generatedText = await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 500, prompt });
 
     let subject = "";
     let body = generatedText;

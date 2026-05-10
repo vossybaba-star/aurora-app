@@ -26,6 +26,24 @@ export interface ApolloCompany {
   primary_domain: string | null;
   phone: string | null;
   logo_url: string | null;
+  // ── Enriched fields (returned by Apollo when available) ──────────────────
+  /** e.g. ["Salesforce", "HubSpot", "Slack"] */
+  technology_names?: string[];
+  /** e.g. "Series A", "Seed", "Bootstrapped" */
+  latest_funding_stage?: string | null;
+  /** e.g. "$1M-$10M" */
+  annual_revenue_printed?: string | null;
+  /** 6-month LinkedIn headcount growth rate as a decimal, e.g. 0.12 = 12% */
+  employee_count_6_month_growth?: number | null;
+  // ── Pre-computed ICP scoring ─────────────────────────────────────────────
+  /** Pre-computed ICP score (0-100) — set by apollo/companies batch scoring */
+  icp_score?: number;
+  /** Account tier derived from icp_score — T1 ≥75, T2 ≥50, T3 <50 */
+  account_tier?: "T1" | "T2" | "T3";
+  /** One-sentence rationale for the score */
+  score_rationale?: string;
+  /** Reachability: senior contact found in Apollo */
+  reachable?: boolean;
 }
 
 export interface ApolloPerson {
@@ -110,6 +128,10 @@ interface RawOrganization {
   sanitized_phone: string | null;
   phone: string | null;
   logo_url?: string | null;
+  technology_names?: string[] | null;
+  latest_funding_stage?: string | null;
+  annual_revenue_printed?: string | null;
+  employee_count_6_month_growth?: number | null;
 }
 
 export async function searchCompanies(params: SearchCompaniesParams): Promise<ApolloCompany[] | null> {
@@ -133,6 +155,10 @@ export async function searchCompanies(params: SearchCompaniesParams): Promise<Ap
     primary_domain: o.primary_domain ?? null,
     phone: o.sanitized_phone ?? o.phone ?? null,
     logo_url: o.logo_url ?? null,
+    technology_names: o.technology_names ?? undefined,
+    latest_funding_stage: o.latest_funding_stage ?? null,
+    annual_revenue_printed: o.annual_revenue_printed ?? null,
+    employee_count_6_month_growth: o.employee_count_6_month_growth ?? null,
   }));
 }
 

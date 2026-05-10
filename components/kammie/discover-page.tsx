@@ -286,7 +286,7 @@ export function DiscoverPage() {
             location: filterLocation || undefined,
             size:     filterSize     || undefined,
           };
-          requestBody = { icp: icp ?? {}, filters };
+          requestBody = { icp: icp ?? {}, company_analysis: profile?.companyAnalysis, filters };
         } else {
           // ── Freelancer / role-based mode ────────────────────────────────
           const userTargetMarkets = profile?.targetMarkets ?? [];

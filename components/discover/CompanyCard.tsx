@@ -287,6 +287,7 @@ export function CompanyCard({
           company_name: company.name,
           domain:       company.primary_domain ?? undefined,
           role_id:      roleId,
+          icp:          icp ?? undefined,
         }),
       });
       if (res.ok) {
@@ -384,11 +385,13 @@ export function CompanyCard({
   }, [company, saved, onSaved, onToast, connectingId, result]);
 
   /* ── Derived ────────────────────────────────────────────────── */
-  const domain   = company.primary_domain
+  const domain    = company.primary_domain
     ?? (company.website_url
       ? (() => { try { return new URL(company.website_url!).hostname.replace(/^www\./, ""); } catch { return null; } })()
       : null);
-  const hasScore = result?.score != null;
+  const hasScore  = result?.score != null;
+  // Pre-computed ICP score from batch scoring at discovery time
+  const preScore  = company.icp_score;
 
   return (
     <div
@@ -418,7 +421,17 @@ export function CompanyCard({
                   </span>
                 );
               })()}
-              {saved && !hasScore && (
+              {!hasScore && preScore != null && (() => {
+                const b = scoreBadge(preScore);
+                return (
+                  <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                        title={company.score_rationale}
+                        style={{ background: b.bg, color: b.color }}>
+                    {preScore}/100
+                  </span>
+                );
+              })()}
+              {saved && !hasScore && preScore == null && (
                 <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-md"
                       style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}>
                   Saved
@@ -426,12 +439,27 @@ export function CompanyCard({
               )}
             </div>
 
-            {company.industry && (
-              <span className="inline-block mt-0.5 text-[10px] font-medium px-2 py-0.5 rounded-full"
-                    style={{ background: `${ACCENT}12`, color: ACCENT }}>
-                {company.industry}
-              </span>
-            )}
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+              {company.industry && (
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                      style={{ background: `${ACCENT}12`, color: ACCENT }}>
+                  {company.industry}
+                </span>
+              )}
+              {company.reachable && !hasScore && (
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}
+                      title="Senior contact found in Apollo">
+                  · reachable
+                </span>
+              )}
+              {company.account_tier === "T1" && !hasScore && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(124,110,247,0.1)", color: ACCENT }}>
+                  T1
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -444,6 +472,13 @@ export function CompanyCard({
         {company.short_description && (
           <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
             {company.short_description}
+          </p>
+        )}
+
+        {company.score_rationale && !hasScore && (
+          <p className="text-[10px] mt-1.5 leading-relaxed"
+             style={{ color: ACCENT, opacity: 0.8 }}>
+            {company.score_rationale}
           </p>
         )}
       </div>
