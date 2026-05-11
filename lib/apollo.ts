@@ -201,9 +201,9 @@ interface RawPerson {
 }
 
 export async function searchPeople(params: SearchPeopleParams): Promise<ApolloPerson[]> {
-  // Use /people/search (paid endpoint) — returns full last_name for licensed accounts.
-  // /mixed_people/api_search is credits-free but always obfuscates last_name regardless of plan.
-  const data = await apolloPost<ApolloPeopleResponse>("/people/search", params, APOLLO_BASE_PEOPLE);
+  // api_search is Apollo's only working search endpoint — mixed_people/search is deprecated.
+  // Last names are obfuscated at the search layer regardless of plan; enrichment per-person is needed for full names.
+  const data = await apolloPost<ApolloPeopleResponse>("/mixed_people/api_search", params, APOLLO_BASE_PEOPLE);
   if (!data?.people) return [];
 
   return data.people.map((p) => ({

@@ -387,10 +387,12 @@ export function DiscoverPage() {
     }
   }, []);
 
-  // Manual Search button handler — uses current filter state
-  const fetchContacts = useCallback(() => {
-    doFetchContacts({ titles: contactTitles, company: contactCompany, location: contactLocation, employeeRanges: contactEmployeeRange });
-  }, [doFetchContacts, contactTitles, contactCompany, contactLocation, contactEmployeeRange]);
+  // Manual Search button handler — uses current filter state.
+  // contactSearchInput may have an uncommitted value (state update lag), so pass it directly.
+  const fetchContacts = useCallback((searchOverride?: string) => {
+    const company = searchOverride ?? (contactSearchInput.trim() || contactCompany || undefined);
+    doFetchContacts({ titles: contactTitles, company, location: contactLocation, employeeRanges: contactEmployeeRange });
+  }, [doFetchContacts, contactTitles, contactCompany, contactSearchInput, contactLocation, contactEmployeeRange]);
 
   // Build suggestions as user types in the contact search bar
   const handleContactSearchChange = useCallback((val: string) => {
@@ -684,7 +686,7 @@ export function DiscoverPage() {
                   {contactTitles.length > 0 ? `${contactTitles.length} role${contactTitles.length > 1 ? "s" : ""}` : "Any role"}
                   <ChevronDown className={`w-3 h-3 transition-transform ${rolePickerOpen ? "rotate-180" : ""}`} />
                 </button>
-                <button onClick={fetchContacts}
+                <button onClick={() => fetchContacts()}
                   disabled={isLoadingContacts}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-40"
                   style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
@@ -771,12 +773,10 @@ export function DiscoverPage() {
             onKeyDown={(e) => {
               if (e.key !== "Enter") return;
               if (searchMode === "contacts") {
-                if (contactSearchInput.trim()) {
-                  setContactCompany(contactSearchInput.trim());
-                  setContactSuggestions([]);
-                  setContactSearchInput("");
-                }
-                fetchContacts();
+                const val = contactSearchInput.trim();
+                setContactSuggestions([]);
+                setContactSearchInput("");
+                fetchContacts(val || undefined);
               } else {
                 handleSearch();
               }
