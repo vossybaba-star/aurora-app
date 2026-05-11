@@ -200,6 +200,84 @@ interface RawPerson {
   city: string | null;
 }
 
+// ── enrichPerson ───────────────────────────────────────────────────────────
+
+export interface ApolloPersonEnriched extends ApolloPerson {
+  organization?: {
+    name:                          string | null;
+    website_url:                   string | null;
+    primary_domain:                string | null;
+    industry:                      string | null;
+    estimated_num_employees:       number | null;
+    latest_funding_stage:          string | null;
+    employee_count_6_month_growth: number | null;
+    technology_names:              string[];
+    short_description:             string | null;
+  } | null;
+}
+
+interface ApolloMatchResponse {
+  person: {
+    id: string;
+    first_name: string;
+    last_name?: string;
+    title: string | null;
+    email: string | null;
+    linkedin_url: string | null;
+    photo_url: string | null;
+    city: string | null;
+    organization?: {
+      name: string | null;
+      website_url: string | null;
+      primary_domain: string | null;
+      industry: string | null;
+      estimated_num_employees: number | null;
+      latest_funding_stage: string | null;
+      employee_count_6_month_growth: number | null;
+      technology_names?: string[] | null;
+      short_description: string | null;
+    } | null;
+  } | null;
+}
+
+export async function enrichPerson(params: {
+  first_name: string;
+  last_name?: string;
+  organization_name?: string;
+  domain?: string;
+}): Promise<ApolloPersonEnriched | null> {
+  const data = await apolloPost<ApolloMatchResponse>("/people/match", {
+    ...params,
+    reveal_personal_emails: false,
+  });
+  if (!data?.person) return null;
+  const p = data.person;
+  return {
+    id:                p.id,
+    first_name:        p.first_name,
+    last_name:         p.last_name ?? "",
+    title:             p.title ?? null,
+    email:             p.email ?? null,
+    linkedin_url:      p.linkedin_url ?? null,
+    photo_url:         p.photo_url ?? null,
+    organization_name: p.organization?.name ?? null,
+    city:              p.city ?? null,
+    organization: p.organization
+      ? {
+          name:                          p.organization.name ?? null,
+          website_url:                   p.organization.website_url ?? null,
+          primary_domain:                p.organization.primary_domain ?? null,
+          industry:                      p.organization.industry ?? null,
+          estimated_num_employees:       p.organization.estimated_num_employees ?? null,
+          latest_funding_stage:          p.organization.latest_funding_stage ?? null,
+          employee_count_6_month_growth: p.organization.employee_count_6_month_growth ?? null,
+          technology_names:              p.organization.technology_names ?? [],
+          short_description:             p.organization.short_description ?? null,
+        }
+      : null,
+  };
+}
+
 export async function searchPeople(params: SearchPeopleParams): Promise<ApolloPerson[]> {
   // api_search is Apollo's only working search endpoint — mixed_people/search is deprecated.
   // Last names are obfuscated at the search layer regardless of plan; enrichment per-person is needed for full names.

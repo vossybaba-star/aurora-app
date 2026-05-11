@@ -43,6 +43,7 @@ import type { VenueEnrichmentResult } from "@/hooks/useVenueEnrichment";
 import { CompanyCard } from "@/components/discover/CompanyCard";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import { getRoleById } from "@/lib/roles";
+import { ContactDetailSheet } from "@/components/kammie/contact-detail-sheet";
 
 /* ─── Constants ──────────────────────────────── */
 const ACCENT  = "#7c6ef7";
@@ -236,6 +237,7 @@ export function DiscoverPage() {
   const [isLoadingContacts,    setIsLoadingContacts]    = useState(false);
   const [contactsError,        setContactsError]        = useState<string | null>(null);
   const [contactsSearched,     setContactsSearched]     = useState(false);
+  const [selectedContact,      setSelectedContact]      = useState<ApolloPerson | null>(null);
   const toastCounter = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -476,10 +478,15 @@ export function DiscoverPage() {
     setIsFinding(true);
     setFindResult(null);
     try {
-      const response = await fetch("/api/find-opportunities", {
-        method: "POST",
+      const endpoint = isB2B ? "/api/ai-find-b2b" : "/api/find-opportunities";
+      const body     = isB2B
+        ? {}
+        : { query: searchQuery || undefined, type: selectedType !== "all" ? selectedType : undefined };
+
+      const response = await fetch(endpoint, {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchQuery || undefined, type: selectedType !== "all" ? selectedType : undefined }),
+        body:    JSON.stringify(body),
       });
       const data = await response.json();
       if (data.success) {
@@ -931,7 +938,7 @@ export function DiscoverPage() {
                 ) : apolloContacts.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {apolloContacts.map(person => (
-                      <ContactCard key={person.id} person={person} />
+                      <ContactCard key={person.id} person={person} onOpen={() => setSelectedContact(person)} />
                     ))}
                   </div>
                 ) : (
@@ -1075,6 +1082,12 @@ export function DiscoverPage() {
           onDismiss={() => setToast(null)}
         />
       )}
+
+      {/* ── Contact Detail Sheet ── */}
+      <ContactDetailSheet
+        person={selectedContact}
+        onClose={() => setSelectedContact(null)}
+      />
     </div>
   );
 }
@@ -1099,9 +1112,8 @@ interface DiscoverCardProps {
 /* ═══════════════════════════════════════════════
    ContactCard — B2B people search result
 ═══════════════════════════════════════════════ */
-function ContactCard({ person }: { person: ApolloPerson }) {
-  const [imgFailed,    setImgFailed]    = useState(false);
-  const [logoFailed,   setLogoFailed]   = useState(false);
+function ContactCard({ person, onOpen }: { person: ApolloPerson; onOpen?: () => void }) {
+  const [logoFailed, setLogoFailed] = useState(false);
   const fullName = [person.first_name, person.last_name].filter(Boolean).join(" ");
 
   // Derive a best-guess domain from the org name for Clearbit logo lookup
@@ -1112,25 +1124,22 @@ function ContactCard({ person }: { person: ApolloPerson }) {
     : null;
 
   return (
-    <div className="glass-card rounded-2xl border border-white/60 p-4 flex flex-col gap-3">
+    <div
+      className="glass-card rounded-2xl border border-white/60 p-4 flex flex-col gap-3 cursor-pointer hover:border-primary/30 transition-colors"
+      onClick={onOpen}
+    >
       <div className="flex items-start gap-3">
-        {/* Person avatar */}
-        <div className="relative shrink-0">
-          {person.photo_url && !imgFailed ? (
-            <img src={person.photo_url} alt={fullName}
-              className="w-10 h-10 rounded-xl object-cover"
-              onError={() => setImgFailed(true)} />
+        {/* Company logo as main avatar, fall back to initials */}
+        <div className="shrink-0">
+          {derivedLogoUrl && !logoFailed ? (
+            <img src={derivedLogoUrl} alt={person.organization_name ?? ""}
+              className="w-10 h-10 rounded-xl border border-white/60 bg-white object-contain p-0.5"
+              onError={() => setLogoFailed(true)} />
           ) : (
             <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
                  style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
               {fullName.split(" ").slice(0,2).map(w => w[0]?.toUpperCase()).join("")}
             </div>
-          )}
-          {/* Company logo badge */}
-          {derivedLogoUrl && !logoFailed && (
-            <img src={derivedLogoUrl} alt=""
-              className="absolute -bottom-1 -right-1 w-5 h-5 rounded-md border border-white/80 bg-white object-contain"
-              onError={() => setLogoFailed(true)} />
           )}
         </div>
         <div className="flex-1 min-w-0">
@@ -1142,7 +1151,7 @@ function ContactCard({ person }: { person: ApolloPerson }) {
           {person.city && <p className="text-[10px] text-muted-foreground">{person.city}</p>}
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2" onClick={e => e.stopPropagation()}>
         {person.linkedin_url && (
           <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer"
             className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-semibold border border-white/60 bg-white/40 hover:bg-white/70 transition-colors"
@@ -1157,6 +1166,13 @@ function ContactCard({ person }: { person: ApolloPerson }) {
             <Mail className="w-3 h-3" /> Email
           </a>
         )}
+        <button
+          onClick={onOpen}
+          className="flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl text-xs font-semibold border border-white/60 bg-white/40 hover:bg-white/70 transition-colors"
+          style={{ color: ACCENT }}
+        >
+          View →
+        </button>
       </div>
     </div>
   );
