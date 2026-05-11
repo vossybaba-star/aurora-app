@@ -48,6 +48,15 @@ import { getRoleById } from "@/lib/roles";
 const ACCENT  = "#7c6ef7";
 const ACCENT2 = "#9585f9";
 
+const CONTACT_ALL_ROLES = [
+  "CEO","COO","CFO","CTO","CMO","CPO","CRO","CHRO","CSO",
+  "VP of Sales","VP of Marketing","VP of Engineering","VP of Product","VP of Operations","VP of Business Development",
+  "Sales Director","Marketing Director","Growth Director","Operations Director","Business Development Director","IT Director",
+  "Head of Sales","Head of Marketing","Head of Growth","Head of Product","Head of Engineering","Sales Manager","Account Manager",
+  "Account Executive","SDR","BDR","Sales Representative","Marketing Manager","Product Manager","Software Engineer",
+  "Founder","Co-Founder","Managing Director","General Manager","Owner",
+];
+
 // Module-level cache: placeIds we've already attempted Instagram lookup for.
 // Persists across re-renders so navigating back doesn't re-fire.
 const igFetchedIds = new Set<string>();
@@ -220,6 +229,8 @@ export function DiscoverPage() {
   const [contactLocation,      setContactLocation]      = useState("");
   const [contactEmployeeRange, setContactEmployeeRange] = useState<string[]>([]);
   const [rolePickerOpen,       setRolePickerOpen]       = useState(false);
+  const [contactSearchInput,   setContactSearchInput]   = useState("");
+  const [contactSuggestions,   setContactSuggestions]   = useState<Array<{ type: "role" | "company"; value: string }>>([]);
   const [apolloContacts,       setApolloContacts]       = useState<ApolloPerson[]>([]);
   const [isLoadingContacts,    setIsLoadingContacts]    = useState(false);
   const [contactsError,        setContactsError]        = useState<string | null>(null);
@@ -380,6 +391,32 @@ export function DiscoverPage() {
   const fetchContacts = useCallback(() => {
     doFetchContacts({ titles: contactTitles, company: contactCompany, location: contactLocation, employeeRanges: contactEmployeeRange });
   }, [doFetchContacts, contactTitles, contactCompany, contactLocation, contactEmployeeRange]);
+
+  // Build suggestions as user types in the contact search bar
+  const handleContactSearchChange = useCallback((val: string) => {
+    setContactSearchInput(val);
+    if (!val.trim()) { setContactSuggestions([]); return; }
+    const lower = val.toLowerCase();
+    const icpRoles = [...(profile?.icp?.champions ?? []), ...(profile?.icp?.decision_makers ?? [])];
+    const allRoles = [...new Set([...icpRoles, ...CONTACT_ALL_ROLES])];
+    const roleMatches = allRoles
+      .filter(r => r.toLowerCase().includes(lower) && !contactTitles.includes(r))
+      .slice(0, 6)
+      .map(r => ({ type: "role" as const, value: r }));
+    const suggestions: Array<{ type: "role" | "company"; value: string }> = [...roleMatches];
+    if (roleMatches.length < 6) suggestions.push({ type: "company" as const, value: val.trim() });
+    setContactSuggestions(suggestions);
+  }, [profile?.icp, contactTitles]);
+
+  const applyContactSuggestion = useCallback((s: { type: "role" | "company"; value: string }) => {
+    if (s.type === "role") {
+      setContactTitles(prev => prev.includes(s.value) ? prev : [...prev, s.value]);
+    } else {
+      setContactCompany(s.value);
+    }
+    setContactSearchInput("");
+    setContactSuggestions([]);
+  }, []);
 
   // Auto-load contacts when user switches to contacts mode — seed from ICP
   useEffect(() => {
@@ -635,7 +672,8 @@ export function DiscoverPage() {
                 </button>
               </div>
               {/* Row 2: Company size pills */}
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground shrink-0">Any size</span>
                 {([
                   { label: "1–10",    range: "1,10"      },
                   { label: "11–50",   range: "11,50"     },
@@ -739,16 +777,42 @@ export function DiscoverPage() {
             : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           }
           <Input
-            placeholder={searchMode === "contacts" ? "Search by company name…" : getSearchPlaceholder(profile?.businessType, isB2B)}
-            value={searchMode === "contacts" ? contactCompany : searchQuery}
-            onChange={(e) => searchMode === "contacts" ? setContactCompany(e.target.value) : setSearchQuery(e.target.value)}
+            placeholder={searchMode === "contacts" ? "Search by name, role, or company…" : getSearchPlaceholder(profile?.businessType, isB2B)}
+            value={searchMode === "contacts" ? contactSearchInput : searchQuery}
+            onChange={(e) => {
+              if (searchMode === "contacts") handleContactSearchChange(e.target.value);
+              else setSearchQuery(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key !== "Enter") return;
-              if (searchMode === "contacts") fetchContacts();
-              else handleSearch();
+              if (searchMode === "contacts") {
+                if (contactSearchInput.trim()) {
+                  setContactCompany(contactSearchInput.trim());
+                  setContactSuggestions([]);
+                  setContactSearchInput("");
+                }
+                fetchContacts();
+              } else {
+                handleSearch();
+              }
             }}
             className="pl-10"
           />
+          {/* Typeahead dropdown */}
+          {searchMode === "contacts" && contactSuggestions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 z-50 glass-card rounded-2xl border border-white/60 shadow-lg overflow-hidden">
+              {contactSuggestions.map((s, i) => (
+                <button key={i} onClick={() => applyContactSuggestion(s)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs hover:bg-black/[0.04] transition-colors border-b border-white/40 last:border-0">
+                  {s.type === "role"
+                    ? <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide" style={{ background: `rgba(124,110,247,0.1)`, color: ACCENT }}>Role</span>
+                    : <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide" style={{ background: "rgba(0,0,0,0.06)", color: "#374151" }}>Co.</span>
+                  }
+                  <span className="font-medium" style={{ color: "#131b2e" }}>{s.value}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

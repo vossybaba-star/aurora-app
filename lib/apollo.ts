@@ -6,7 +6,8 @@
  */
 
 const APOLLO_BASE      = "https://api.apollo.io/v1";
-// People search migrated to the newer api/v1 namespace (mixed_people/search deprecated May 2025)
+// People search uses the paid /v1/people/search endpoint which returns full last names.
+// /api/v1/mixed_people/api_search is the credits-free endpoint and always obfuscates last names.
 const APOLLO_BASE_PEOPLE = "https://api.apollo.io/api/v1";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -200,7 +201,9 @@ interface RawPerson {
 }
 
 export async function searchPeople(params: SearchPeopleParams): Promise<ApolloPerson[]> {
-  const data = await apolloPost<ApolloPeopleResponse>("/mixed_people/api_search", params, APOLLO_BASE_PEOPLE);
+  // Use /people/search (paid endpoint) — returns full last_name for licensed accounts.
+  // /mixed_people/api_search is credits-free but always obfuscates last_name regardless of plan.
+  const data = await apolloPost<ApolloPeopleResponse>("/people/search", params, APOLLO_BASE_PEOPLE);
   if (!data?.people) return [];
 
   return data.people.map((p) => ({
