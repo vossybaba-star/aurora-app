@@ -233,7 +233,7 @@ export function FirstRunWizard() {
     icp: ICP,
   ) => {
     setIsSaving(true);
-    await updateProfile({ companyDomain, companyAnalysis, icp }).catch(() => {});
+    await updateProfile({ companyDomain, companyAnalysis: companyAnalysis as unknown as Record<string, unknown>, icp: icp as unknown as Record<string, unknown> }).catch(() => {});
     setIsSaving(false);
     setStep("email");
   };

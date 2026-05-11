@@ -429,12 +429,7 @@ const B2B_ROLES = [
   { id: "cs",       label: "CS Manager"    },
 ];
 
-const B2B_TONE_OPTIONS: { id: CompanyAnalysis['tone']; label: string }[] = [
-  { id: "professional", label: "Professional" },
-  { id: "friendly",     label: "Friendly" },
-  { id: "technical",    label: "Technical" },
-  { id: "casual",       label: "Casual" },
-];
+// B2B_TONE_OPTIONS removed — tone field no longer part of CompanyAnalysis
 const ICP_SIZE_OPTIONS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 
 /* ═══════════════════════════════════════════════
@@ -483,17 +478,23 @@ function MyProfileSection({
   const [activeProduct,        setActiveProduct]        = useState<string>("");
   const [generatingProduct,    setGeneratingProduct]    = useState(false);
   const [newProductInput,      setNewProductInput]      = useState("");
-  const [caKeyFeatures,     setCaKeyFeatures]     = useState<string[]>(ca?.key_features  ?? []);
-  const [caTone,            setCaTone]            = useState<CompanyAnalysis['tone']>(ca?.tone ?? "professional");
-  const [icpIndustries,     setIcpIndustries]     = useState<string[]>(ic?.industries   ?? []);
-  const [icpSizes,          setIcpSizes]          = useState<string[]>(ic?.company_sizes ?? []);
-  const [icpPersonas,       setIcpPersonas]       = useState<string[]>(ic?.personas      ?? []);
-  const [icpPainPoints,     setIcpPainPoints]     = useState<Record<string, string[]>>(
+  const [caKeyFeatures,       setCaKeyFeatures]       = useState<string[]>(ca?.key_features   ?? []);
+  const [icpIndustries,       setIcpIndustries]       = useState<string[]>(ic?.industries    ?? []);
+  const [icpSizes,            setIcpSizes]            = useState<string[]>(ic?.company_sizes  ?? []);
+  const [icpChampions,        setIcpChampions]        = useState<string[]>((ic as any)?.champions       ?? []);
+  const [icpDecisionMakers,   setIcpDecisionMakers]   = useState<string[]>((ic as any)?.decision_makers ?? []);
+  const [icpPainPoints,       setIcpPainPoints]       = useState<Record<string, string[]>>(
     ic?.pain_points && !Array.isArray(ic.pain_points) ? ic.pain_points as Record<string, string[]> : {}
   );
-  const [icpGeography,      setIcpGeography]      = useState<string[]>(ic?.geography     ?? []);
-  const [activePainPersona, setActivePainPersona] = useState<string>("");
-  const [generatingPains,   setGeneratingPains]   = useState(false);
+  const [icpGoals,            setIcpGoals]            = useState<Record<string, string[]>>(
+    (ic as any)?.goals && !Array.isArray((ic as any)?.goals) ? (ic as any).goals as Record<string, string[]> : {}
+  );
+  const [icpObjections,       setIcpObjections]       = useState<Record<string, string[]>>(
+    (ic as any)?.objections && !Array.isArray((ic as any)?.objections) ? (ic as any).objections as Record<string, string[]> : {}
+  );
+  const [icpGeography,        setIcpGeography]        = useState<string[]>(ic?.geography      ?? []);
+  const [activePainPersona,   setActivePainPersona]   = useState<string>("");
+  const [generatingPains,     setGeneratingPains]     = useState(false);
 
   // Reset CA/ICP state when a new company is selected
   useEffect(() => {
@@ -509,15 +510,19 @@ function MyProfileSection({
     );
     setActiveProduct("");
     setNewProductInput("");
-    setCaKeyFeatures(ca2?.key_features      ?? []);
-    setCaTone       (ca2?.tone              ?? "professional");
+    setCaKeyFeatures  (ca2?.key_features      ?? []);
     setActivePainPersona("");
-    setIcpIndustries(ic2?.industries        ?? []);
-    setIcpSizes     (ic2?.company_sizes     ?? []);
-    setIcpPersonas  (ic2?.personas          ?? []);
+    setIcpIndustries  (ic2?.industries        ?? []);
+    setIcpSizes       (ic2?.company_sizes     ?? []);
+    setIcpChampions   ((ic2 as any)?.champions       ?? []);
+    setIcpDecisionMakers((ic2 as any)?.decision_makers ?? []);
     const pp = ic2?.pain_points;
-    setIcpPainPoints(!pp || Array.isArray(pp) ? {} : pp as Record<string, string[]>);
-    setIcpGeography (ic2?.geography         ?? []);
+    setIcpPainPoints  (!pp || Array.isArray(pp) ? {} : pp as Record<string, string[]>);
+    const gl = (ic2 as any)?.goals;
+    setIcpGoals       (!gl || Array.isArray(gl) ? {} : gl as Record<string, string[]>);
+    const ob = (ic2 as any)?.objections;
+    setIcpObjections  (!ob || Array.isArray(ob) ? {} : ob as Record<string, string[]>);
+    setIcpGeography   (ic2?.geography         ?? []);
     if (profile.website)  setPortfolioUrl(profile.website);
     if (profile.linkedin) setLinkedin(profile.linkedin);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -583,17 +588,26 @@ function MyProfileSection({
 
   const handleSaveCompany = () => {
     onSave({
-      companyAnalysis: { description: caDescription, value_proposition: caValueProp, key_products: caKeyProducts, key_features: caKeyFeatures, tone: caTone, name: profile.companyAnalysis?.name },
+      companyAnalysis: { description: caDescription, value_proposition: caValueProp, key_products: caKeyProducts, key_features: caKeyFeatures, name: profile.companyAnalysis?.name },
     });
   };
 
   const handleSaveIcp = () => {
-    // Drop pain-point entries for personas that no longer exist
-    const filteredPains = Object.fromEntries(
-      Object.entries(icpPainPoints).filter(([k]) => icpPersonas.includes(k))
-    );
+    const allPersonas = [...icpChampions, ...icpDecisionMakers];
+    const filteredPains      = Object.fromEntries(Object.entries(icpPainPoints).filter(([k]) => allPersonas.includes(k)));
+    const filteredGoals      = Object.fromEntries(Object.entries(icpGoals).filter(([k]) => allPersonas.includes(k)));
+    const filteredObjections = Object.fromEntries(Object.entries(icpObjections).filter(([k]) => allPersonas.includes(k)));
     onSave({
-      icp: { industries: icpIndustries, company_sizes: icpSizes, personas: icpPersonas, pain_points: filteredPains, geography: icpGeography },
+      icp: {
+        industries:      icpIndustries,
+        company_sizes:   icpSizes,
+        champions:       icpChampions,
+        decision_makers: icpDecisionMakers,
+        pain_points:     filteredPains,
+        goals:           filteredGoals,
+        objections:      filteredObjections,
+        geography:       icpGeography,
+      },
     });
   };
 
@@ -687,8 +701,8 @@ function MyProfileSection({
           <div className="space-y-4">
             <FieldRow label="Description" incomplete={!caDescription}>
               <textarea value={caDescription} onChange={e => setCaDescription(e.target.value)}
-                placeholder="What does your company do? Who do you serve?"
-                rows={3}
+                placeholder="3-5 sentences: what you do, who you serve, and what makes you different."
+                rows={4}
                 className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
                            focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground" />
             </FieldRow>
@@ -872,27 +886,39 @@ function MyProfileSection({
                 })}
               </div>
             </FieldRow>
-            <FieldRow label="Decision-maker personas">
-              <PillInput pills={icpPersonas}
-                onAdd={v => { setIcpPersonas(p => [...p, v]); if (!activePainPersona) setActivePainPersona(v); }}
+            <FieldRow label="Champions (mid-level)">
+              <PillInput pills={icpChampions}
+                onAdd={v => { setIcpChampions(p => [...p, v]); if (!activePainPersona) setActivePainPersona(v); }}
                 onRemove={v => {
-                  setIcpPersonas(p => p.filter(x => x !== v));
-                  if (activePainPersona === v) setActivePainPersona(icpPersonas.filter(x => x !== v)[0] ?? "");
+                  setIcpChampions(p => p.filter(x => x !== v));
+                  if (activePainPersona === v) setActivePainPersona([...icpChampions.filter(x => x !== v), ...icpDecisionMakers][0] ?? "");
                 }}
-                placeholder="e.g. VP Sales, Head of Marketing, Founder…" />
+                placeholder="e.g. Marketing Manager, Sales Ops, Account Executive…" />
             </FieldRow>
-            <FieldRow label="Pain points by persona">
-              {icpPersonas.length === 0 ? (
+            <FieldRow label="Decision makers (C-suite)">
+              <PillInput pills={icpDecisionMakers}
+                onAdd={v => { setIcpDecisionMakers(p => [...p, v]); if (!activePainPersona) setActivePainPersona(v); }}
+                onRemove={v => {
+                  setIcpDecisionMakers(p => p.filter(x => x !== v));
+                  if (activePainPersona === v) setActivePainPersona([...icpChampions, ...icpDecisionMakers.filter(x => x !== v)][0] ?? "");
+                }}
+                placeholder="e.g. CMO, VP Sales, CEO, Head of Growth…" />
+            </FieldRow>
+            <FieldRow label="Pain points, goals &amp; objections">
+              {(icpChampions.length === 0 && icpDecisionMakers.length === 0) ? (
                 <p className="text-[11px] text-muted-foreground italic">
-                  Add decision-maker personas above, then Kammie will suggest pain points per role.
+                  Add champions or decision makers above, then Kammie will generate insight per role.
                 </p>
               ) : (() => {
-                const currentPersona = activePainPersona || icpPersonas[0];
+                const allPersonas    = [...icpChampions, ...icpDecisionMakers];
+                const currentPersona = activePainPersona || allPersonas[0];
                 const currentPains   = icpPainPoints[currentPersona] ?? [];
+                const currentGoals   = icpGoals[currentPersona] ?? [];
+                const currentObjs    = icpObjections[currentPersona] ?? [];
                 const hasAuto        = currentPains.length > 0;
 
                 const generateForPersona = async (p: string) => {
-                  if (icpPainPoints[p]?.length) return; // already filled
+                  if (icpPainPoints[p]?.length) return;
                   setGeneratingPains(true);
                   try {
                     const res = await fetch("/api/generate-pain-points", {
@@ -907,9 +933,9 @@ function MyProfileSection({
                       }),
                     });
                     const data = await res.json();
-                    if (data.pain_points?.length) {
-                      setIcpPainPoints(prev => ({ ...prev, [p]: data.pain_points }));
-                    }
+                    if (data.pain_points?.length) setIcpPainPoints(prev => ({ ...prev, [p]: data.pain_points }));
+                    if (data.goals?.length)       setIcpGoals(prev => ({ ...prev, [p]: data.goals }));
+                    if (data.objections?.length)  setIcpObjections(prev => ({ ...prev, [p]: data.objections }));
                   } finally {
                     setGeneratingPains(false);
                   }
@@ -917,10 +943,11 @@ function MyProfileSection({
 
                 return (
                   <div className="space-y-3">
-                    {/* Persona tab buttons */}
+                    {/* Persona tab buttons — champions then DMs */}
                     <div className="flex flex-wrap gap-2">
-                      {icpPersonas.map(p => {
-                        const isActive = (activePainPersona || icpPersonas[0]) === p;
+                      {allPersonas.map(p => {
+                        const isActive  = currentPersona === p;
+                        const isDM      = icpDecisionMakers.includes(p);
                         return (
                           <button key={p}
                             onClick={() => { setActivePainPersona(p); generateForPersona(p); }}
@@ -933,6 +960,7 @@ function MyProfileSection({
                               borderColor: "rgba(255,255,255,0.7)", color: "var(--muted-foreground)",
                             }}>
                             {p}
+                            {isDM && <span className="ml-1 opacity-60 text-[9px]">DM</span>}
                             {(icpPainPoints[p]?.length ?? 0) > 0 && (
                               <span className="ml-1.5 opacity-70">·{icpPainPoints[p].length}</span>
                             )}
@@ -941,28 +969,53 @@ function MyProfileSection({
                       })}
                     </div>
 
-                    {/* Pain points for active persona */}
-                    <div className="rounded-xl border border-white/50 bg-white/30 p-3">
+                    {/* Pain points */}
+                    <div className="rounded-xl border border-white/50 bg-white/30 p-3 space-y-3">
                       {generatingPains && !hasAuto ? (
                         <div className="flex items-center gap-2 py-1">
                           <Spinner className="w-3.5 h-3.5" />
-                          <p className="text-[11px] text-muted-foreground">Kammie is generating pain points…</p>
+                          <p className="text-[11px] text-muted-foreground">Kammie is generating insight…</p>
                         </div>
                       ) : (
                         <>
-                          <PillInput
-                            pills={currentPains}
-                            onAdd={v => setIcpPainPoints(prev => ({ ...prev, [currentPersona]: [...(prev[currentPersona] ?? []), v] }))}
-                            onRemove={v => setIcpPainPoints(prev => ({ ...prev, [currentPersona]: (prev[currentPersona] ?? []).filter(x => x !== v) }))}
-                            placeholder={`Pain point for ${currentPersona}…`}
-                          />
-                          {!hasAuto && !generatingPains && (
-                            <button
-                              onClick={() => generateForPersona(currentPersona)}
-                              className="mt-2 text-[11px] font-bold flex items-center gap-1"
-                              style={{ color: ACCENT }}>
-                              <Sparkles className="w-3 h-3" /> Generate with Kammie
-                            </button>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Pain points</p>
+                            <PillInput
+                              pills={currentPains}
+                              onAdd={v => setIcpPainPoints(prev => ({ ...prev, [currentPersona]: [...(prev[currentPersona] ?? []), v] }))}
+                              onRemove={v => setIcpPainPoints(prev => ({ ...prev, [currentPersona]: (prev[currentPersona] ?? []).filter(x => x !== v) }))}
+                              placeholder={`Pain point for ${currentPersona}…`}
+                            />
+                            {!hasAuto && !generatingPains && (
+                              <button
+                                onClick={() => generateForPersona(currentPersona)}
+                                className="mt-2 text-[11px] font-bold flex items-center gap-1"
+                                style={{ color: ACCENT }}>
+                                <Sparkles className="w-3 h-3" /> Generate with Kammie
+                              </button>
+                            )}
+                          </div>
+                          {currentGoals.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Goals</p>
+                              <PillInput
+                                pills={currentGoals}
+                                onAdd={v => setIcpGoals(prev => ({ ...prev, [currentPersona]: [...(prev[currentPersona] ?? []), v] }))}
+                                onRemove={v => setIcpGoals(prev => ({ ...prev, [currentPersona]: (prev[currentPersona] ?? []).filter(x => x !== v) }))}
+                                placeholder={`Goal for ${currentPersona}…`}
+                              />
+                            </div>
+                          )}
+                          {currentObjs.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Objections</p>
+                              <PillInput
+                                pills={currentObjs}
+                                onAdd={v => setIcpObjections(prev => ({ ...prev, [currentPersona]: [...(prev[currentPersona] ?? []), v] }))}
+                                onRemove={v => setIcpObjections(prev => ({ ...prev, [currentPersona]: (prev[currentPersona] ?? []).filter(x => x !== v) }))}
+                                placeholder={`Objection for ${currentPersona}…`}
+                              />
+                            </div>
                           )}
                         </>
                       )}
@@ -1187,8 +1240,8 @@ function MyProfileSection({
                   <textarea
                     value={caDescription}
                     onChange={e => setCaDescription(e.target.value)}
-                    placeholder="What does your company do? Who do you serve?"
-                    rows={3}
+                    placeholder="3-5 sentences: what you do, who you serve, and what makes you different."
+                    rows={4}
                     className="w-full px-3 py-2.5 text-sm rounded-xl border border-white/50 bg-white/60 resize-none
                                focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 placeholder:text-muted-foreground"
                   />
@@ -1202,26 +1255,6 @@ function MyProfileSection({
                     onAdd={v => setCaKeyFeatures(f => [...f, v])}
                     onRemove={v => setCaKeyFeatures(f => f.filter(x => x !== v))}
                     placeholder="e.g. AI outreach, CRM sync, analytics…" />
-                </FieldRow>
-                <FieldRow label="Brand tone">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {B2B_TONE_OPTIONS.map(opt => {
-                      const isActive = caTone === opt.id;
-                      return (
-                        <button key={opt.id} onClick={() => setCaTone(opt.id)}
-                          className="py-2.5 rounded-xl border text-sm font-bold transition-all"
-                          style={isActive ? {
-                            background: `linear-gradient(135deg,rgba(124,110,247,0.13),rgba(149,133,249,0.07))`,
-                            borderColor: "rgba(124,110,247,0.4)", color: ACCENT,
-                          } : {
-                            background: "rgba(255,255,255,0.5)",
-                            borderColor: "rgba(255,255,255,0.6)", color: "var(--muted-foreground)",
-                          }}>
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
                 </FieldRow>
               </div>
             </SectionCard>
@@ -1260,17 +1293,17 @@ function MyProfileSection({
                     })}
                   </div>
                 </FieldRow>
-                <FieldRow label="Decision-maker personas">
-                  <PillInput pills={icpPersonas}
-                    onAdd={v => setIcpPersonas(p => [...p, v])}
-                    onRemove={v => setIcpPersonas(p => p.filter(x => x !== v))}
-                    placeholder="e.g. VP Sales, Head of Marketing, Founder…" />
+                <FieldRow label="Champions (mid-level)">
+                  <PillInput pills={icpChampions}
+                    onAdd={v => setIcpChampions(p => [...p, v])}
+                    onRemove={v => setIcpChampions(p => p.filter(x => x !== v))}
+                    placeholder="e.g. Marketing Manager, Sales Ops…" />
                 </FieldRow>
-                <FieldRow label="Pain points you solve">
-                  <PillInput pills={icpPainPoints}
-                    onAdd={v => setIcpPainPoints(p => [...p, v])}
-                    onRemove={v => setIcpPainPoints(p => p.filter(x => x !== v))}
-                    placeholder="e.g. Low reply rates, manual prospecting…" />
+                <FieldRow label="Decision makers (C-suite)">
+                  <PillInput pills={icpDecisionMakers}
+                    onAdd={v => setIcpDecisionMakers(p => [...p, v])}
+                    onRemove={v => setIcpDecisionMakers(p => p.filter(x => x !== v))}
+                    placeholder="e.g. CMO, VP Sales, CEO…" />
                 </FieldRow>
                 <FieldRow label="Geography">
                   <PillInput pills={icpGeography}
@@ -1370,14 +1403,16 @@ function B2BWorkSection({
   const [description,       setDescription]      = useState(ca?.description       ?? "");
   const [valueProposition,  setValueProposition]  = useState(ca?.value_proposition ?? "");
   const [keyFeatures,       setKeyFeatures]       = useState<string[]>(ca?.key_features ?? []);
-  const [caTone,            setCaTone]            = useState<CompanyAnalysis['tone']>(ca?.tone ?? "professional");
 
   // ICP state
-  const [industries,  setIndustries]  = useState<string[]>(ic?.industries   ?? []);
-  const [sizes,       setSizes]       = useState<string[]>(ic?.company_sizes ?? []);
-  const [personas,    setPersonas]    = useState<string[]>(ic?.personas      ?? []);
-  const [painPoints,  setPainPoints]  = useState<string[]>(ic?.pain_points   ?? []);
-  const [geography,   setGeography]   = useState<string[]>(ic?.geography     ?? []);
+  const [industries,       setIndustries]       = useState<string[]>(ic?.industries       ?? []);
+  const [sizes,            setSizes]            = useState<string[]>(ic?.company_sizes     ?? []);
+  const [champions,        setChampions]        = useState<string[]>((ic as any)?.champions       ?? []);
+  const [decisionMakers,   setDecisionMakers]   = useState<string[]>((ic as any)?.decision_makers ?? []);
+  const [painPoints,       setPainPoints]       = useState<Record<string, string[]>>(
+    ic?.pain_points && !Array.isArray(ic.pain_points) ? ic.pain_points as Record<string, string[]> : {}
+  );
+  const [geography,        setGeography]        = useState<string[]>(ic?.geography         ?? []);
 
   const toggleSize = (s: string) =>
     setSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -1388,7 +1423,6 @@ function B2BWorkSection({
         description,
         value_proposition: valueProposition,
         key_features: keyFeatures,
-        tone: caTone,
       },
     });
   };
@@ -1397,9 +1431,12 @@ function B2BWorkSection({
     onSave({
       icp: {
         industries,
-        company_sizes: sizes,
-        personas,
-        pain_points: painPoints,
+        company_sizes:   sizes,
+        champions,
+        decision_makers: decisionMakers,
+        pain_points:     painPoints,
+        goals:           {},
+        objections:      {},
         geography,
       },
     });
@@ -1443,31 +1480,6 @@ function B2BWorkSection({
                   onRemove={v => setKeyFeatures(f => f.filter(x => x !== v))}
                   placeholder="e.g. AI outreach, CRM sync, analytics…"
                 />
-              </FieldRow>
-              <FieldRow label="Brand tone">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {B2B_TONE_OPTIONS.map(opt => {
-                    const isActive = caTone === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        onClick={() => setCaTone(opt.id)}
-                        className="py-2.5 rounded-xl border text-sm font-bold transition-all"
-                        style={isActive ? {
-                          background: `linear-gradient(135deg,rgba(124,110,247,0.13),rgba(149,133,249,0.07))`,
-                          borderColor: "rgba(124,110,247,0.4)",
-                          color: ACCENT,
-                        } : {
-                          background: "rgba(255,255,255,0.5)",
-                          borderColor: "rgba(255,255,255,0.6)",
-                          color: "var(--muted-foreground)",
-                        }}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
               </FieldRow>
             </div>
           </SectionCard>
@@ -1516,19 +1528,31 @@ function B2BWorkSection({
                   })}
                 </div>
               </FieldRow>
-              <FieldRow label="Decision-maker personas">
+              <FieldRow label="Champions (mid-level)">
                 <PillInput
-                  pills={personas}
-                  onAdd={v => setPersonas(p => [...p, v])}
-                  onRemove={v => setPersonas(p => p.filter(x => x !== v))}
-                  placeholder="e.g. VP Sales, Head of Marketing, Founder…"
+                  pills={champions}
+                  onAdd={v => setChampions(p => [...p, v])}
+                  onRemove={v => setChampions(p => p.filter(x => x !== v))}
+                  placeholder="e.g. VP Sales, Head of Marketing, Team Lead…"
+                />
+              </FieldRow>
+              <FieldRow label="Decision makers (C-suite)">
+                <PillInput
+                  pills={decisionMakers}
+                  onAdd={v => setDecisionMakers(p => [...p, v])}
+                  onRemove={v => setDecisionMakers(p => p.filter(x => x !== v))}
+                  placeholder="e.g. CEO, CRO, Founder, COO…"
                 />
               </FieldRow>
               <FieldRow label="Pain points you solve">
                 <PillInput
-                  pills={painPoints}
-                  onAdd={v => setPainPoints(p => [...p, v])}
-                  onRemove={v => setPainPoints(p => p.filter(x => x !== v))}
+                  pills={Object.values(painPoints).flat()}
+                  onAdd={v => setPainPoints(p => ({ ...p, general: [...(p.general ?? []), v] }))}
+                  onRemove={v => setPainPoints(p => {
+                    const next = { ...p };
+                    for (const k of Object.keys(next)) next[k] = next[k].filter(x => x !== v);
+                    return next;
+                  })}
                   placeholder="e.g. Low reply rates, manual prospecting…"
                 />
               </FieldRow>
@@ -2030,10 +2054,10 @@ export function ProfilePage() {
   const handleCompanySaved = (companyDomain: string, companyName: string, companyAnalysis: CompanyAnalysis, icp: ICP, website?: string, linkedin?: string) => {
     startTransition(async () => {
       const namedAnalysis = { ...companyAnalysis, name: companyName };
-      const updates: Parameters<typeof updateProfile>[0] = {
+      const updates = {
         companyDomain,
-        companyAnalysis: namedAnalysis,
-        icp,
+        companyAnalysis: namedAnalysis as unknown as Record<string, unknown>,
+        icp: icp as unknown as Record<string, unknown>,
         ...(website  ? { website  } : {}),
         ...(linkedin ? { linkedin } : {}),
       } as Parameters<typeof updateProfile>[0];

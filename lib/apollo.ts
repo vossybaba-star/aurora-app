@@ -42,8 +42,12 @@ export interface ApolloCompany {
   account_tier?: "T1" | "T2" | "T3";
   /** One-sentence rationale for the score */
   score_rationale?: string;
-  /** Reachability: senior contact found in Apollo */
-  reachable?: boolean;
+  /** Suggested outreach angle derived from timing signals (funding, growth) */
+  recommended_angle?: string;
+  /** Reachability: champion-tier contact (mid-level) found in Apollo */
+  champion_reachable?: boolean;
+  /** Reachability: decision-maker-tier contact (C-suite/heads-of) found in Apollo */
+  decision_maker_reachable?: boolean;
 }
 
 export interface ApolloPerson {

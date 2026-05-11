@@ -446,11 +446,18 @@ export function CompanyCard({
                   {company.industry}
                 </span>
               )}
-              {company.reachable && !hasScore && (
+              {company.decision_maker_reachable && !hasScore && (
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
                       style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}
-                      title="Senior contact found in Apollo">
-                  · reachable
+                      title="Decision maker found in Apollo">
+                  DM ✓
+                </span>
+              )}
+              {!company.decision_maker_reachable && company.champion_reachable && !hasScore && (
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(22,163,74,0.08)", color: "#16a34a" }}
+                      title="Champion contact found in Apollo">
+                  Champion ✓
                 </span>
               )}
               {company.account_tier === "T1" && !hasScore && (

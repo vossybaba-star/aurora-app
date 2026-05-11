@@ -45,7 +45,8 @@ Value proposition: ${company_analysis!.value_proposition}
 Key capabilities: ${company_analysis!.key_features?.join(", ") || "Not specified"}
 ICP target industries: ${icp!.industries?.join(", ") || "Any"}
 ICP company sizes: ${icp!.company_sizes?.join(", ") || "Any"}
-ICP decision-maker personas: ${icp!.personas?.join(", ") || "Any"}
+ICP champions: ${(icp!.champions ?? []).join(", ") || "Any"}
+ICP decision makers: ${(icp!.decision_makers ?? []).join(", ") || "Any"}
 ICP pain points: ${Object.values(icp!.pain_points ?? {}).flat().join(", ") || "Not specified"}
 ICP geography: ${icp!.geography?.join(", ") || "United Kingdom"}
 

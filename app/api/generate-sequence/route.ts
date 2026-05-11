@@ -42,14 +42,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { opportunity_id?: string; regenerate?: boolean };
+  let body: { opportunity_id?: string; regenerate?: boolean; persona_type?: "champion" | "decision_maker" };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { opportunity_id, regenerate = false } = body;
+  const { opportunity_id, regenerate = false, persona_type = "champion" } = body;
   if (!opportunity_id) {
     return NextResponse.json({ error: "opportunity_id is required" }, { status: 400 });
   }
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
   // ── Step A: Initial email ──────────────────────────────────────────────
   let initialEmail: Record<string, unknown>;
   try {
-    const raw = await callClaude({ model: MODEL, maxTokens: 1200, system, prompt: buildInitialEmailPrompt(ctx) });
+    const raw = await callClaude({ model: MODEL, maxTokens: 1200, system, prompt: buildInitialEmailPrompt(ctx, persona_type) });
     initialEmail = parseClaudeJson(raw);
     if (process.env.NODE_ENV === "development") {
       console.log("[Copy Engine] Initial email generated:", {
@@ -123,7 +123,7 @@ export async function POST(req: Request) {
   const initialBody    = String(initialEmail.body ?? "");
   const personalisationScore = Number(initialEmail.personalisation_score ?? 0);
 
-  // ── Step B: Three follow-ups (sequential — each builds on previous) ────
+  // ── Step B: Seven follow-ups (sequential — each builds on previous) ────
   const followUps: Array<{
     subject: string;
     body:    string;
@@ -131,16 +131,17 @@ export async function POST(req: Request) {
     new_value_added?: string;
   }> = [];
 
-  const delays = [3, 7, 10]; // days between steps
+  // Days between each touch: touch 2→3→4→5→6→7→8
+  const delays = [3, 6, 9, 12, 16, 21, 27];
 
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= 7; i++) {
     try {
       const previousEmails = [
         { subject: initialSubject, body: initialBody },
         ...followUps.map((f) => ({ subject: f.subject, body: f.body })),
       ];
 
-      const raw  = await callClaude({ model: MODEL, maxTokens: 1200, system, prompt: buildFollowUpPrompt(ctx, i, previousEmails) });
+      const raw  = await callClaude({ model: MODEL, maxTokens: 1200, system, prompt: buildFollowUpPrompt(ctx, i, previousEmails, persona_type) });
       const parsed = parseClaudeJson(raw);
 
       const followUp = {
@@ -180,7 +181,7 @@ export async function POST(req: Request) {
       .eq("user_id", user.id);
   }
 
-  // Build all 4 steps with scheduled dates
+  // Build all 8 steps with scheduled dates
   let scheduledDate = new Date();
   const allSteps = [
     {

@@ -381,7 +381,7 @@ export function DiscoverPage() {
   // Auto-load contacts when user switches to contacts mode — seed from ICP
   useEffect(() => {
     if (!isB2B || searchMode !== "contacts" || contactsSearched) return;
-    const icpPersonas  = profile?.icp?.personas  ?? [];
+    const icpPersonas  = [...(profile?.icp?.champions ?? []), ...(profile?.icp?.decision_makers ?? [])];
     const icpGeo       = profile?.icp?.geography ?? [];
     const defaultLoc   = icpGeo[0] ?? "";
     // Pre-populate the visible filter chips so the user sees what was used
@@ -943,7 +943,7 @@ export function DiscoverPage() {
                         <CompanyCard
                           key={company.id}
                           company={company}
-                          roleId={resolvedRoleId}
+                          roleId={resolvedRoleId ?? ""}
                           isSaved={savedApolloIds.has(company.id)}
                           onSaved={handleApolloSaved}
                           onToast={showToast}

@@ -102,14 +102,25 @@ function scoreGeography(city: string | null, country: string | null, icpGeo: str
   return 0;
 }
 
-function scoreFunding(stage: string | null | undefined): number {
-  if (!stage) return 0;
-  const s = stage.toLowerCase();
-  if (s.includes("seed") || s.includes("series a")) return 10;
-  if (s.includes("series b") || s.includes("series c")) return 8;
-  if (s.includes("series d") || s.includes("growth") || s.includes("late")) return 6;
-  if (s.includes("angel") || s.includes("bootstrap") || s.includes("private")) return 4;
-  return 2;
+/** Combines funding stage + headcount growth into a timing signal (0-15 pts) */
+function scoreTiming(
+  stage: string | null | undefined,
+  growth: number | null | undefined,
+): number {
+  let score = 0;
+  if (stage) {
+    const s = stage.toLowerCase();
+    if (s.includes("seed") || s.includes("series a"))                          score += 10;
+    else if (s.includes("series b") || s.includes("series c"))                  score += 6;
+    else if (s.includes("series d") || s.includes("growth") || s.includes("late")) score += 3;
+    else if (s.includes("angel") || s.includes("bootstrap") || s.includes("private")) score += 1;
+  }
+  if (growth != null) {
+    if (growth > 0.10)       score += 5;
+    else if (growth >= 0.05) score += 3;
+    else if (growth > 0)     score += 1;
+  }
+  return Math.min(score, 15);
 }
 
 function scoreTechStack(techNames: string[] | undefined): number {
@@ -121,30 +132,33 @@ function scoreTechStack(techNames: string[] | undefined): number {
 
 // ── People reachability ───────────────────────────────────────────────────────
 
-const SENIOR_TITLES = [
+const DM_TITLES = [
   "CEO", "Founder", "Co-Founder", "Managing Director", "Director",
   "VP", "Vice President", "Head of", "CTO", "CMO", "COO", "CFO",
   "President", "Partner", "Principal", "General Manager", "Owner",
 ];
 
-async function checkReachability(
+async function checkTierReachability(
   company: ApolloCompany,
-  icpPersonas: string[],
+  titles: string[],
 ): Promise<{ reachable: boolean; count: number }> {
-  const titles = [...new Set([...SENIOR_TITLES, ...icpPersonas])];
+  if (!titles.length) return { reachable: false, count: 0 };
   const params = company.primary_domain
     ? { organization_domains: [company.primary_domain], person_titles: titles, per_page: 5, page: 1 }
     : { q_organization_name: company.name,              person_titles: titles, per_page: 5, page: 1 };
   const people = await searchPeople(params);
-  const seniorFound = people.some(p =>
-    SENIOR_TITLES.some(t => p.title?.toLowerCase().includes(t.toLowerCase()))
+  const found = people.some(p =>
+    titles.some(t => p.title?.toLowerCase().includes(t.toLowerCase()))
   );
-  return { reachable: seniorFound, count: people.length };
+  return { reachable: found, count: people.length };
 }
 
-function reachabilityBonus(r: { reachable: boolean; count: number }): number {
-  if (r.reachable)    return 8;
-  if (r.count >= 2)   return 4;
+function reachabilityBonus(
+  dm: { reachable: boolean },
+  champion: { reachable: boolean },
+): number {
+  if (dm.reachable)      return 8;
+  if (champion.reachable) return 5;
   return 0;
 }
 
@@ -161,7 +175,7 @@ async function batchScoreCompanies(
     industry: scoreIndustry(c.industry, c.keywords, icp.industries ?? []),
     size:     scoreSize(c.estimated_num_employees, icp.company_sizes ?? []),
     geo:      scoreGeography(c.city, c.country, icp.geography ?? []),
-    funding:  scoreFunding(c.latest_funding_stage),
+    timing:   scoreTiming(c.latest_funding_stage, c.employee_count_6_month_growth),
     tech:     scoreTechStack(c.technology_names),
   }));
 
@@ -197,45 +211,69 @@ Judge: does this company's description/keywords suggest they'd benefit from what
   // ── Step 3: Combined pre-reachability score ────────────────────────────
   const baseScored = companies.map((c, i) => {
     const f     = firmographic[i];
-    const score = f.industry + f.size + f.geo + f.funding + f.tech + semanticScores[i];
+    const score = f.industry + f.size + f.geo + f.timing + f.tech + semanticScores[i];
     return { company: c, score, breakdown: { ...f, semantic: semanticScores[i] } };
   }).sort((a, b) => b.score - a.score);
 
-  // ── Step 4: Parallel people search on top 8 ────────────────────────────
-  const TOP_N     = 8;
-  const topSlice  = baseScored.slice(0, TOP_N);
-  const personas  = icp.personas ?? [];
+  // ── Step 4: Parallel dual people search on top 8 ──────────────────────
+  const TOP_N          = 8;
+  const topSlice       = baseScored.slice(0, TOP_N);
+  const championTitles = icp.champions       ?? [];
+  const dmTitles       = [...new Set([...DM_TITLES, ...(icp.decision_makers ?? [])])];
 
-  const reachResults = await Promise.allSettled(
-    topSlice.map(({ company }) => checkReachability(company, personas))
-  );
+  type ReachResult = { reachable: boolean; count: number };
+
+  const [dmResults, championResults] = await Promise.all([
+    Promise.allSettled(topSlice.map(({ company }) => checkTierReachability(company, dmTitles))),
+    Promise.allSettled(topSlice.map(({ company }) => checkTierReachability(company, championTitles))),
+  ]);
 
   // ── Step 5: Final score with reachability bonus + clamp to 100 ─────────
   const finalScored = baseScored.map((item, i) => {
-    const reach = i < TOP_N && reachResults[i].status === "fulfilled"
-      ? (reachResults[i] as PromiseFulfilledResult<{ reachable: boolean; count: number }>).value
+    const dm      = i < TOP_N && dmResults[i].status      === "fulfilled"
+      ? (dmResults[i]      as PromiseFulfilledResult<ReachResult>).value
+      : { reachable: false, count: 0 };
+    const champion = i < TOP_N && championResults[i].status === "fulfilled"
+      ? (championResults[i] as PromiseFulfilledResult<ReachResult>).value
       : { reachable: false, count: 0 };
 
-    const bonus     = reachabilityBonus(reach);
-    const rawScore  = item.score + bonus;
-    const clamped   = Math.max(0, Math.min(100, rawScore));
+    const bonus    = reachabilityBonus(dm, champion);
+    const rawScore = item.score + bonus;
+    const clamped  = Math.max(0, Math.min(100, rawScore));
     const tier: "T1" | "T2" | "T3" = clamped >= 75 ? "T1" : clamped >= 50 ? "T2" : "T3";
 
     const parts: string[] = [];
     if (item.breakdown.industry >= 20) parts.push("industry match");
     if (item.breakdown.size >= 15)     parts.push("right size");
     if (item.breakdown.geo >= 12)      parts.push("in target geography");
-    if (item.breakdown.funding >= 8)   parts.push("recently funded");
+    if (item.breakdown.timing >= 8)    parts.push("strong timing signal");
     if (item.breakdown.tech >= 8)      parts.push("enterprise tech stack");
-    if (reach.reachable)               parts.push("senior contact reachable");
+    if (dm.reachable)                  parts.push("decision maker reachable");
+    else if (champion.reachable)       parts.push("champion reachable");
     const rationale = parts.length ? parts.join(", ") : "partial ICP match";
+
+    // Derive outreach angle from the strongest timing signal
+    let recommended_angle: string | undefined;
+    const stage = item.company.latest_funding_stage?.toLowerCase() ?? "";
+    const growth = item.company.employee_count_6_month_growth ?? 0;
+    if (stage.includes("seed") || stage.includes("series a")) {
+      recommended_angle = "Just raised early-stage funding — lead with scaling challenges and building the right foundations.";
+    } else if (stage.includes("series b") || stage.includes("series c")) {
+      recommended_angle = "Growth-stage funding — lead with efficiency, ROI, and supporting rapid team expansion.";
+    } else if (growth > 0.10) {
+      recommended_angle = "Strong headcount growth — lead with operational efficiency and keeping pace with scale.";
+    } else if (item.breakdown.tech >= 8) {
+      recommended_angle = "Enterprise tech stack — lead with integration, workflow fit, and measurable ROI.";
+    }
 
     return {
       ...item.company,
-      icp_score:       clamped,
-      account_tier:    tier,
-      score_rationale: rationale,
-      reachable:       reach.reachable,
+      icp_score:                clamped,
+      account_tier:             tier,
+      score_rationale:          rationale,
+      recommended_angle,
+      champion_reachable:       champion.reachable,
+      decision_maker_reachable: dm.reachable,
     };
   });
 

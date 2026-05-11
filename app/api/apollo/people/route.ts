@@ -21,9 +21,10 @@ export async function POST(req: Request) {
   // ── Resolve person_titles: ICP personas > role config > legacy ───────────
   let personTitles: string[] = [];
 
-  if (icp?.personas?.length) {
-    // B2B mode: user-defined personas from ICP settings
-    personTitles = icp.personas;
+  const allIcpPersonas = [...(icp?.champions ?? []), ...(icp?.decision_makers ?? [])];
+  if (allIcpPersonas.length) {
+    // B2B mode: champions + decision makers from ICP settings
+    personTitles = allIcpPersonas;
   } else {
     const role = role_id ? getRoleById(role_id) : undefined;
     if (role?.contactKeywords) {

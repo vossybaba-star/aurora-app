@@ -92,15 +92,31 @@ UK ENGLISH ALWAYS:
 // ─── B2B email sequence angles ────────────────────────────────────────────────
 const B2B_INITIAL_ANGLE =
   "Pain-point hook → product capability → soft CTA (15-min call or 'reply if relevant')";
+
+// 7 follow-up angles — one per touch after the initial email
 const B2B_FOLLOWUP_ANGLES = [
-  "Highlight a specific feature or use case relevant to their industry. Keep it short — one new thing only.",
-  "Lead with a brief social proof or outcome: a result you delivered for a similar company. One sentence, make it concrete.",
-  "Graceful exit. Acknowledge they're busy. Leave the door open — 'happy to reconnect whenever the timing is better.' No guilt, no pressure.",
+  // Touch 2 — day 3
+  "Value reinforcement. Restate the core value prop from a slightly different angle. One new concrete benefit or capability. Keep it tight — one new thing only.",
+  // Touch 3 — day 6
+  "Social proof. Lead with a brief outcome or result from a similar company. One sentence, make it concrete and specific. Don't name-drop — describe the situation and the result.",
+  // Touch 4 — day 9
+  "Different pain point. Try a completely different angle — a pain point from the ICP not yet mentioned. Fresh lens, same goal.",
+  // Touch 5 — day 12
+  "Question-led. Open with a direct, relevant question about their situation — 'Are you currently dealing with X?' or 'How are you handling Y right now?' One question, one short response, soft CTA.",
+  // Touch 6 — day 16
+  "Resource or insight share. Offer something useful with no strings — an observation about their industry, a stat, a useful framing. Position it as value, not a sales pitch. Soft CTA or none at all.",
+  // Touch 7 — day 21
+  "Referral ask. If this person isn't the right fit, ask who is. 'Is there someone on your team better placed for this conversation?' Makes the prospect feel helpful, not sold to.",
+  // Touch 8 — day 27
+  "Graceful exit. Acknowledge they're busy. Leave the door wide open — 'happy to reconnect whenever the timing is better.' No guilt, no pressure. Leave a positive impression.",
 ];
 
 // ─── Initial email prompt ─────────────────────────────────────────────────────
 
-export function buildInitialEmailPrompt(ctx: CopyContext): string {
+export function buildInitialEmailPrompt(
+  ctx: CopyContext,
+  personaType: "champion" | "decision_maker" = "champion",
+): string {
   if (isB2BMode(ctx)) {
     const s = ctx.sender as any;
     const contactName  = ctx.recipient.contact_name;
@@ -112,6 +128,11 @@ export function buildInitialEmailPrompt(ctx: CopyContext): string {
     const painPointsLine = (s.icp_pain_points as string[]).length > 0
       ? `Key pain points your product solves: ${(s.icp_pain_points as string[]).join(", ")}`
       : "";
+
+    const wordLimit = personaType === "decision_maker" ? 80 : 100;
+    const personaGuidance = personaType === "decision_maker"
+      ? "This is a C-suite / budget holder. Lead with business outcomes, ROI, or competitive risk. Be brief, direct, and strategic."
+      : "This is a champion / daily user. Lead with a specific pain point they face. Tactical value is fine.";
 
     return `Write a B2B cold outreach email${firstName && contactTitle
       ? ` to ${contactName}, ${contactTitle} at ${ctx.recipient.venue_name}`
@@ -125,7 +146,9 @@ SENDER COMPANY:
 - Value proposition: ${s.value_proposition || "Not specified"}
 - Capabilities: ${(s.key_features as string[]).join(", ") || "Not specified"}
 ${painPointsLine ? "- " + painPointsLine : ""}
-- Tone: ${s.tone}
+
+PERSONA TYPE: ${personaType === "decision_maker" ? "Decision Maker (C-suite / Head of)" : "Champion (mid-level / daily user)"}
+${personaGuidance}
 
 PROSPECT:
 - Company: ${ctx.recipient.venue_name}
@@ -142,7 +165,7 @@ INSTRUCTIONS:
 - FIRST sentence: lead with the suggested angle — reference a specific pain point or insight relevant to ${ctx.recipient.venue_name}'s industry. Never open with "I hope this finds you well" or "I wanted to reach out"
 - 1-2 sentences: what your product does and why it's relevant to this specific prospect
 - One soft CTA: suggest a 15-minute call or "reply if relevant" — never pushy
-- Max 100 words
+- Max ${wordLimit} words
 - UK English, no exclamation marks
 - Sign off: ${signOff}
 
@@ -270,15 +293,21 @@ Return ONLY valid JSON — no markdown fences, no preamble, no extra text:
 export function buildFollowUpPrompt(
   ctx:            CopyContext,
   followUpNumber: number,
-  previousEmails: Array<{ subject: string; body: string }>
+  previousEmails: Array<{ subject: string; body: string }>,
+  personaType:    "champion" | "decision_maker" = "champion",
 ): string {
   if (isB2BMode(ctx)) {
     const s = ctx.sender as any;
     const contactName  = ctx.recipient.contact_name;
     const firstName    = contactName ? contactName.split(" ")[0] : null;
     const signOff      = firstName ? s.first_name : s.name;
-    const b2bAngle     = B2B_FOLLOWUP_ANGLES[Math.min(followUpNumber - 1, 2)];
+    const b2bAngle     = B2B_FOLLOWUP_ANGLES[Math.min(followUpNumber - 1, B2B_FOLLOWUP_ANGLES.length - 1)];
     const previousSubject = previousEmails[0]?.subject ?? `${s.business_name || s.name}`;
+
+    const wordLimit = personaType === "decision_maker" ? 70 : 85;
+    const personaGuidance = personaType === "decision_maker"
+      ? "This contact is a budget holder / C-suite. Lead with business outcomes, ROI, or risk reduction. Be brief and direct."
+      : "This contact is a champion / daily user. Tactical value is fine — features, workflow improvements, time saved.";
 
     return `Write B2B follow-up email #${followUpNumber} from ${s.name} (${s.business_name || s.name}) to ${firstName ?? ctx.recipient.venue_name} at ${ctx.recipient.venue_name}.
 
@@ -287,6 +316,9 @@ ${previousEmails.map((e, i) => `Email ${i + 1}:\nSubject: ${e.subject}\n${e.body
 
 FOLLOW-UP ANGLE:
 ${b2bAngle}
+
+PERSONA TYPE: ${personaType === "decision_maker" ? "Decision Maker (C-suite / Head of)" : "Champion (mid-level / daily user)"}
+${personaGuidance}
 
 PRODUCT CONTEXT:
 - Product: ${s.product_description}
@@ -297,7 +329,7 @@ INSTRUCTIONS:
 - Subject: "Re: ${previousSubject}"
 - Greeting: Hi ${firstName ?? "there"},
 - Do NOT just say "following up" — add genuine new value per the angle above
-- Max 80 words
+- Max ${wordLimit} words
 - UK English, no exclamation marks
 - Sign off: ${signOff}
 

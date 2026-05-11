@@ -127,7 +127,7 @@ function ChipEditor({
           }}
           placeholder={placeholder}
           className="rounded-full border px-3 py-1 text-xs outline-none focus:ring-2 transition-shadow"
-          style={{ borderColor: "rgba(0,0,0,0.12)", minWidth: 100, focusRingColor: ACCENT }}
+          style={{ borderColor: "rgba(0,0,0,0.12)", minWidth: 100 }}
         />
         {draft && (
           <button
@@ -183,13 +183,12 @@ export function CompanySetupWizard({ onComplete }: Props) {
   const [valueProp,        setValueProp]         = useState("");
   const [keyFeatures,      setKeyFeatures]       = useState<string[]>([]);
   const [keyProducts,      setKeyProducts]       = useState<Record<string, string>>({});
-  const [tone,             setTone]              = useState<CompanyAnalysis["tone"]>("professional");
-
   // ── Step 3 state ──────────────────────────────────────────────────────────
-  const [industries,   setIndustries]   = useState<string[]>([]);
-  const [companySizes, setCompanySizes] = useState<string[]>([]);
-  const [personas,     setPersonas]     = useState<string[]>([]);
-  const [painPoints,   setPainPoints]   = useState<string[]>([]);
+  const [industries,      setIndustries]      = useState<string[]>([]);
+  const [companySizes,    setCompanySizes]    = useState<string[]>([]);
+  const [champions,       setChampions]       = useState<string[]>([]);
+  const [decisionMakers,  setDecisionMakers]  = useState<string[]>([]);
+  const [painPoints,      setPainPoints]      = useState<string[]>([]);
   const [geography,    setGeography]    = useState<string[]>(["United Kingdom"]);
 
   // ── Debounced search ──────────────────────────────────────────────────────
@@ -243,12 +242,12 @@ export function CompanySetupWizard({ onComplete }: Props) {
         setValueProp(a.value_proposition);
         setKeyFeatures(a.key_features ?? []);
         setKeyProducts(a.key_products ?? {});
-        setTone(a.tone ?? "professional");
 
         const icp = data.icpSuggestion as ICP;
         setIndustries(icp.industries ?? []);
         setCompanySizes(icp.company_sizes ?? []);
-        setPersonas(icp.personas ?? []);
+        setChampions(icp.champions ?? []);
+        setDecisionMakers(icp.decision_makers ?? []);
         // pain_points is now Record<string,string[]> — flatten for wizard display
         setPainPoints(Object.values(icp.pain_points ?? {}).flat());
         setGeography(icp.geography?.length ? icp.geography : ["United Kingdom"]);
@@ -279,6 +278,7 @@ export function CompanySetupWizard({ onComplete }: Props) {
       website_url: `https://${domain}`,
       linkedin_url: null,
       twitter_url: null,
+      logo_url: null,
       industry: null,
       keywords: [],
       estimated_num_employees: null,
@@ -302,14 +302,16 @@ export function CompanySetupWizard({ onComplete }: Props) {
       value_proposition: valueProp,
       key_features: keyFeatures,
       key_products: keyProducts,
-      tone,
     };
 
     const icp: ICP = {
       industries,
       company_sizes: companySizes,
-      personas,
+      champions,
+      decision_makers: decisionMakers,
       pain_points: painPoints.length ? { General: painPoints } : {},
+      goals: {},
+      objections: {},
       geography,
     };
 
@@ -516,29 +518,6 @@ export function CompanySetupWizard({ onComplete }: Props) {
                 />
               </div>
 
-              {/* Tone */}
-              <div className="mb-6">
-                <label className="block text-xs font-bold mb-1.5 uppercase tracking-wide text-muted-foreground">
-                  Brand tone
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {(["professional", "casual", "technical", "friendly"] as const).map(t => (
-                    <button
-                      key={t}
-                      onClick={() => setTone(t)}
-                      className="px-3.5 py-1.5 rounded-full text-xs font-semibold border capitalize transition-all"
-                      style={
-                        tone === t
-                          ? { background: ACCENT, color: "#fff", borderColor: ACCENT }
-                          : { background: "transparent", color: "#374151", borderColor: "rgba(0,0,0,0.12)" }
-                      }
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <button
                 onClick={() => setStep(3)}
                 className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-2"
@@ -604,15 +583,28 @@ export function CompanySetupWizard({ onComplete }: Props) {
                 </div>
               </div>
 
-              {/* Personas */}
+              {/* Champions */}
               <div className="mb-4">
                 <label className="block text-xs font-bold mb-1.5 uppercase tracking-wide text-muted-foreground">
-                  Decision-maker personas
+                  Champions (mid-level)
                 </label>
                 <ChipEditor
-                  items={personas}
-                  onChange={setPersonas}
-                  placeholder="e.g. Head of Marketing…"
+                  items={champions}
+                  onChange={setChampions}
+                  placeholder="e.g. VP Sales, Head of Marketing…"
+                  accent
+                />
+              </div>
+
+              {/* Decision makers */}
+              <div className="mb-4">
+                <label className="block text-xs font-bold mb-1.5 uppercase tracking-wide text-muted-foreground">
+                  Decision makers (C-suite)
+                </label>
+                <ChipEditor
+                  items={decisionMakers}
+                  onChange={setDecisionMakers}
+                  placeholder="e.g. CEO, CRO, Founder…"
                   accent
                 />
               </div>

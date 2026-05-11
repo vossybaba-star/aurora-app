@@ -195,8 +195,8 @@ export function dbProfileToProfile(db: DbProfile): UserProfile {
     notificationWeeklySummary: db.notification_weekly_summary ?? true,
     // B2B / Agency fields
     companyDomain: db.company_domain || undefined,
-    companyAnalysis: db.company_analysis as import('./types').CompanyAnalysis | undefined,
-    icp: db.icp as import('./types').ICP | undefined,
+    companyAnalysis: db.company_analysis as unknown as import('./types').CompanyAnalysis | undefined,
+    icp: db.icp as unknown as import('./types').ICP | undefined,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   };

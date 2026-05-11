@@ -108,8 +108,11 @@ export async function POST(request: Request) {
     // Truncate to ~4000 chars to keep token usage low
     const contentSample = combinedText.slice(0, 4000);
 
+    // Compute completeness score based on scrape quality
+    const completeness_score = partial ? 0.3 : scraped === 1 ? 0.6 : 1.0;
+
     // ── Haiku analysis ───────────────────────────────────────────────────────
-    const prompt = `You are analysing a company's website to help them set up outbound sales.
+    const prompt = `You are analysing a company's website to help them set up outbound B2B sales.
 
 Company name: ${companyName || "Unknown"}
 Website content:
@@ -117,41 +120,43 @@ ${contentSample}
 
 Return ONLY valid JSON — no markdown, no explanation:
 {
-  "description": "2-3 sentence plain-language company description",
+  "description": "3-5 sentence plain-language company description covering what they do, who they serve, and key differentiators",
   "value_proposition": "single most compelling headline value prop (max 15 words)",
   "key_products": ["up to 5 specific named products or services this company sells"],
   "key_features": ["up to 5 core capabilities or differentiators"],
-  "tone": "professional|casual|technical|friendly",
   "icp_suggestion": {
     "industries": ["up to 5 industries they most likely sell to"],
     "company_sizes": ["one or more of: 1-10, 11-50, 51-200, 201-1000, 1000+"],
-    "personas": ["up to 5 job titles of ideal buyers"],
+    "champions": ["up to 4 mid-level job titles who use or benefit from this daily — internal advocates"],
+    "decision_makers": ["up to 3 C-suite or Head-of titles who control budget and final sign-off"],
     "pain_points": ["up to 4 specific problems this company solves"],
     "geography": ["countries or regions they serve — default to United Kingdom if unclear"]
   }
 }`;
 
-    const raw = await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 700, prompt });
+    const raw = await callClaude({ model: "claude-haiku-4-5-20251001", maxTokens: 800, prompt });
     const parsed = parseClaudeJson<Record<string, any>>(raw);
 
     const analysis: CompanyAnalysis = {
-      description:       String(parsed.description || ""),
-      value_proposition: String(parsed.value_proposition || ""),
-      key_products:      Array.isArray(parsed.key_products)
-                           ? Object.fromEntries(parsed.key_products.map((p: unknown) => [String(p), ""]))
-                           : {},
-      key_features:      Array.isArray(parsed.key_features)  ? parsed.key_features.map(String)  : [],
-      tone:              (["professional","casual","technical","friendly"] as const)
-                           .includes(parsed.tone) ? parsed.tone : "professional",
+      description:        String(parsed.description || ""),
+      value_proposition:  String(parsed.value_proposition || ""),
+      key_products:       Array.isArray(parsed.key_products)
+                            ? Object.fromEntries(parsed.key_products.map((p: unknown) => [String(p), ""]))
+                            : {},
+      key_features:       Array.isArray(parsed.key_features) ? parsed.key_features.map(String) : [],
+      completeness_score,
     };
 
     const icpRaw = parsed.icp_suggestion ?? {};
     const icpSuggestion: ICP = {
-      industries:    Array.isArray(icpRaw.industries)    ? icpRaw.industries.map(String)    : [],
-      company_sizes: Array.isArray(icpRaw.company_sizes) ? icpRaw.company_sizes.map(String) : ["11-50", "51-200"],
-      personas:      Array.isArray(icpRaw.personas)      ? icpRaw.personas.map(String)      : [],
-      pain_points:   {},  // populated per-persona in the profile page after personas are set
-      geography:     Array.isArray(icpRaw.geography)     ? icpRaw.geography.map(String)     : ["United Kingdom"],
+      industries:      Array.isArray(icpRaw.industries)      ? icpRaw.industries.map(String)      : [],
+      company_sizes:   Array.isArray(icpRaw.company_sizes)   ? icpRaw.company_sizes.map(String)   : ["11-50", "51-200"],
+      champions:       Array.isArray(icpRaw.champions)       ? icpRaw.champions.map(String)       : [],
+      decision_makers: Array.isArray(icpRaw.decision_makers) ? icpRaw.decision_makers.map(String) : [],
+      pain_points:     {},  // populated per-persona in profile page after personas are confirmed
+      goals:           {},
+      objections:      {},
+      geography:       Array.isArray(icpRaw.geography)       ? icpRaw.geography.map(String)       : ["United Kingdom"],
     };
 
     return NextResponse.json({
