@@ -658,11 +658,24 @@ export function DiscoverPage() {
               <div className="flex flex-wrap gap-2 items-center">
                 <div className="relative">
                   <input value={contactLocation} onChange={e => setContactLocation(e.target.value)}
-                    placeholder="Country"
-                    className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-28"
+                    placeholder="Location"
+                    className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
                   />
                   {contactLocation && <button onClick={() => setContactLocation("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
                 </div>
+                <select value={contactEmployeeRange[0] ?? ""} onChange={e => setContactEmployeeRange(e.target.value ? [e.target.value] : [])}
+                  className="px-3 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30">
+                  <option value="">Any size</option>
+                  {([
+                    { label: "1-10",      value: "1,10"       },
+                    { label: "11-50",     value: "11,50"      },
+                    { label: "51-200",    value: "51,200"     },
+                    { label: "201-1000",  value: "201,1000"   },
+                    { label: "1000+",     value: "1001,100000"},
+                  ] as const).map(({ label, value }) => (
+                    <option key={value} value={value}>{label} employees</option>
+                  ))}
+                </select>
                 <button onClick={fetchContacts}
                   disabled={isLoadingContacts}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-40"
@@ -670,34 +683,6 @@ export function DiscoverPage() {
                   {isLoadingContacts ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserSearch className="w-3 h-3" />}
                   Search
                 </button>
-              </div>
-              {/* Row 2: Company size pills */}
-              <div className="flex flex-wrap gap-1.5 items-center">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground shrink-0">Any size</span>
-                {([
-                  { label: "1–10",    range: "1,10"      },
-                  { label: "11–50",   range: "11,50"     },
-                  { label: "51–200",  range: "51,200"    },
-                  { label: "201–500", range: "201,500"   },
-                  { label: "500+",    range: "501,10000" },
-                ] as const).map(({ label, range }) => {
-                  const active = contactEmployeeRange.includes(range);
-                  return (
-                    <button key={range}
-                      onClick={() => setContactEmployeeRange(prev =>
-                        active ? prev.filter(r => r !== range) : [...prev, range]
-                      )}
-                      className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all"
-                      style={active
-                        ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, color: "white", borderColor: "transparent" }
-                        : { background: "rgba(0,0,0,0.04)", color: "#374151", borderColor: "rgba(0,0,0,0.08)" }
-                      }
-                    >{label}</button>
-                  );
-                })}
-                {contactEmployeeRange.length > 0 && (
-                  <button onClick={() => setContactEmployeeRange([])} className="text-[11px] text-muted-foreground hover:text-foreground">Clear</button>
-                )}
               </div>
               {/* Row 2: Role selector */}
               <div className="space-y-1.5">
