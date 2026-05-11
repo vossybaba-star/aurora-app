@@ -238,7 +238,7 @@ export function DiscoverPage() {
   const [isLoadingContacts,    setIsLoadingContacts]    = useState(false);
   const [contactsError,        setContactsError]        = useState<string | null>(null);
   const [contactsSearched,     setContactsSearched]     = useState(false);
-  const [selectedCompany,      setSelectedCompany]      = useState<{ company: ApolloCompany; contacts: ApolloPerson[]; initialPersonId?: string } | null>(null);
+  const [selectedCompany,      setSelectedCompany]      = useState<{ company: ApolloCompany; contacts: ApolloPerson[]; initialPersonId?: string; suggestedAngle?: string | null } | null>(null);
   const toastCounter = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -1028,7 +1028,7 @@ export function DiscoverPage() {
                           userLocation={profile?.location ?? ""}
                           icp={profile?.icp}
                           companyAnalysis={profile?.companyAnalysis}
-                          onViewFull={(c, contacts) => setSelectedCompany({ company: c, contacts })}
+                          onViewFull={(c, contacts, suggestedAngle) => setSelectedCompany({ company: c, contacts, suggestedAngle })}
                         />
                       ))}
                     </div>
@@ -1113,6 +1113,7 @@ export function DiscoverPage() {
         company={selectedCompany?.company ?? null}
         initialContacts={selectedCompany?.contacts ?? []}
         initialPersonId={selectedCompany?.initialPersonId}
+        suggestedAngle={selectedCompany?.suggestedAngle}
         onClose={() => setSelectedCompany(null)}
         icp={profile?.icp}
         companyAnalysis={profile?.companyAnalysis}

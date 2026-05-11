@@ -158,7 +158,7 @@ export interface CompanyCardProps {
   icp?:                ICP;
   companyAnalysis?:    CompanyAnalysis;
   /** Opens the full company detail sheet */
-  onViewFull?:         (company: ApolloCompany, contacts: ApolloPerson[]) => void;
+  onViewFull?:         (company: ApolloCompany, contacts: ApolloPerson[], suggestedAngle?: string | null) => void;
 }
 
 export function CompanyCard({
@@ -269,7 +269,7 @@ export function CompanyCard({
         border:    saved ? "1.5px solid rgba(22,163,74,0.4)" : "1px solid rgba(255,255,255,0.6)",
         boxShadow: saved ? "0 4px 20px rgba(22,163,74,0.08)" : "0 2px 12px rgba(124,110,247,0.06)",
       }}
-      onClick={() => onViewFull?.(company, people)}
+      onClick={() => onViewFull?.(company, people, result?.suggested_angle)}
     >
       {/* ── Header ── */}
       <div className="px-4 pt-4 pb-3">
@@ -357,7 +357,7 @@ export function CompanyCard({
           </div>
           {peopleFetched && (
             <button
-              onClick={e => { e.stopPropagation(); onViewFull?.(company, people); }}
+              onClick={e => { e.stopPropagation(); onViewFull?.(company, people, result?.suggested_angle); }}
               className="flex items-center gap-1 text-[10px] font-semibold hover:opacity-80 transition-opacity"
               style={{ color: ACCENT }}
             >

@@ -5,8 +5,9 @@ import {
   Sheet, SheetContent, SheetTitle,
 } from "@/components/ui/sheet";
 import {
-  Globe, Linkedin, ExternalLink, Loader2,
-  Users, Mail, Copy, Check, UserRound, X,
+  Globe, Linkedin, Loader2,
+  Users, Mail, Copy, Check, UserRound, X, Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import type { ICP, CompanyAnalysis } from "@/lib/types";
@@ -42,12 +43,25 @@ function pill(label: string, accent = false) {
   );
 }
 
+function findIcpItems(
+  map: Record<string, string[]> | undefined,
+  contactTitle: string | null,
+): string[] {
+  if (!map || !contactTitle) return [];
+  const lower = contactTitle.toLowerCase();
+  for (const [key, vals] of Object.entries(map)) {
+    if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) return vals;
+  }
+  return Object.values(map)[0] ?? [];
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface CompanyDetailSheetProps {
   company:             ApolloCompany | null;
   initialContacts?:    ApolloPerson[];
   initialPersonId?:    string;
+  suggestedAngle?:     string | null;
   onClose:             () => void;
   icp?:                ICP;
   companyAnalysis?:    CompanyAnalysis;
@@ -63,13 +77,13 @@ export interface CompanyDetailSheetProps {
 function ContactRow({
   person, selected, onClick, onAdd, isAdding, isAdded, isFailed,
 }: {
-  person:    ApolloPerson;
-  selected:  boolean;
-  onClick:   () => void;
-  onAdd:     () => void;
-  isAdding:  boolean;
-  isAdded:   boolean;
-  isFailed:  boolean;
+  person:   ApolloPerson;
+  selected: boolean;
+  onClick:  () => void;
+  onAdd:    () => void;
+  isAdding: boolean;
+  isAdded:  boolean;
+  isFailed: boolean;
 }) {
   const name = displayName(person);
   return (
@@ -112,32 +126,31 @@ function ContactRow({
   );
 }
 
-// ── EmailPanel ────────────────────────────────────────────────────────────────
+// ── EmailPanel (one-time email, no role selector) ─────────────────────────────
 
 function EmailPanel({
-  person, company, companyDescription, companyIndustry, suggestedAngle,
+  person, company, companyDescription, companyIndustry, suggestedAngle, personaType,
 }: {
-  person:             ApolloPerson | null;
+  person:             ApolloPerson;
   company:            ApolloCompany;
   companyDescription: string | null;
   companyIndustry:    string | null;
   suggestedAngle:     string | null;
+  personaType:        "champion" | "decision_maker";
 }) {
-  const [contactRole, setContactRole] = useState<"champion" | "decision_maker">("champion");
-  const [angle,       setAngle]       = useState(suggestedAngle ?? "");
-  const [loading,     setLoading]     = useState(false);
-  const [email,       setEmail]       = useState<{ subject: string; body: string } | null>(null);
-  const [error,       setError]       = useState<string | null>(null);
-  const [copied,      setCopied]      = useState(false);
-  const [showFull,    setShowFull]    = useState(false);
+  const [angle,    setAngle]    = useState(suggestedAngle ?? "");
+  const [loading,  setLoading]  = useState(false);
+  const [email,    setEmail]    = useState<{ subject: string; body: string } | null>(null);
+  const [error,    setError]    = useState<string | null>(null);
+  const [copied,   setCopied]   = useState(false);
+  const [showFull, setShowFull] = useState(false);
 
   useEffect(() => {
     setEmail(null); setError(null); setCopied(false); setShowFull(false);
     setAngle(suggestedAngle ?? "");
-  }, [person?.id, suggestedAngle]);
+  }, [person.id, suggestedAngle]);
 
   const generate = async () => {
-    if (!person) return;
     setLoading(true); setEmail(null); setError(null);
     try {
       const res = await fetch("/api/contacts/generate-email", {
@@ -148,7 +161,7 @@ function EmailPanel({
           company_name:         company.name,
           company_description:  companyDescription,
           company_industry:     companyIndustry,
-          contact_role:         contactRole,
+          contact_role:         personaType,
           angle,
         }),
       });
@@ -168,29 +181,8 @@ function EmailPanel({
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!person) {
-    return (
-      <p className="text-[11px] text-muted-foreground text-center py-2">
-        Select a contact to generate an email.
-      </p>
-    );
-  }
-
   return (
     <div className="space-y-2.5">
-      <div className="flex rounded-xl border border-white/60 overflow-hidden bg-white/30">
-        {(["champion", "decision_maker"] as const).map(role => (
-          <button key={role}
-            onClick={() => { setContactRole(role); setEmail(null); }}
-            className="flex-1 py-1.5 text-[10px] font-semibold transition-all"
-            style={contactRole === role
-              ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, color: "white" }
-              : { color: "var(--muted-foreground)" }}>
-            {role === "champion" ? "Champion" : "Decision Maker"}
-          </button>
-        ))}
-      </div>
-
       <textarea value={angle} onChange={e => setAngle(e.target.value)} rows={2}
         placeholder="e.g. Just raised funding — timing your outreach here…"
         className="w-full text-[11px] rounded-xl border border-white/60 bg-white/60 px-2.5 py-2 resize-none focus:outline-none placeholder:text-muted-foreground/50" />
@@ -245,23 +237,23 @@ function EmailPanel({
 // ── SequencePanel ─────────────────────────────────────────────────────────────
 
 const SEQUENCE_STEPS = [
-  { step: 1, day: 1,  label: "Trigger hook"    },
-  { step: 2, day: 3,  label: "Value add"       },
-  { step: 3, day: 6,  label: "Social proof"    },
-  { step: 4, day: 9,  label: "New angle"       },
-  { step: 5, day: 12, label: "Question-led"    },
-  { step: 6, day: 16, label: "Resource share"  },
-  { step: 7, day: 21, label: "Referral ask"    },
-  { step: 8, day: 27, label: "Graceful exit"   },
+  { step: 1, day: 1,  label: "Trigger hook"   },
+  { step: 2, day: 3,  label: "Value add"      },
+  { step: 3, day: 6,  label: "Social proof"   },
+  { step: 4, day: 9,  label: "New angle"      },
+  { step: 5, day: 12, label: "Question-led"   },
+  { step: 6, day: 16, label: "Resource share" },
+  { step: 7, day: 21, label: "Referral ask"   },
+  { step: 8, day: 27, label: "Graceful exit"  },
 ];
 
 const CHAMPION_DESCS = [
-  "Lead with the research signal — recent news or trigger that shows you did your homework.",
+  "Lead with the research signal — recent news or trigger showing you did your homework.",
   "Connect your offering to a day-to-day workflow pain they'd feel.",
   "Name a peer company or role that got a result they'd want.",
   "Tackle a different pain — don't repeat step 2.",
   "Ask an open question that invites a reply.",
-  "Share a piece of content that earns trust without a hard ask.",
+  "Share content that earns trust without a hard ask.",
   "Ask if there's someone better placed to chat.",
   "Low-pressure close — leave the door open.",
 ];
@@ -277,18 +269,64 @@ const DM_DESCS = [
   "Final outreach — make it easy to either engage or pass.",
 ];
 
+interface GeneratedStep {
+  step:     number;
+  day:      number;
+  label:    string;
+  preview:  string;
+}
+
 function SequencePanel({
-  person, suggestedAngle,
+  person, company, suggestedAngle,
 }: {
   person:         ApolloPerson | null;
+  company:        ApolloCompany;
   suggestedAngle: string | null;
 }) {
-  const [persona, setPersona] = useState<"champion" | "decision_maker">("champion");
-  const descs = persona === "champion" ? CHAMPION_DESCS : DM_DESCS;
+  const [persona,    setPersona]    = useState<"champion" | "decision_maker">("champion");
+  const [generating, setGenerating] = useState(false);
+  const [steps,      setSteps]      = useState<GeneratedStep[] | null>(null);
+  const [genError,   setGenError]   = useState<string | null>(null);
+
+  // Reset generated steps when person or persona changes
+  useEffect(() => { setSteps(null); setGenError(null); }, [person?.id, persona]);
+
+  const staticDescs = persona === "champion" ? CHAMPION_DESCS : DM_DESCS;
+
+  const generateSequence = async () => {
+    if (!person) return;
+    setGenerating(true); setSteps(null); setGenError(null);
+    try {
+      const res = await fetch("/api/contacts/generate-sequence", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_name:         company.name,
+          company_description:  company.short_description ?? null,
+          company_industry:     company.industry ?? null,
+          recipient_first_name: person.first_name,
+          recipient_title:      person.title ?? null,
+          angle:                suggestedAngle ?? "",
+          persona_type:         persona,
+        }),
+      });
+      const data = await res.json();
+      if (data.steps) setSteps(data.steps);
+      else setGenError(data.error ?? "Failed to generate sequence");
+    } catch {
+      setGenError("Something went wrong.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const displaySteps = steps
+    ? SEQUENCE_STEPS.map((s, i) => ({ ...s, preview: steps[i]?.preview ?? staticDescs[i] }))
+    : SEQUENCE_STEPS.map((s, i) => ({ ...s, preview: s.step === 1 && suggestedAngle ? suggestedAngle : staticDescs[i] }));
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-3 space-y-3">
+        {/* Persona toggle + generate button */}
         <div className="flex rounded-xl border border-white/60 overflow-hidden bg-white/30">
           {(["champion", "decision_maker"] as const).map(role => (
             <button key={role} onClick={() => setPersona(role)}
@@ -301,8 +339,24 @@ function SequencePanel({
           ))}
         </div>
 
+        <button
+          onClick={generateSequence}
+          disabled={!person || generating}
+          className="w-full py-2 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 border transition-all disabled:opacity-50"
+          style={steps
+            ? { borderColor: `${ACCENT}40`, color: ACCENT, background: `${ACCENT}08` }
+            : { borderColor: `${ACCENT}40`, color: ACCENT, background: "white" }}
+        >
+          {generating
+            ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating…</>
+            : <><Sparkles className="w-3 h-3" /> {steps ? "Regenerate AI sequence" : "Generate AI sequence"}</>}
+        </button>
+
+        {genError && <p className="text-[10px] text-red-500 text-center">{genError}</p>}
+
+        {/* Step timeline */}
         <div>
-          {SEQUENCE_STEPS.map((s, i) => (
+          {displaySteps.map((s, i) => (
             <div key={s.step} className="flex gap-2.5 items-start">
               <div className="shrink-0 flex flex-col items-center pt-0.5">
                 <div
@@ -311,7 +365,7 @@ function SequencePanel({
                 >
                   {s.step}
                 </div>
-                {i < SEQUENCE_STEPS.length - 1 && (
+                {i < displaySteps.length - 1 && (
                   <div className="w-px flex-1 min-h-[20px] bg-black/10 my-0.5" />
                 )}
               </div>
@@ -320,24 +374,24 @@ function SequencePanel({
                   <p className="text-[11px] font-semibold" style={{ color: "#131b2e" }}>{s.label}</p>
                   <span className="text-[9px] text-muted-foreground shrink-0">Day {s.day}</span>
                 </div>
-                <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  {s.step === 1 && suggestedAngle ? suggestedAngle : descs[i]}
-                </p>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">{s.preview}</p>
               </div>
             </div>
           ))}
         </div>
 
-        {person ? (
+        {person && (
           <button
             className="w-full py-2.5 rounded-xl text-[11px] font-semibold text-white flex items-center justify-center gap-1.5"
             style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 4px 12px ${ACCENT}40` }}
           >
             <Mail className="w-3.5 h-3.5" /> Add {person.first_name} to sequence
           </button>
-        ) : (
+        )}
+
+        {!person && (
           <p className="text-[10px] text-muted-foreground text-center py-1">
-            Select a contact to activate sequence
+            Select a contact to generate sequence
           </p>
         )}
       </div>
@@ -368,15 +422,21 @@ function ContactResearchPanel({
     );
   }
 
-  const name      = displayName(person);
+  const name       = displayName(person);
   const isChampion = icp?.champions?.some(t => person.title?.toLowerCase().includes(t.toLowerCase()));
   const isDM       = icp?.decision_makers?.some(t => person.title?.toLowerCase().includes(t.toLowerCase()));
   const role       = isDM ? "Decision Maker" : isChampion ? "Champion" : null;
   const roleColor  = isDM ? ACCENT : "#16a34a";
+  const personaType: "champion" | "decision_maker" = isDM ? "decision_maker" : "champion";
+
+  const painPoints = findIcpItems(icp?.pain_points as Record<string, string[]> | undefined, person.title);
+  const goals      = findIcpItems(icp?.goals      as Record<string, string[]> | undefined, person.title);
+  const objections = findIcpItems(icp?.objections  as Record<string, string[]> | undefined, person.title);
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-3 space-y-3">
+
         {/* Person header */}
         <div className="flex items-start gap-2.5 p-2.5 rounded-xl border border-white/60 bg-white/40">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm text-white"
@@ -422,7 +482,56 @@ function ContactResearchPanel({
           </div>
         )}
 
-        {/* Email */}
+        {/* Prospect research */}
+        {(painPoints.length > 0 || goals.length > 0 || objections.length > 0) && (
+          <div className="p-2.5 rounded-xl border border-white/60 bg-white/30 space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Prospect research</p>
+
+            {painPoints.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold mb-1" style={{ color: "#131b2e" }}>Pain points</p>
+                <ul className="space-y-0.5">
+                  {painPoints.slice(0, 4).map((pt, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                      <span className="mt-0.5 shrink-0" style={{ color: ACCENT }}>•</span>
+                      {pt}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {goals.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold mb-1" style={{ color: "#131b2e" }}>Goals</p>
+                <ul className="space-y-0.5">
+                  {goals.slice(0, 3).map((g, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                      <span className="mt-0.5 shrink-0" style={{ color: "#16a34a" }}>•</span>
+                      {g}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {objections.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold mb-1" style={{ color: "#131b2e" }}>Likely objections</p>
+                <ul className="space-y-0.5">
+                  {objections.slice(0, 2).map((o, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                      <span className="mt-0.5 shrink-0" style={{ color: "#f59e0b" }}>•</span>
+                      {o}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* One-time email */}
         <div className="p-2.5 rounded-xl border border-white/60 bg-white/30">
           <div className="flex items-center gap-1.5 mb-2.5">
             <Mail className="w-3 h-3 shrink-0" style={{ color: ACCENT }} />
@@ -436,8 +545,10 @@ function ContactResearchPanel({
             companyDescription={company.short_description ?? null}
             companyIndustry={company.industry ?? null}
             suggestedAngle={suggestedAngle}
+            personaType={personaType}
           />
         </div>
+
       </div>
     </div>
   );
@@ -446,7 +557,7 @@ function ContactResearchPanel({
 // ── Main sheet ────────────────────────────────────────────────────────────────
 
 export function CompanyDetailSheet({
-  company, initialContacts = [], initialPersonId,
+  company, initialContacts = [], initialPersonId, suggestedAngle: propAngle,
   onClose, icp, companyAnalysis, roleId,
   userProfession = "", userAbout = "", userSpecialityTags = [], userLocation = "",
 }: CompanyDetailSheetProps) {
@@ -534,7 +645,8 @@ export function CompanyDetailSheet({
       : null);
 
   const tier  = company.account_tier;
-  const angle = company.recommended_angle ?? null;
+  // Use DB angle first, fall back to enrichment result passed from CompanyCard
+  const angle = company.recommended_angle ?? propAngle ?? null;
 
   const icpTitles = [...(icp?.champions ?? []), ...(icp?.decision_makers ?? [])].map(t => t.toLowerCase());
   const sorted    = [...contacts].sort((a, b) => {
@@ -546,9 +658,9 @@ export function CompanyDetailSheet({
   const selectedPerson = contacts.find(c => c.id === selectedId) ?? null;
 
   const TABS = [
-    { key: "contacts" as const,  label: `Contacts${contacts.length > 0 ? ` (${contacts.length})` : ""}` },
-    { key: "research" as const,  label: selectedPerson ? selectedPerson.first_name : "Research" },
-    { key: "sequence" as const,  label: "Sequence" },
+    { key: "contacts" as const, label: `Contacts${contacts.length > 0 ? ` (${contacts.length})` : ""}` },
+    { key: "research" as const, label: selectedPerson ? selectedPerson.first_name : "Research" },
+    { key: "sequence" as const, label: "Sequence" },
   ];
 
   return (
@@ -621,7 +733,7 @@ export function CompanyDetailSheet({
               <a href={company.linkedin_url} target="_blank" rel="noopener noreferrer"
                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-white/60 bg-white/50 hover:bg-white/80 transition-colors"
                  style={{ color: ACCENT }}>
-                <Globe className="w-3 h-3" /> LinkedIn
+                <Linkedin className="w-3 h-3" /> LinkedIn
               </a>
             )}
           </div>
@@ -723,7 +835,11 @@ export function CompanyDetailSheet({
             <div className="px-3 py-2 border-b border-black/5 shrink-0">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">8-Touch Sequence</p>
             </div>
-            <SequencePanel person={selectedPerson} suggestedAngle={angle} />
+            <SequencePanel
+              person={selectedPerson}
+              company={company}
+              suggestedAngle={angle}
+            />
           </div>
 
         </div>
