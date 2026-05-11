@@ -7,11 +7,12 @@ import {
 import {
   Globe, Linkedin, Loader2,
   Users, Mail, Copy, Check, UserRound, X, Sparkles,
-  ExternalLink,
+  ExternalLink, Zap,
 } from "lucide-react";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import type { ICP, CompanyAnalysis } from "@/lib/types";
 import { CompanyLogo } from "./CompanyLogo";
+import { useCompanyEnrichment } from "@/hooks/useCompanyEnrichment";
 
 const ACCENT  = "#7c6ef7";
 const ACCENT2 = "#9585f9";
@@ -54,6 +55,14 @@ function findIcpItems(
   }
   return Object.values(map)[0] ?? [];
 }
+
+// ── Module-level research cache (session-scoped) ───────────────────────────
+
+interface PersonResearch {
+  angles: string[];
+  hooks:  string[];
+}
+const researchCache = new Map<string, PersonResearch>();
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -126,7 +135,7 @@ function ContactRow({
   );
 }
 
-// ── EmailPanel (one-time email, no role selector) ─────────────────────────────
+// ── EmailPanel ────────────────────────────────────────────────────────────────
 
 function EmailPanel({
   person, company, companyDescription, companyIndustry, suggestedAngle, personaType,
@@ -259,21 +268,21 @@ const CHAMPION_DESCS = [
 ];
 
 const DM_DESCS = [
-  "Lead with the business signal — funding, growth, or strategic shift that creates timing.",
+  "Lead with the business signal — funding, growth, or strategic shift creating timing.",
   "Frame your ROI in terms of revenue impact or cost reduction.",
   "Reference a comparable company outcome at the strategic level.",
   "Raise a risk or missed opportunity they're accountable for.",
   "Ask a direct question about their priority this quarter.",
-  "Share a benchmark or data point relevant to their board metrics.",
+  "Share a benchmark relevant to their board metrics.",
   "Offer an intro to someone relevant to their goals.",
   "Final outreach — make it easy to either engage or pass.",
 ];
 
 interface GeneratedStep {
-  step:     number;
-  day:      number;
-  label:    string;
-  preview:  string;
+  step:    number;
+  day:     number;
+  label:   string;
+  preview: string;
 }
 
 function SequencePanel({
@@ -288,7 +297,6 @@ function SequencePanel({
   const [steps,      setSteps]      = useState<GeneratedStep[] | null>(null);
   const [genError,   setGenError]   = useState<string | null>(null);
 
-  // Reset generated steps when person or persona changes
   useEffect(() => { setSteps(null); setGenError(null); }, [person?.id, persona]);
 
   const staticDescs = persona === "champion" ? CHAMPION_DESCS : DM_DESCS;
@@ -326,7 +334,6 @@ function SequencePanel({
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-3 space-y-3">
-        {/* Persona toggle + generate button */}
         <div className="flex rounded-xl border border-white/60 overflow-hidden bg-white/30">
           {(["champion", "decision_maker"] as const).map(role => (
             <button key={role} onClick={() => setPersona(role)}
@@ -354,15 +361,12 @@ function SequencePanel({
 
         {genError && <p className="text-[10px] text-red-500 text-center">{genError}</p>}
 
-        {/* Step timeline */}
         <div>
           {displaySteps.map((s, i) => (
             <div key={s.step} className="flex gap-2.5 items-start">
               <div className="shrink-0 flex flex-col items-center pt-0.5">
-                <div
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
-                  style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
-                >
+                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                     style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
                   {s.step}
                 </div>
                 {i < displaySteps.length - 1 && (
@@ -380,18 +384,16 @@ function SequencePanel({
           ))}
         </div>
 
-        {person && (
+        {person ? (
           <button
             className="w-full py-2.5 rounded-xl text-[11px] font-semibold text-white flex items-center justify-center gap-1.5"
             style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 4px 12px ${ACCENT}40` }}
           >
             <Mail className="w-3.5 h-3.5" /> Add {person.first_name} to sequence
           </button>
-        )}
-
-        {!person && (
+        ) : (
           <p className="text-[10px] text-muted-foreground text-center py-1">
-            Select a contact to generate sequence
+            Select a contact to activate sequence
           </p>
         )}
       </div>
@@ -409,6 +411,55 @@ function ContactResearchPanel({
   icp?:           ICP;
   suggestedAngle: string | null;
 }) {
+  const [research,    setResearch]    = useState<PersonResearch | null>(null);
+  const [researching, setResearching] = useState(false);
+
+  // Auto-run prospect research when contact changes
+  useEffect(() => {
+    if (!person) { setResearch(null); return; }
+
+    // Serve from cache if available
+    if (researchCache.has(person.id)) {
+      setResearch(researchCache.get(person.id)!);
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      setResearching(true);
+      setResearch(null);
+      try {
+        const painPoints = findIcpItems(icp?.pain_points as Record<string, string[]> | undefined, person.title);
+        const goals      = findIcpItems(icp?.goals      as Record<string, string[]> | undefined, person.title);
+        const res = await fetch("/api/contacts/prospect-research", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipient_first_name:  person.first_name,
+            recipient_last_name:   person.last_name?.includes("*") ? undefined : person.last_name,
+            recipient_title:       person.title,
+            company_name:          company.name,
+            company_description:   company.short_description ?? null,
+            company_industry:      company.industry ?? null,
+            latest_funding_stage:  company.latest_funding_stage ?? null,
+            headcount_growth:      company.employee_count_6_month_growth ?? null,
+            suggested_angle:       suggestedAngle,
+            icp_pain_points:       painPoints,
+            icp_goals:             goals,
+          }),
+        });
+        if (res.ok && !cancelled) {
+          const data: PersonResearch = await res.json();
+          researchCache.set(person.id, data);
+          setResearch(data);
+        }
+      } catch { /* non-fatal */ }
+      finally { if (!cancelled) setResearching(false); }
+    };
+    run();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [person?.id]);
+
   if (!person) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-4 text-center gap-2">
@@ -428,10 +479,6 @@ function ContactResearchPanel({
   const role       = isDM ? "Decision Maker" : isChampion ? "Champion" : null;
   const roleColor  = isDM ? ACCENT : "#16a34a";
   const personaType: "champion" | "decision_maker" = isDM ? "decision_maker" : "champion";
-
-  const painPoints = findIcpItems(icp?.pain_points as Record<string, string[]> | undefined, person.title);
-  const goals      = findIcpItems(icp?.goals      as Record<string, string[]> | undefined, person.title);
-  const objections = findIcpItems(icp?.objections  as Record<string, string[]> | undefined, person.title);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -482,54 +529,56 @@ function ContactResearchPanel({
           </div>
         )}
 
-        {/* Prospect research */}
-        {(painPoints.length > 0 || goals.length > 0 || objections.length > 0) && (
-          <div className="p-2.5 rounded-xl border border-white/60 bg-white/30 space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Prospect research</p>
-
-            {painPoints.length > 0 && (
-              <div>
-                <p className="text-[10px] font-semibold mb-1" style={{ color: "#131b2e" }}>Pain points</p>
-                <ul className="space-y-0.5">
-                  {painPoints.slice(0, 4).map((pt, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-                      <span className="mt-0.5 shrink-0" style={{ color: ACCENT }}>•</span>
-                      {pt}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {goals.length > 0 && (
-              <div>
-                <p className="text-[10px] font-semibold mb-1" style={{ color: "#131b2e" }}>Goals</p>
-                <ul className="space-y-0.5">
-                  {goals.slice(0, 3).map((g, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-                      <span className="mt-0.5 shrink-0" style={{ color: "#16a34a" }}>•</span>
-                      {g}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {objections.length > 0 && (
-              <div>
-                <p className="text-[10px] font-semibold mb-1" style={{ color: "#131b2e" }}>Likely objections</p>
-                <ul className="space-y-0.5">
-                  {objections.slice(0, 2).map((o, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-                      <span className="mt-0.5 shrink-0" style={{ color: "#f59e0b" }}>•</span>
-                      {o}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+        {/* Prospect research — angles + hooks */}
+        <div className="p-2.5 rounded-xl border border-white/60 bg-white/30 space-y-2.5">
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-3 h-3 shrink-0" style={{ color: ACCENT }} />
+            <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: ACCENT }}>
+              Prospect research
+            </p>
+            {researching && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground ml-auto" />}
           </div>
-        )}
+
+          {researching && !research && (
+            <div className="space-y-1.5 animate-pulse">
+              {[80, 65, 90, 70].map((w, i) => (
+                <div key={i} className="h-2.5 rounded-full bg-black/8" style={{ width: `${w}%` }} />
+              ))}
+            </div>
+          )}
+
+          {research && (
+            <>
+              {research.hooks.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold mb-1.5" style={{ color: "#131b2e" }}>Hooks</p>
+                  <ul className="space-y-1.5">
+                    {research.hooks.map((h, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground leading-snug">
+                        <span className="mt-0.5 shrink-0 text-[10px]" style={{ color: "#f59e0b" }}>⚡</span>
+                        {h}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {research.angles.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold mb-1.5" style={{ color: "#131b2e" }}>Personalisation angles</p>
+                  <ul className="space-y-1.5">
+                    {research.angles.map((a, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground leading-snug">
+                        <span className="mt-0.5 shrink-0" style={{ color: ACCENT }}>•</span>
+                        {a}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
         {/* One-time email */}
         <div className="p-2.5 rounded-xl border border-white/60 bg-white/30">
@@ -564,15 +613,21 @@ export function CompanyDetailSheet({
 
   const open = !!company;
 
-  const [contacts,    setContacts]    = useState<ApolloPerson[]>(initialContacts);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [allFetched,  setAllFetched]  = useState(false);
-  const [selectedId,  setSelectedId]  = useState<string | null>(initialPersonId ?? null);
-  const [addingId,    setAddingId]    = useState<string | null>(null);
-  const [addedIds,    setAddedIds]    = useState<Set<string>>(new Set());
-  const [failedIds,   setFailedIds]   = useState<Set<string>>(new Set());
-  const [activeTab,   setActiveTab]   = useState<"contacts" | "research" | "sequence">("contacts");
+  // Company scoring enrichment — always run on open to get suggested_angle
+  const { enrichCompany, enriching: companyEnriching, result: enrichmentResult } = useCompanyEnrichment();
 
+  const [contacts,        setContacts]        = useState<ApolloPerson[]>(initialContacts);
+  const [loadingMore,     setLoadingMore]      = useState(false);
+  const [allFetched,      setAllFetched]       = useState(false);
+  const [selectedId,      setSelectedId]       = useState<string | null>(initialPersonId ?? null);
+  const [addingId,        setAddingId]         = useState<string | null>(null);
+  const [addedIds,        setAddedIds]         = useState<Set<string>>(new Set());
+  const [failedIds,       setFailedIds]        = useState<Set<string>>(new Set());
+  const [activeTab,       setActiveTab]        = useState<"contacts" | "research" | "sequence">("contacts");
+  const [generatedSummary, setGeneratedSummary] = useState<string | null>(null);
+  const [summaryLoading,   setSummaryLoading]   = useState(false);
+
+  // Reset on company change
   useEffect(() => {
     setContacts(initialContacts);
     setSelectedId(initialPersonId ?? null);
@@ -580,9 +635,40 @@ export function CompanyDetailSheet({
     setAddedIds(new Set());
     setFailedIds(new Set());
     setActiveTab("contacts");
+    setGeneratedSummary(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company?.id, initialPersonId]);
 
+  // Always run company scoring enrichment on open
+  useEffect(() => {
+    if (!company) return;
+    enrichCompany(
+      company.id, company, initialContacts,
+      userProfession, userAbout, userSpecialityTags, userLocation,
+      icp, companyAnalysis,
+    );
+
+    // Generate summary if Apollo doesn't have one and we have a domain
+    if (!company.short_description && (company.primary_domain || company.website_url)) {
+      setSummaryLoading(true);
+      fetch("/api/analyze-company", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyName:      company.name,
+          domain:           company.primary_domain ?? undefined,
+          websiteUrl:       company.website_url ?? undefined,
+          shortDescription: null,
+        }),
+      })
+        .then(r => r.json())
+        .then(d => { if (d.analysis?.description) setGeneratedSummary(d.analysis.description); })
+        .catch(() => { /* non-fatal */ })
+        .finally(() => setSummaryLoading(false));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company?.id]);
+
+  // Load full contact list
   useEffect(() => {
     if (!company || allFetched) return;
     let cancelled = false;
@@ -644,9 +730,13 @@ export function CompanyDetailSheet({
       ? (() => { try { return new URL(company.website_url!).hostname.replace(/^www\./, ""); } catch { return null; } })()
       : null);
 
-  const tier  = company.account_tier;
-  // Use DB angle first, fall back to enrichment result passed from CompanyCard
-  const angle = company.recommended_angle ?? propAngle ?? null;
+  const tier = company.account_tier;
+
+  // Angle: enrichment result (fresh) → DB field → prop from CompanyCard enrichment
+  const angle = enrichmentResult?.suggested_angle ?? company.recommended_angle ?? propAngle ?? null;
+
+  // Summary: Apollo field → analyze-company result
+  const summary = company.short_description ?? generatedSummary;
 
   const icpTitles = [...(icp?.champions ?? []), ...(icp?.decision_makers ?? [])].map(t => t.toLowerCase());
   const sorted    = [...contacts].sort((a, b) => {
@@ -738,21 +828,32 @@ export function CompanyDetailSheet({
             )}
           </div>
 
-          {/* Summary */}
-          {company.short_description && (
-            <p className="text-[12px] text-muted-foreground leading-relaxed mb-2">
-              {company.short_description}
-            </p>
-          )}
+          {/* Summary — always generated */}
+          {summary ? (
+            <p className="text-[12px] text-muted-foreground leading-relaxed mb-2">{summary}</p>
+          ) : summaryLoading ? (
+            <div className="mb-2 space-y-1.5 animate-pulse">
+              <div className="h-2.5 bg-black/6 rounded-full w-full" />
+              <div className="h-2.5 bg-black/6 rounded-full w-4/5" />
+              <div className="h-2.5 bg-black/6 rounded-full w-3/5" />
+            </div>
+          ) : null}
 
-          {/* Suggested angle */}
-          {angle && (
+          {/* Angle — always generated via enrichment */}
+          {angle ? (
             <div className="px-2.5 py-2 rounded-xl"
                  style={{ background: `${ACCENT}08`, borderLeft: `2px solid ${ACCENT}35` }}>
               <p className="text-[9px] font-bold uppercase tracking-wide mb-0.5" style={{ color: ACCENT }}>Suggested angle</p>
               <p className="text-[12px] leading-relaxed" style={{ color: "#334155" }}>{angle}</p>
             </div>
-          )}
+          ) : companyEnriching ? (
+            <div className="px-2.5 py-2 rounded-xl animate-pulse"
+                 style={{ background: `${ACCENT}06`, borderLeft: `2px solid ${ACCENT}20` }}>
+              <p className="text-[9px] font-bold uppercase tracking-wide mb-1" style={{ color: `${ACCENT}80` }}>Generating angle…</p>
+              <div className="h-2.5 bg-black/6 rounded-full w-full" />
+              <div className="h-2.5 bg-black/6 rounded-full w-4/5 mt-1" />
+            </div>
+          ) : null}
         </div>
 
         {/* ── Mobile tabs ── */}
