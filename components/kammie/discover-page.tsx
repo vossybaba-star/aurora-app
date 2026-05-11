@@ -228,6 +228,7 @@ export function DiscoverPage() {
   const [contactTitles,        setContactTitles]        = useState<string[]>([]);
   const [contactLocation,      setContactLocation]      = useState("");
   const [contactEmployeeRange, setContactEmployeeRange] = useState<string[]>([]);
+  const [contactIndustry,      setContactIndustry]      = useState("");
   const [rolePickerOpen,       setRolePickerOpen]       = useState(false);
   const [contactSearchInput,   setContactSearchInput]   = useState("");
   const [contactSuggestions,   setContactSuggestions]   = useState<Array<{ type: "role" | "company"; value: string }>>([]);
@@ -387,8 +388,7 @@ export function DiscoverPage() {
     }
   }, []);
 
-  // Manual Search button handler — uses current filter state.
-  // contactSearchInput may have an uncommitted value (state update lag), so pass it directly.
+  // Search button / Enter key — searchOverride avoids setState lag on Enter.
   const fetchContacts = useCallback((searchOverride?: string) => {
     const company = searchOverride ?? (contactSearchInput.trim() || contactCompany || undefined);
     doFetchContacts({ titles: contactTitles, company, location: contactLocation, employeeRanges: contactEmployeeRange });
@@ -420,18 +420,20 @@ export function DiscoverPage() {
     setContactSuggestions([]);
   }, []);
 
-  // Auto-load contacts when user switches to contacts mode — seed from ICP
+  // Seed ICP on first switch to contacts, then auto-re-search whenever filters change.
   useEffect(() => {
-    if (!isB2B || searchMode !== "contacts" || contactsSearched) return;
-    const icpPersonas  = [...(profile?.icp?.champions ?? []), ...(profile?.icp?.decision_makers ?? [])];
-    const icpGeo       = profile?.icp?.geography ?? [];
-    const defaultLoc   = icpGeo[0] ?? "";
-    // Pre-populate the visible filter chips so the user sees what was used
-    if (icpPersonas.length) setContactTitles(icpPersonas);
-    if (defaultLoc)         setContactLocation(defaultLoc);
-    doFetchContacts({ titles: icpPersonas.length ? icpPersonas : undefined, location: defaultLoc || undefined });
+    if (!isB2B || searchMode !== "contacts") return;
+    if (!contactsSearched) {
+      const icpPersonas = [...(profile?.icp?.champions ?? []), ...(profile?.icp?.decision_makers ?? [])];
+      const defaultLoc  = profile?.icp?.geography?.[0] ?? "";
+      if (icpPersonas.length) setContactTitles(icpPersonas);
+      if (defaultLoc)         setContactLocation(defaultLoc);
+      doFetchContacts({ titles: icpPersonas.length ? icpPersonas : undefined, location: defaultLoc || undefined });
+    } else {
+      doFetchContacts({ titles: contactTitles, company: contactCompany || undefined, location: contactLocation || undefined, employeeRanges: contactEmployeeRange });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchMode, isB2B]);
+  }, [searchMode, isB2B, contactTitles, contactLocation, contactEmployeeRange, contactIndustry]);
 
   // Infinite scroll
   useEffect(() => {
@@ -656,12 +658,12 @@ export function DiscoverPage() {
           {/* Contact filters */}
           {searchMode === "contacts" && (
             <div className="space-y-2">
-              {/* Row 1: Location + Size + Role + Search — all in one row */}
+              {/* Location + Size + Industry + Role — auto-search on change */}
               <div className="flex flex-wrap gap-2 items-center">
                 <div className="relative">
                   <input value={contactLocation} onChange={e => setContactLocation(e.target.value)}
                     placeholder="Location"
-                    className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
+                    className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-28"
                   />
                   {contactLocation && <button onClick={() => setContactLocation("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
                 </div>
@@ -669,14 +671,22 @@ export function DiscoverPage() {
                   className="px-3 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30">
                   <option value="">Any size</option>
                   {([
-                    { label: "1-10",      value: "1,10"       },
-                    { label: "11-50",     value: "11,50"      },
-                    { label: "51-200",    value: "51,200"     },
-                    { label: "201-1000",  value: "201,1000"   },
-                    { label: "1000+",     value: "1001,100000"},
+                    { label: "1-10",     value: "1,10"        },
+                    { label: "11-50",    value: "11,50"       },
+                    { label: "51-200",   value: "51,200"      },
+                    { label: "201-1000", value: "201,1000"    },
+                    { label: "1000+",    value: "1001,100000" },
                   ] as const).map(({ label, value }) => (
                     <option key={value} value={value}>{label} employees</option>
                   ))}
+                </select>
+                <select value={contactIndustry} onChange={e => setContactIndustry(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30">
+                  <option value="">Any industry</option>
+                  {(profile?.icp?.industries?.length
+                    ? profile.icp.industries
+                    : ["SaaS","FinTech","HealthTech","E-commerce","Marketing","HR","Legal","Real Estate","Logistics","EdTech"]
+                  ).map(i => <option key={i} value={i}>{i}</option>)}
                 </select>
                 <button
                   onClick={() => setRolePickerOpen(o => !o)}
@@ -686,13 +696,7 @@ export function DiscoverPage() {
                   {contactTitles.length > 0 ? `${contactTitles.length} role${contactTitles.length > 1 ? "s" : ""}` : "Any role"}
                   <ChevronDown className={`w-3 h-3 transition-transform ${rolePickerOpen ? "rotate-180" : ""}`} />
                 </button>
-                <button onClick={() => fetchContacts()}
-                  disabled={isLoadingContacts}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-40"
-                  style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
-                  {isLoadingContacts ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserSearch className="w-3 h-3" />}
-                  Search
-                </button>
+                {isLoadingContacts && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
               </div>
               {/* Role picker + selected chips */}
               <div className="space-y-1.5">
@@ -801,34 +805,26 @@ export function DiscoverPage() {
         </div>
       </div>
 
-      {/* Suggestion chips */}
-      <div className="flex flex-wrap gap-1.5">
-        {getSearchPrompts(profile?.businessType, isB2B, profile?.icp?.industries).map((prompt) => {
-          const isActive = isB2B ? filterIndustry === prompt : searchQuery === prompt;
-          return (
-            <button
-              key={prompt}
-              onClick={() => {
-                if (isB2B) {
-                  // Set industry filter — Apollo useEffect re-fires automatically
-                  setFilterIndustry((prev) => prev === prompt ? "" : prompt);
-                } else {
-                  setSearchQuery(prompt);
-                  handleSearch(prompt);
-                }
-              }}
-              className={`px-3 py-1 text-xs rounded-full border font-semibold transition-all ${
-                isActive
-                  ? "text-white border-transparent shadow-sm"
-                  : "glass-card border-white/60 text-foreground hover:border-primary/30"
-              }`}
-              style={isActive ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 2px 8px ${ACCENT}40` } : {}}
-            >
-              {prompt}
-            </button>
-          );
-        })}
-      </div>
+      {/* Suggestion chips — freelancer mode only */}
+      {!isB2B && (
+        <div className="flex flex-wrap gap-1.5">
+          {getSearchPrompts(profile?.businessType, false).map((prompt) => {
+            const isActive = searchQuery === prompt;
+            return (
+              <button
+                key={prompt}
+                onClick={() => { setSearchQuery(prompt); handleSearch(prompt); }}
+                className={`px-3 py-1 text-xs rounded-full border font-semibold transition-all ${
+                  isActive ? "text-white border-transparent shadow-sm" : "glass-card border-white/60 text-foreground hover:border-primary/30"
+                }`}
+                style={isActive ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 2px 8px ${ACCENT}40` } : {}}
+              >
+                {prompt}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Filter + view toggle row */}
       <div className="flex items-center gap-2">
@@ -849,34 +845,6 @@ export function DiscoverPage() {
           </Select>
         )}
 
-        <Select value={sortBy} onValueChange={(v) => setSortBy(v as "score" | "rating" | "newest")}>
-          <SelectTrigger className="w-[150px] shrink-0">
-            <SelectValue placeholder="Sort" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="score">Kammie Score</SelectItem>
-            <SelectItem value="rating">Rating</SelectItem>
-            <SelectItem value="newest">Newest</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* View toggle */}
-        <div className="flex rounded-xl border border-white/60 overflow-hidden shrink-0 glass-card">
-          <button
-            onClick={() => setViewMode("grid")}
-            className={`px-3 py-2 flex items-center transition-colors ${viewMode === "grid" ? "text-white" : "hover:bg-white/30 text-muted-foreground"}`}
-            style={viewMode === "grid" ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` } : {}}
-          >
-            <Grid3X3 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setViewMode("map")}
-            className={`px-3 py-2 flex items-center transition-colors ${viewMode === "map" ? "text-white" : "hover:bg-white/30 text-muted-foreground"}`}
-            style={viewMode === "map" ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` } : {}}
-          >
-            <MapIcon className="w-4 h-4" />
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -1098,84 +1066,6 @@ export function DiscoverPage() {
         </div>
       )}
 
-      {/* ════════════════════════════════
-          MAP VIEW
-      ════════════════════════════════ */}
-      {viewMode === "map" && (
-        <>
-          {/* Desktop: 30/70 side-by-side split */}
-          <div className="hidden lg:flex gap-4" style={{ height: "calc(100vh - 320px)", minHeight: "480px" }}>
-
-            {/* Left 30% — scrollable card list */}
-            <div className="w-[30%] shrink-0 overflow-y-auto space-y-3 pr-1">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
-                {searchResults.length} leads
-              </p>
-              {searchResults.slice(0, 12).map((place) => (
-                <DiscoverCardCompact
-                  key={place.id}
-                  place={place}
-                  isSaved={savedIds.has(place.id)}
-                  savedInstagram={savedInstagramMap.get(place.id) ?? null}
-                  igHandle={igMap.get(place.id) ?? null}
-                  onSaved={handleSaved}
-                  onToast={showToast}
-                  selectedType={selectedType}
-                />
-              ))}
-            </div>
-
-            {/* Right 70% — map */}
-            <div className="flex-1 rounded-2xl overflow-hidden border border-white/40 shadow-sm">
-              <iframe
-                title="Venue map"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                loading="lazy"
-                allowFullScreen
-                referrerPolicy="no-referrer-when-downgrade"
-                src={mapSrc}
-              />
-            </div>
-          </div>
-
-          {/* Mobile / tablet: stacked */}
-          <div className="lg:hidden space-y-3">
-            <div className="rounded-2xl overflow-hidden border border-white/40" style={{ height: "55vmax", minHeight: "260px", maxHeight: "480px" }}>
-              <iframe
-                title="Venue map"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                loading="lazy"
-                allowFullScreen
-                referrerPolicy="no-referrer-when-downgrade"
-                src={mapSrc}
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">{searchResults.length} leads</p>
-            {searchResults.slice(0, 5).map((place) => (
-              <DiscoverCard
-                key={place.id}
-                place={place}
-                isSaved={savedIds.has(place.id)}
-                savedInstagram={savedInstagramMap.get(place.id) ?? null}
-                igHandle={igMap.get(place.id) ?? null}
-                onSaved={handleSaved}
-                onToast={showToast}
-                selectedType={selectedType}
-                isExpanded={expandedPlaceId === place.id}
-                onToggle={() =>
-                  setExpandedPlaceId(
-                    expandedPlaceId === place.id ? null : place.id
-                  )
-                }
-              />
-            ))}
-          </div>
-        </>
-      )}
 
       {/* ── Toast ── */}
       {toast && (
@@ -1210,22 +1100,39 @@ interface DiscoverCardProps {
    ContactCard — B2B people search result
 ═══════════════════════════════════════════════ */
 function ContactCard({ person }: { person: ApolloPerson }) {
-  const [imgFailed, setImgFailed] = useState(false);
+  const [imgFailed,    setImgFailed]    = useState(false);
+  const [logoFailed,   setLogoFailed]   = useState(false);
   const fullName = [person.first_name, person.last_name].filter(Boolean).join(" ");
+
+  // Derive a best-guess domain from the org name for Clearbit logo lookup
+  const derivedLogoUrl = person.organization_name
+    ? `/api/logo?domain=${encodeURIComponent(
+        person.organization_name.toLowerCase().replace(/\s+(inc|llc|ltd|corp|limited|group|co)\.?$/i, "").replace(/[^a-z0-9]/g, "") + ".com"
+      )}`
+    : null;
+
   return (
     <div className="glass-card rounded-2xl border border-white/60 p-4 flex flex-col gap-3">
       <div className="flex items-start gap-3">
-        {/* Avatar / photo */}
-        {person.photo_url && !imgFailed ? (
-          <img src={person.photo_url} alt={fullName}
-            className="w-10 h-10 rounded-xl object-cover shrink-0"
-            onError={() => setImgFailed(true)} />
-        ) : (
-          <div className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center font-bold text-sm text-white"
-               style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
-            {fullName.split(" ").slice(0,2).map(w => w[0]?.toUpperCase()).join("")}
-          </div>
-        )}
+        {/* Person avatar */}
+        <div className="relative shrink-0">
+          {person.photo_url && !imgFailed ? (
+            <img src={person.photo_url} alt={fullName}
+              className="w-10 h-10 rounded-xl object-cover"
+              onError={() => setImgFailed(true)} />
+          ) : (
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
+                 style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+              {fullName.split(" ").slice(0,2).map(w => w[0]?.toUpperCase()).join("")}
+            </div>
+          )}
+          {/* Company logo badge */}
+          {derivedLogoUrl && !logoFailed && (
+            <img src={derivedLogoUrl} alt=""
+              className="absolute -bottom-1 -right-1 w-5 h-5 rounded-md border border-white/80 bg-white object-contain"
+              onError={() => setLogoFailed(true)} />
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold truncate" style={{ color: "#131b2e" }}>{fullName}</p>
           {person.title && <p className="text-[11px] text-muted-foreground truncate">{person.title}</p>}
