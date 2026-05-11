@@ -169,14 +169,16 @@ export async function searchCompanies(params: SearchCompaniesParams): Promise<Ap
 // ── searchPeople ───────────────────────────────────────────────────────────
 
 export interface SearchPeopleParams {
-  q_organization_name?:  string;
-  organization_domains?: string[];
+  q_organization_name?:              string;
+  organization_domains?:             string[];
   /** Array of job titles — maps to person_titles on Apollo's api_search endpoint */
-  person_titles?:        string[];
+  person_titles?:                    string[];
   /** City / country strings to filter by person location */
-  person_locations?:     string[];
-  per_page?:             number;
-  page?:                 number;
+  person_locations?:                 string[];
+  /** Employee count ranges e.g. ["1,10","11,50","51,200"] */
+  organization_num_employees_ranges?: string[];
+  per_page?:                         number;
+  page?:                             number;
 }
 
 interface ApolloPeopleResponse {

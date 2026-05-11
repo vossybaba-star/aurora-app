@@ -218,6 +218,7 @@ export function DiscoverPage() {
   const [contactCompany,       setContactCompany]       = useState("");
   const [contactTitles,        setContactTitles]        = useState<string[]>([]);
   const [contactLocation,      setContactLocation]      = useState("");
+  const [contactEmployeeRange, setContactEmployeeRange] = useState<string[]>([]);
   const [rolePickerOpen,       setRolePickerOpen]       = useState(false);
   const [apolloContacts,       setApolloContacts]       = useState<ApolloPerson[]>([]);
   const [isLoadingContacts,    setIsLoadingContacts]    = useState(false);
@@ -342,9 +343,10 @@ export function DiscoverPage() {
   // ── Core contacts fetcher — accepts explicit params so it can be called
   //    both from the auto-load effect (ICP values) and from the manual Search button
   const doFetchContacts = useCallback(async (opts: {
-    titles?:   string[];
-    company?:  string;
-    location?: string;
+    titles?:         string[];
+    company?:        string;
+    location?:       string;
+    employeeRanges?: string[];
   }) => {
     setIsLoadingContacts(true);
     setContactsError(null);
@@ -354,9 +356,10 @@ export function DiscoverPage() {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          company:  opts.company              || undefined,
-          titles:   opts.titles?.length ? opts.titles : undefined,
-          location: opts.location             || undefined,
+          company:         opts.company              || undefined,
+          titles:          opts.titles?.length ? opts.titles : undefined,
+          location:        opts.location             || undefined,
+          employee_ranges: opts.employeeRanges?.length ? opts.employeeRanges : undefined,
         }),
       });
       if (res.ok) {
@@ -375,8 +378,8 @@ export function DiscoverPage() {
 
   // Manual Search button handler — uses current filter state
   const fetchContacts = useCallback(() => {
-    doFetchContacts({ titles: contactTitles, company: contactCompany, location: contactLocation });
-  }, [doFetchContacts, contactTitles, contactCompany, contactLocation]);
+    doFetchContacts({ titles: contactTitles, company: contactCompany, location: contactLocation, employeeRanges: contactEmployeeRange });
+  }, [doFetchContacts, contactTitles, contactCompany, contactLocation, contactEmployeeRange]);
 
   // Auto-load contacts when user switches to contacts mode — seed from ICP
   useEffect(() => {
@@ -614,29 +617,49 @@ export function DiscoverPage() {
           {/* Contact filters */}
           {searchMode === "contacts" && (
             <div className="space-y-2">
-              {/* Row 1: Company + Country + Search */}
+              {/* Row 1: Country + Size + Search */}
               <div className="flex flex-wrap gap-2 items-center">
-                <div className="relative">
-                  <input value={contactCompany} onChange={e => setContactCompany(e.target.value)}
-                    placeholder="Company"
-                    className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-36"
-                  />
-                  {contactCompany && <button onClick={() => setContactCompany("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
-                </div>
                 <div className="relative">
                   <input value={contactLocation} onChange={e => setContactLocation(e.target.value)}
                     placeholder="Country"
-                    className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-32"
+                    className="pl-3 pr-7 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c6ef7]/30 w-28"
                   />
                   {contactLocation && <button onClick={() => setContactLocation("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
                 </div>
                 <button onClick={fetchContacts}
-                  disabled={isLoadingContacts || (!contactCompany && !contactLocation && !contactTitles.length)}
+                  disabled={isLoadingContacts}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-40"
                   style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
                   {isLoadingContacts ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserSearch className="w-3 h-3" />}
                   Search
                 </button>
+              </div>
+              {/* Row 2: Company size pills */}
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  { label: "1–10",    range: "1,10"      },
+                  { label: "11–50",   range: "11,50"     },
+                  { label: "51–200",  range: "51,200"    },
+                  { label: "201–500", range: "201,500"   },
+                  { label: "500+",    range: "501,10000" },
+                ] as const).map(({ label, range }) => {
+                  const active = contactEmployeeRange.includes(range);
+                  return (
+                    <button key={range}
+                      onClick={() => setContactEmployeeRange(prev =>
+                        active ? prev.filter(r => r !== range) : [...prev, range]
+                      )}
+                      className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all"
+                      style={active
+                        ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, color: "white", borderColor: "transparent" }
+                        : { background: "rgba(0,0,0,0.04)", color: "#374151", borderColor: "rgba(0,0,0,0.08)" }
+                      }
+                    >{label}</button>
+                  );
+                })}
+                {contactEmployeeRange.length > 0 && (
+                  <button onClick={() => setContactEmployeeRange([])} className="text-[11px] text-muted-foreground hover:text-foreground">Clear</button>
+                )}
               </div>
               {/* Row 2: Role selector */}
               <div className="space-y-1.5">
@@ -716,10 +739,14 @@ export function DiscoverPage() {
             : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           }
           <Input
-            placeholder={getSearchPlaceholder(profile?.businessType, isB2B)}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            placeholder={searchMode === "contacts" ? "Search by company name…" : getSearchPlaceholder(profile?.businessType, isB2B)}
+            value={searchMode === "contacts" ? contactCompany : searchQuery}
+            onChange={(e) => searchMode === "contacts" ? setContactCompany(e.target.value) : setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              if (searchMode === "contacts") fetchContacts();
+              else handleSearch();
+            }}
             className="pl-10"
           />
         </div>
@@ -1135,8 +1162,7 @@ interface DiscoverCardProps {
 ═══════════════════════════════════════════════ */
 function ContactCard({ person }: { person: ApolloPerson }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const displayLastName = person.last_name?.includes("*") ? "" : person.last_name ?? "";
-  const fullName = [person.first_name, displayLastName].filter(Boolean).join(" ");
+  const fullName = [person.first_name, person.last_name].filter(Boolean).join(" ");
   return (
     <div className="glass-card rounded-2xl border border-white/60 p-4 flex flex-col gap-3">
       <div className="flex items-start gap-3">

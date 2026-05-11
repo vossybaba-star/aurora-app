@@ -5,9 +5,10 @@ export async function POST(req: Request) {
   try {
     const {
       company,
-      titles,   // string[] — preferred
-      title,    // string   — legacy fallback
+      titles,          // string[] — preferred
+      title,           // string   — legacy fallback
       location,
+      employee_ranges, // string[] — e.g. ["1,10","11,50"]
       page     = 1,
       per_page = 18,
     } = await req.json();
@@ -21,9 +22,10 @@ export async function POST(req: Request) {
           : undefined;
 
     const people = await searchPeople({
-      q_organization_name: company         || undefined,
-      person_titles:       resolvedTitles,
-      person_locations:    location        ? [location] : undefined,
+      q_organization_name:               company || undefined,
+      person_titles:                     resolvedTitles,
+      person_locations:                  location ? [location] : undefined,
+      organization_num_employees_ranges: Array.isArray(employee_ranges) && employee_ranges.length ? employee_ranges : undefined,
       per_page,
       page,
     });
