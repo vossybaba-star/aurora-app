@@ -339,9 +339,13 @@ export function DiscoverPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.icp, profile?.roleId, profile?.businessType, profile?.targetMarkets, searchMode, filterIndustry, filterLocation, filterSize]);
 
-  // Load Apollo contacts (B2B contacts mode)
-  const fetchContacts = useCallback(async () => {
-    if (!contactCompany && !contactLocation) return;
+  // ── Core contacts fetcher — accepts explicit params so it can be called
+  //    both from the auto-load effect (ICP values) and from the manual Search button
+  const doFetchContacts = useCallback(async (opts: {
+    titles?:   string[];
+    company?:  string;
+    location?: string;
+  }) => {
     setIsLoadingContacts(true);
     setContactsError(null);
     setContactsSearched(true);
@@ -350,9 +354,9 @@ export function DiscoverPage() {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          company:  contactCompany       || undefined,
-          titles:   contactTitles.length ? contactTitles : undefined,
-          location: contactLocation      || undefined,
+          company:  opts.company              || undefined,
+          titles:   opts.titles?.length ? opts.titles : undefined,
+          location: opts.location             || undefined,
         }),
       });
       if (res.ok) {
@@ -367,7 +371,25 @@ export function DiscoverPage() {
     } finally {
       setIsLoadingContacts(false);
     }
-  }, [contactCompany, contactTitles, contactLocation]);
+  }, []);
+
+  // Manual Search button handler — uses current filter state
+  const fetchContacts = useCallback(() => {
+    doFetchContacts({ titles: contactTitles, company: contactCompany, location: contactLocation });
+  }, [doFetchContacts, contactTitles, contactCompany, contactLocation]);
+
+  // Auto-load contacts when user switches to contacts mode — seed from ICP
+  useEffect(() => {
+    if (!isB2B || searchMode !== "contacts" || contactsSearched) return;
+    const icpPersonas  = profile?.icp?.personas  ?? [];
+    const icpGeo       = profile?.icp?.geography ?? [];
+    const defaultLoc   = icpGeo[0] ?? "";
+    // Pre-populate the visible filter chips so the user sees what was used
+    if (icpPersonas.length) setContactTitles(icpPersonas);
+    if (defaultLoc)         setContactLocation(defaultLoc);
+    doFetchContacts({ titles: icpPersonas.length ? icpPersonas : undefined, location: defaultLoc || undefined });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchMode, isB2B]);
 
   // Infinite scroll
   useEffect(() => {
@@ -609,7 +631,7 @@ export function DiscoverPage() {
                   {contactLocation && <button onClick={() => setContactLocation("")} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-muted-foreground" /></button>}
                 </div>
                 <button onClick={fetchContacts}
-                  disabled={isLoadingContacts || (!contactCompany && !contactLocation)}
+                  disabled={isLoadingContacts || (!contactCompany && !contactLocation && !contactTitles.length)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-40"
                   style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
                   {isLoadingContacts ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserSearch className="w-3 h-3" />}
