@@ -654,7 +654,7 @@ export function DiscoverPage() {
           {/* Contact filters */}
           {searchMode === "contacts" && (
             <div className="space-y-2">
-              {/* Row 1: Country + Size + Search */}
+              {/* Row 1: Location + Size + Role + Search — all in one row */}
               <div className="flex flex-wrap gap-2 items-center">
                 <div className="relative">
                   <input value={contactLocation} onChange={e => setContactLocation(e.target.value)}
@@ -676,6 +676,14 @@ export function DiscoverPage() {
                     <option key={value} value={value}>{label} employees</option>
                   ))}
                 </select>
+                <button
+                  onClick={() => setRolePickerOpen(o => !o)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl border border-white/60 bg-white/60 focus:outline-none hover:border-primary/30 transition-colors"
+                  style={{ color: ACCENT }}
+                >
+                  {contactTitles.length > 0 ? `${contactTitles.length} role${contactTitles.length > 1 ? "s" : ""}` : "Any role"}
+                  <ChevronDown className={`w-3 h-3 transition-transform ${rolePickerOpen ? "rotate-180" : ""}`} />
+                </button>
                 <button onClick={fetchContacts}
                   disabled={isLoadingContacts}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white disabled:opacity-40"
@@ -684,17 +692,9 @@ export function DiscoverPage() {
                   Search
                 </button>
               </div>
-              {/* Row 2: Role selector */}
+              {/* Role picker + selected chips */}
               <div className="space-y-1.5">
-                <button
-                  onClick={() => setRolePickerOpen(o => !o)}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-white/60 glass-card hover:border-primary/30 transition-colors"
-                  style={{ color: ACCENT }}
-                >
-                  <UserSearch className="w-3 h-3" />
-                  {contactTitles.length > 0 ? `${contactTitles.length} role${contactTitles.length > 1 ? "s" : ""} selected` : "Filter by role"}
-                  <ChevronDown className={`w-3 h-3 transition-transform ${rolePickerOpen ? "rotate-180" : ""}`} />
-                </button>
+                <button className="hidden" />
                 {/* Selected roles as removable chips */}
                 {contactTitles.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
