@@ -41,9 +41,10 @@ import {
 import { useVenueEnrichment } from "@/hooks/useVenueEnrichment";
 import type { VenueEnrichmentResult } from "@/hooks/useVenueEnrichment";
 import { CompanyCard } from "@/components/discover/CompanyCard";
+import { CompanyDetailSheet } from "@/components/discover/CompanyDetailSheet";
+import { CompanyLogo, deriveOrgDomain } from "@/components/discover/CompanyLogo";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import { getRoleById } from "@/lib/roles";
-import { ContactDetailSheet } from "@/components/kammie/contact-detail-sheet";
 
 /* ─── Constants ──────────────────────────────── */
 const ACCENT  = "#7c6ef7";
@@ -237,7 +238,7 @@ export function DiscoverPage() {
   const [isLoadingContacts,    setIsLoadingContacts]    = useState(false);
   const [contactsError,        setContactsError]        = useState<string | null>(null);
   const [contactsSearched,     setContactsSearched]     = useState(false);
-  const [selectedContact,      setSelectedContact]      = useState<ApolloPerson | null>(null);
+  const [selectedCompany,      setSelectedCompany]      = useState<{ company: ApolloCompany; contacts: ApolloPerson[]; initialPersonId?: string } | null>(null);
   const toastCounter = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -286,7 +287,8 @@ export function DiscoverPage() {
     load();
   }, []);
 
-  const isB2B = !!(profile?.companyAnalysis || profile?.icp);
+  const isB2B        = !!(profile?.companyAnalysis || profile?.icp);
+  const resolvedRoleId = resolveRoleId(profile?.roleId, profile?.businessType);
 
   // Load Apollo companies — ICP mode (B2B) takes priority over role-based (freelancer)
   useEffect(() => {
@@ -938,7 +940,30 @@ export function DiscoverPage() {
                 ) : apolloContacts.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {apolloContacts.map(person => (
-                      <ContactCard key={person.id} person={person} onOpen={() => setSelectedContact(person)} />
+                      <ContactCard
+                        key={person.id}
+                        person={person}
+                        onOpen={() => {
+                          // Build a minimal ApolloCompany stub so CompanyDetailSheet can open
+                          const stub: ApolloCompany = {
+                            id:                   person.id + "_org",
+                            name:                 person.organization_name ?? person.first_name,
+                            website_url:          null,
+                            linkedin_url:         null,
+                            twitter_url:          null,
+                            industry:             null,
+                            keywords:             [],
+                            estimated_num_employees: null,
+                            city:                 person.city ?? null,
+                            country:              null,
+                            short_description:    null,
+                            primary_domain:       person.organization_name ? deriveOrgDomain(person.organization_name) : null,
+                            phone:                null,
+                            logo_url:             null,
+                          };
+                          setSelectedCompany({ company: stub, contacts: [person], initialPersonId: person.id });
+                        }}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -955,7 +980,6 @@ export function DiscoverPage() {
 
               {/* Responsive card grid: 1 col mobile / 2 col tablet / 3 col desktop */}
               {(!isB2B || searchMode === "companies") && (() => {
-                const resolvedRoleId = resolveRoleId(profile?.roleId, profile?.businessType);
                 const useApollo = resolvedRoleId !== null || isB2B;
                 if (useApollo) {
                   if (isLoadingApollo) {
@@ -1004,6 +1028,7 @@ export function DiscoverPage() {
                           userLocation={profile?.location ?? ""}
                           icp={profile?.icp}
                           companyAnalysis={profile?.companyAnalysis}
+                          onViewFull={(c, contacts) => setSelectedCompany({ company: c, contacts })}
                         />
                       ))}
                     </div>
@@ -1083,10 +1108,19 @@ export function DiscoverPage() {
         />
       )}
 
-      {/* ── Contact Detail Sheet ── */}
-      <ContactDetailSheet
-        person={selectedContact}
-        onClose={() => setSelectedContact(null)}
+      {/* ── Company Detail Sheet (company card tap + contact card tap) ── */}
+      <CompanyDetailSheet
+        company={selectedCompany?.company ?? null}
+        initialContacts={selectedCompany?.contacts ?? []}
+        initialPersonId={selectedCompany?.initialPersonId}
+        onClose={() => setSelectedCompany(null)}
+        icp={profile?.icp}
+        companyAnalysis={profile?.companyAnalysis}
+        roleId={resolvedRoleId ?? ""}
+        userProfession={profile?.businessType ?? ""}
+        userAbout={profile?.pitch ?? ""}
+        userSpecialityTags={profile?.specialityTags ?? []}
+        userLocation={profile?.location ?? ""}
       />
     </div>
   );
@@ -1113,15 +1147,8 @@ interface DiscoverCardProps {
    ContactCard — B2B people search result
 ═══════════════════════════════════════════════ */
 function ContactCard({ person, onOpen }: { person: ApolloPerson; onOpen?: () => void }) {
-  const [logoFailed, setLogoFailed] = useState(false);
   const fullName = [person.first_name, person.last_name].filter(Boolean).join(" ");
-
-  // Derive a best-guess domain from the org name for Clearbit logo lookup
-  const derivedLogoUrl = person.organization_name
-    ? `/api/logo?domain=${encodeURIComponent(
-        person.organization_name.toLowerCase().replace(/\s+(inc|llc|ltd|corp|limited|group|co)\.?$/i, "").replace(/[^a-z0-9]/g, "") + ".com"
-      )}`
-    : null;
+  const domain   = person.organization_name ? deriveOrgDomain(person.organization_name) : undefined;
 
   return (
     <div
@@ -1129,19 +1156,8 @@ function ContactCard({ person, onOpen }: { person: ApolloPerson; onOpen?: () => 
       onClick={onOpen}
     >
       <div className="flex items-start gap-3">
-        {/* Company logo as main avatar, fall back to initials */}
-        <div className="shrink-0">
-          {derivedLogoUrl && !logoFailed ? (
-            <img src={derivedLogoUrl} alt={person.organization_name ?? ""}
-              className="w-10 h-10 rounded-xl border border-white/60 bg-white object-contain p-0.5"
-              onError={() => setLogoFailed(true)} />
-          ) : (
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
-                 style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
-              {fullName.split(" ").slice(0,2).map(w => w[0]?.toUpperCase()).join("")}
-            </div>
-          )}
-        </div>
+        {/* Company logo via shared CompanyLogo (Clearbit via derived domain, then initials) */}
+        <CompanyLogo name={person.organization_name ?? fullName} domain={domain} size="md" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold truncate" style={{ color: "#131b2e" }}>{fullName}</p>
           {person.title && <p className="text-[11px] text-muted-foreground truncate">{person.title}</p>}
