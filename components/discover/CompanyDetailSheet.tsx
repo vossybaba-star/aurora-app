@@ -6,12 +6,11 @@ import {
 } from "@/components/ui/sheet";
 import {
   Globe, Linkedin, ExternalLink, Loader2,
-  Users, TrendingUp, Zap, Mail, Copy, Check,
-  ArrowRight, UserRound, Target, X,
+  Users, Mail, Copy, Check, UserRound, X,
 } from "lucide-react";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import type { ICP, CompanyAnalysis } from "@/lib/types";
-import { CompanyLogo, deriveOrgDomain } from "./CompanyLogo";
+import { CompanyLogo } from "./CompanyLogo";
 
 const ACCENT  = "#7c6ef7";
 const ACCENT2 = "#9585f9";
@@ -46,19 +45,17 @@ function pill(label: string, accent = false) {
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface CompanyDetailSheetProps {
-  company:           ApolloCompany | null;
-  /** Initial contacts from the inline card (already fetched) */
-  initialContacts?:  ApolloPerson[];
-  /** If opened from a contact card — highlight / scroll to this person id */
-  initialPersonId?:  string;
-  onClose:           () => void;
-  icp?:              ICP;
-  companyAnalysis?:  CompanyAnalysis;
-  roleId?:           string;
-  userProfession?:   string;
-  userAbout?:        string;
+  company:             ApolloCompany | null;
+  initialContacts?:    ApolloPerson[];
+  initialPersonId?:    string;
+  onClose:             () => void;
+  icp?:                ICP;
+  companyAnalysis?:    CompanyAnalysis;
+  roleId?:             string;
+  userProfession?:     string;
+  userAbout?:          string;
   userSpecialityTags?: string[];
-  userLocation?:     string;
+  userLocation?:       string;
 }
 
 // ── ContactRow ────────────────────────────────────────────────────────────────
@@ -77,39 +74,37 @@ function ContactRow({
   const name = displayName(person);
   return (
     <div
-      className="flex items-center gap-3 py-2.5 px-3 rounded-xl cursor-pointer transition-all"
+      className="flex items-center gap-2.5 py-2 px-2.5 rounded-xl cursor-pointer transition-all"
       style={selected
         ? { background: `${ACCENT}10`, outline: `1.5px solid ${ACCENT}30` }
         : { background: "transparent" }}
       onClick={onClick}
     >
-      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 font-bold text-xs text-white"
+      <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 font-bold text-[10px] text-white"
            style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
         {initials(name)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-semibold truncate" style={{ color: "#131b2e" }}>{name}</p>
-        {person.title && <p className="text-[11px] text-muted-foreground truncate">{person.title}</p>}
-        {person.city  && <p className="text-[10px] text-muted-foreground">{person.city}</p>}
+        <p className="text-[12px] font-semibold truncate" style={{ color: "#131b2e" }}>{name}</p>
+        {person.title && <p className="text-[10px] text-muted-foreground truncate">{person.title}</p>}
       </div>
-      <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-        {person.linkedin_url && (
-          <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer"
-             className="p-1.5 rounded-lg border border-white/60 bg-white/40 hover:bg-white/70 transition-colors"
-             style={{ color: ACCENT }}>
-            <Linkedin className="w-3 h-3" />
-          </a>
-        )}
+      <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
         {isAdded ? (
-          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg"
+          <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md"
                 style={{ background: "rgba(22,163,74,0.12)", color: "#16a34a" }}>
-            <Check className="w-3 h-3" /> Added
+            <Check className="w-2.5 h-2.5" /> Added
           </span>
+        ) : isFailed ? (
+          <button onClick={onAdd}
+            className="text-[10px] font-bold px-2 py-0.5 rounded-lg border"
+            style={{ borderColor: "rgba(239,68,68,0.4)", color: "#ef4444", background: "rgba(239,68,68,0.07)" }}>
+            Retry
+          </button>
         ) : (
           <button onClick={onAdd} disabled={isAdding}
-            className="text-[11px] font-bold px-2.5 py-1 rounded-lg border hover:bg-primary/5 disabled:opacity-50 transition-colors"
+            className="text-[10px] font-bold px-2 py-0.5 rounded-lg border hover:bg-primary/5 disabled:opacity-50 transition-colors"
             style={{ borderColor: `${ACCENT}40`, color: ACCENT }}>
-            {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Add"}
+            {isAdding ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : "Add"}
           </button>
         )}
       </div>
@@ -117,7 +112,7 @@ function ContactRow({
   );
 }
 
-// ── Email generator ───────────────────────────────────────────────────────────
+// ── EmailPanel ────────────────────────────────────────────────────────────────
 
 function EmailPanel({
   person, company, companyDescription, companyIndustry, suggestedAngle,
@@ -128,20 +123,16 @@ function EmailPanel({
   companyIndustry:    string | null;
   suggestedAngle:     string | null;
 }) {
-  const [contactRole,  setContactRole]  = useState<"champion" | "decision_maker">("champion");
-  const [angle,        setAngle]        = useState(suggestedAngle ?? "");
-  const [loading,      setLoading]      = useState(false);
-  const [email,        setEmail]        = useState<{ subject: string; body: string } | null>(null);
-  const [error,        setError]        = useState<string | null>(null);
-  const [copied,       setCopied]       = useState(false);
-  const [showFull,     setShowFull]     = useState(false);
+  const [contactRole, setContactRole] = useState<"champion" | "decision_maker">("champion");
+  const [angle,       setAngle]       = useState(suggestedAngle ?? "");
+  const [loading,     setLoading]     = useState(false);
+  const [email,       setEmail]       = useState<{ subject: string; body: string } | null>(null);
+  const [error,       setError]       = useState<string | null>(null);
+  const [copied,      setCopied]      = useState(false);
+  const [showFull,    setShowFull]    = useState(false);
 
-  // Reset when person changes
   useEffect(() => {
-    setEmail(null);
-    setError(null);
-    setCopied(false);
-    setShowFull(false);
+    setEmail(null); setError(null); setCopied(false); setShowFull(false);
     setAngle(suggestedAngle ?? "");
   }, [person?.id, suggestedAngle]);
 
@@ -179,20 +170,19 @@ function EmailPanel({
 
   if (!person) {
     return (
-      <div className="rounded-2xl border border-white/60 bg-white/30 p-4 text-center">
-        <p className="text-[12px] text-muted-foreground">Select a contact above to generate a personalised email.</p>
-      </div>
+      <p className="text-[11px] text-muted-foreground text-center py-2">
+        Select a contact to generate an email.
+      </p>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {/* Role selector */}
+    <div className="space-y-2.5">
       <div className="flex rounded-xl border border-white/60 overflow-hidden bg-white/30">
         {(["champion", "decision_maker"] as const).map(role => (
           <button key={role}
             onClick={() => { setContactRole(role); setEmail(null); }}
-            className="flex-1 py-2 text-xs font-semibold transition-all"
+            className="flex-1 py-1.5 text-[10px] font-semibold transition-all"
             style={contactRole === role
               ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, color: "white" }
               : { color: "var(--muted-foreground)" }}>
@@ -200,54 +190,47 @@ function EmailPanel({
           </button>
         ))}
       </div>
-      <p className="text-[10px] text-muted-foreground">
-        {contactRole === "champion"
-          ? "Day-to-day user — lead with workflow pain and ease of adoption."
-          : "Budget holder — lead with ROI, strategic impact, and a clear ask."}
-      </p>
 
-      {/* Angle field */}
       <textarea value={angle} onChange={e => setAngle(e.target.value)} rows={2}
-        placeholder="e.g. Just raised funding — congrats, timing your outreach here…"
-        className="w-full text-[12px] rounded-xl border border-white/60 bg-white/60 px-3 py-2 resize-none focus:outline-none placeholder:text-muted-foreground/50" />
+        placeholder="e.g. Just raised funding — timing your outreach here…"
+        className="w-full text-[11px] rounded-xl border border-white/60 bg-white/60 px-2.5 py-2 resize-none focus:outline-none placeholder:text-muted-foreground/50" />
 
-      {/* Generate */}
       <button onClick={generate} disabled={loading}
-        className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+        className="w-full py-2 rounded-xl text-[11px] font-semibold text-white flex items-center justify-center gap-1.5 disabled:opacity-60 transition-opacity"
         style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 4px 12px ${ACCENT}40` }}>
         {loading
-          ? <><Loader2 className="w-4 h-4 animate-spin" /> Writing…</>
-          : <><Mail className="w-4 h-4" /> {email ? "Regenerate" : `Email ${person.first_name}`}</>}
+          ? <><Loader2 className="w-3 h-3 animate-spin" /> Writing…</>
+          : <><Mail className="w-3 h-3" /> {email ? "Regenerate" : `Email ${person.first_name}`}</>}
       </button>
-      {error && <p className="text-[12px] text-red-500 text-center">{error}</p>}
 
-      {/* Email preview */}
+      {error && <p className="text-[11px] text-red-500 text-center">{error}</p>}
+
       {email && (
         <div className="rounded-2xl border border-white/60 bg-white/60 overflow-hidden">
-          <div className="px-4 py-3 border-b border-black/5">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Subject</p>
-            <p className="text-[12px] font-semibold" style={{ color: "#131b2e" }}>{email.subject}</p>
+          <div className="px-3 py-2 border-b border-black/5">
+            <p className="text-[9px] uppercase tracking-wide text-muted-foreground mb-0.5">Subject</p>
+            <p className="text-[11px] font-semibold" style={{ color: "#131b2e" }}>{email.subject}</p>
           </div>
-          <div className="px-4 py-3">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">Body</p>
-            <p className="text-[12px] leading-relaxed whitespace-pre-line" style={{ color: "#334155" }}>
+          <div className="px-3 py-2">
+            <p className="text-[9px] uppercase tracking-wide text-muted-foreground mb-1">Body</p>
+            <p className="text-[11px] leading-relaxed whitespace-pre-line" style={{ color: "#334155" }}>
               {showFull ? email.body : email.body.split("\n\n").slice(0, 2).join("\n\n") + "…"}
             </p>
             {!showFull && (
-              <button onClick={() => setShowFull(true)} className="mt-1 text-[11px] font-semibold" style={{ color: ACCENT }}>
-                Show full email
+              <button onClick={() => setShowFull(true)} className="mt-1 text-[10px] font-semibold" style={{ color: ACCENT }}>
+                Show full
               </button>
             )}
           </div>
-          <div className="px-4 py-3 border-t border-black/5 flex gap-2">
+          <div className="px-3 py-2 border-t border-black/5 flex gap-2">
             <button onClick={copy}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border border-white/60 bg-white/40 hover:bg-white/70 transition-colors"
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl text-[10px] font-semibold border border-white/60 bg-white/40 hover:bg-white/70 transition-colors"
               style={{ color: copied ? "#22c55e" : ACCENT }}>
               {copied ? <><Check className="w-3 h-3" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy</>}
             </button>
             {person.linkedin_url && (
               <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer"
-                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border border-white/60 bg-white/40 hover:bg-white/70 transition-colors"
+                 className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl text-[10px] font-semibold border border-white/60 bg-white/40 hover:bg-white/70 transition-colors"
                  style={{ color: ACCENT }}>
                 <ExternalLink className="w-3 h-3" /> LinkedIn
               </a>
@@ -255,6 +238,207 @@ function EmailPanel({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── SequencePanel ─────────────────────────────────────────────────────────────
+
+const SEQUENCE_STEPS = [
+  { step: 1, day: 1,  label: "Trigger hook"    },
+  { step: 2, day: 3,  label: "Value add"       },
+  { step: 3, day: 6,  label: "Social proof"    },
+  { step: 4, day: 9,  label: "New angle"       },
+  { step: 5, day: 12, label: "Question-led"    },
+  { step: 6, day: 16, label: "Resource share"  },
+  { step: 7, day: 21, label: "Referral ask"    },
+  { step: 8, day: 27, label: "Graceful exit"   },
+];
+
+const CHAMPION_DESCS = [
+  "Lead with the research signal — recent news or trigger that shows you did your homework.",
+  "Connect your offering to a day-to-day workflow pain they'd feel.",
+  "Name a peer company or role that got a result they'd want.",
+  "Tackle a different pain — don't repeat step 2.",
+  "Ask an open question that invites a reply.",
+  "Share a piece of content that earns trust without a hard ask.",
+  "Ask if there's someone better placed to chat.",
+  "Low-pressure close — leave the door open.",
+];
+
+const DM_DESCS = [
+  "Lead with the business signal — funding, growth, or strategic shift that creates timing.",
+  "Frame your ROI in terms of revenue impact or cost reduction.",
+  "Reference a comparable company outcome at the strategic level.",
+  "Raise a risk or missed opportunity they're accountable for.",
+  "Ask a direct question about their priority this quarter.",
+  "Share a benchmark or data point relevant to their board metrics.",
+  "Offer an intro to someone relevant to their goals.",
+  "Final outreach — make it easy to either engage or pass.",
+];
+
+function SequencePanel({
+  person, suggestedAngle,
+}: {
+  person:         ApolloPerson | null;
+  suggestedAngle: string | null;
+}) {
+  const [persona, setPersona] = useState<"champion" | "decision_maker">("champion");
+  const descs = persona === "champion" ? CHAMPION_DESCS : DM_DESCS;
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="p-3 space-y-3">
+        <div className="flex rounded-xl border border-white/60 overflow-hidden bg-white/30">
+          {(["champion", "decision_maker"] as const).map(role => (
+            <button key={role} onClick={() => setPersona(role)}
+              className="flex-1 py-1.5 text-[10px] font-semibold transition-all"
+              style={persona === role
+                ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, color: "white" }
+                : { color: "var(--muted-foreground)" }}>
+              {role === "champion" ? "Champion" : "DM"}
+            </button>
+          ))}
+        </div>
+
+        <div>
+          {SEQUENCE_STEPS.map((s, i) => (
+            <div key={s.step} className="flex gap-2.5 items-start">
+              <div className="shrink-0 flex flex-col items-center pt-0.5">
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                  style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}
+                >
+                  {s.step}
+                </div>
+                {i < SEQUENCE_STEPS.length - 1 && (
+                  <div className="w-px flex-1 min-h-[20px] bg-black/10 my-0.5" />
+                )}
+              </div>
+              <div className="flex-1 pb-3">
+                <div className="flex items-baseline justify-between gap-1 mb-0.5">
+                  <p className="text-[11px] font-semibold" style={{ color: "#131b2e" }}>{s.label}</p>
+                  <span className="text-[9px] text-muted-foreground shrink-0">Day {s.day}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  {s.step === 1 && suggestedAngle ? suggestedAngle : descs[i]}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {person ? (
+          <button
+            className="w-full py-2.5 rounded-xl text-[11px] font-semibold text-white flex items-center justify-center gap-1.5"
+            style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, boxShadow: `0 4px 12px ${ACCENT}40` }}
+          >
+            <Mail className="w-3.5 h-3.5" /> Add {person.first_name} to sequence
+          </button>
+        ) : (
+          <p className="text-[10px] text-muted-foreground text-center py-1">
+            Select a contact to activate sequence
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── ContactResearchPanel ──────────────────────────────────────────────────────
+
+function ContactResearchPanel({
+  person, company, icp, suggestedAngle,
+}: {
+  person:         ApolloPerson | null;
+  company:        ApolloCompany;
+  icp?:           ICP;
+  suggestedAngle: string | null;
+}) {
+  if (!person) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-4 text-center gap-2">
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
+             style={{ background: `${ACCENT}12` }}>
+          <UserRound className="w-5 h-5" style={{ color: ACCENT }} />
+        </div>
+        <p className="text-[12px] font-semibold" style={{ color: "#131b2e" }}>Select a contact</p>
+        <p className="text-[11px] text-muted-foreground">Research and outreach appear here</p>
+      </div>
+    );
+  }
+
+  const name      = displayName(person);
+  const isChampion = icp?.champions?.some(t => person.title?.toLowerCase().includes(t.toLowerCase()));
+  const isDM       = icp?.decision_makers?.some(t => person.title?.toLowerCase().includes(t.toLowerCase()));
+  const role       = isDM ? "Decision Maker" : isChampion ? "Champion" : null;
+  const roleColor  = isDM ? ACCENT : "#16a34a";
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="p-3 space-y-3">
+        {/* Person header */}
+        <div className="flex items-start gap-2.5 p-2.5 rounded-xl border border-white/60 bg-white/40">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm text-white"
+               style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+            {initials(name)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="text-[13px] font-bold" style={{ color: "#131b2e" }}>{name}</p>
+              {role && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                      style={{ background: `${roleColor}14`, color: roleColor }}>
+                  {role}
+                </span>
+              )}
+            </div>
+            {person.title && <p className="text-[11px] text-muted-foreground">{person.title}</p>}
+            {person.city  && <p className="text-[10px] text-muted-foreground">{person.city}</p>}
+            {person.linkedin_url && (
+              <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center gap-1 text-[10px] mt-1 hover:opacity-80 transition-opacity"
+                 style={{ color: ACCENT }}>
+                LinkedIn →
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* ICP fit */}
+        {company.icp_score != null && (
+          <div className="p-2.5 rounded-xl border border-white/60 bg-white/30 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-semibold" style={{ color: "#131b2e" }}>ICP Fit</span>
+              <span className="font-bold" style={{ color: scoreColor(company.icp_score) }}>{company.icp_score}/100</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-black/5 overflow-hidden">
+              <div className="h-full rounded-full transition-all"
+                   style={{ width: `${company.icp_score}%`, background: `linear-gradient(90deg,${scoreColor(company.icp_score)}99,${scoreColor(company.icp_score)})` }} />
+            </div>
+            {company.score_rationale && (
+              <p className="text-[10px] text-muted-foreground">{company.score_rationale}</p>
+            )}
+          </div>
+        )}
+
+        {/* Email */}
+        <div className="p-2.5 rounded-xl border border-white/60 bg-white/30">
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <Mail className="w-3 h-3 shrink-0" style={{ color: ACCENT }} />
+            <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: ACCENT }}>
+              Email {person.first_name}
+            </p>
+          </div>
+          <EmailPanel
+            person={person}
+            company={company}
+            companyDescription={company.short_description ?? null}
+            companyIndustry={company.industry ?? null}
+            suggestedAngle={suggestedAngle}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -269,25 +453,25 @@ export function CompanyDetailSheet({
 
   const open = !!company;
 
-  const [contacts,      setContacts]      = useState<ApolloPerson[]>(initialContacts);
-  const [loadingMore,   setLoadingMore]   = useState(false);
-  const [allFetched,    setAllFetched]    = useState(false);
-  const [selectedId,    setSelectedId]    = useState<string | null>(initialPersonId ?? null);
-  const [addingId,      setAddingId]      = useState<string | null>(null);
-  const [addedIds,      setAddedIds]      = useState<Set<string>>(new Set());
-  const [failedIds,     setFailedIds]     = useState<Set<string>>(new Set());
+  const [contacts,    setContacts]    = useState<ApolloPerson[]>(initialContacts);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [allFetched,  setAllFetched]  = useState(false);
+  const [selectedId,  setSelectedId]  = useState<string | null>(initialPersonId ?? null);
+  const [addingId,    setAddingId]    = useState<string | null>(null);
+  const [addedIds,    setAddedIds]    = useState<Set<string>>(new Set());
+  const [failedIds,   setFailedIds]   = useState<Set<string>>(new Set());
+  const [activeTab,   setActiveTab]   = useState<"contacts" | "research" | "sequence">("contacts");
 
-  // Sync when company or initial contacts change
   useEffect(() => {
     setContacts(initialContacts);
     setSelectedId(initialPersonId ?? null);
     setAllFetched(false);
     setAddedIds(new Set());
     setFailedIds(new Set());
+    setActiveTab("contacts");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company?.id, initialPersonId]);
 
-  // Load full contact list (up to 20) when sheet opens
   useEffect(() => {
     if (!company || allFetched) return;
     let cancelled = false;
@@ -329,8 +513,8 @@ export function CompanyDetailSheet({
           website: company.website_url ?? undefined,
           source: "apollo", status: "outreach_ready", liked: true,
           contact_name:  displayName(person),
-          contact_title: person.title ?? null,
-          contact_email: person.email ?? null,
+          contact_title: person.title  ?? null,
+          contact_email: person.email  ?? null,
         }),
       });
       if (res.ok) setAddedIds(prev => new Set([...prev, person.id]));
@@ -349,21 +533,23 @@ export function CompanyDetailSheet({
       ? (() => { try { return new URL(company.website_url!).hostname.replace(/^www\./, ""); } catch { return null; } })()
       : null);
 
-  const score     = company.icp_score;
-  const color     = score != null ? scoreColor(score) : ACCENT;
-  const tier      = company.account_tier;
-  const angle     = company.recommended_angle ?? null;
-  const rationale = company.score_rationale ?? null;
+  const tier  = company.account_tier;
+  const angle = company.recommended_angle ?? null;
 
-  const selectedPerson = contacts.find(c => c.id === selectedId) ?? null;
-
-  // Sort: ICP-matched roles first
   const icpTitles = [...(icp?.champions ?? []), ...(icp?.decision_makers ?? [])].map(t => t.toLowerCase());
   const sorted    = [...contacts].sort((a, b) => {
     const aMatch = icpTitles.some(t => a.title?.toLowerCase().includes(t));
     const bMatch = icpTitles.some(t => b.title?.toLowerCase().includes(t));
     return aMatch === bMatch ? 0 : aMatch ? -1 : 1;
   });
+
+  const selectedPerson = contacts.find(c => c.id === selectedId) ?? null;
+
+  const TABS = [
+    { key: "contacts" as const,  label: `Contacts${contacts.length > 0 ? ` (${contacts.length})` : ""}` },
+    { key: "research" as const,  label: selectedPerson ? selectedPerson.first_name : "Research" },
+    { key: "sequence" as const,  label: "Sequence" },
+  ];
 
   return (
     <Sheet open={open} onOpenChange={isOpen => { if (!isOpen) onClose(); }}>
@@ -379,10 +565,9 @@ export function CompanyDetailSheet({
 
         <SheetTitle className="sr-only">{company.name} — Company Detail</SheetTitle>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-10">
-
-          {/* ── Header ── */}
-          <div className="flex items-start gap-4 pt-2 pb-4 border-b border-black/5">
+        {/* ── Company header ── */}
+        <div className="px-4 pt-1 pb-3 border-b border-black/5 shrink-0">
+          <div className="flex items-start gap-3 mb-2">
             <CompanyLogo name={company.name} domain={domain} logoUrl={company.logo_url} size="lg" />
             <div className="flex-1 min-w-0">
               <h2 className="text-base font-bold leading-tight" style={{ color: "#131b2e" }}>{company.name}</h2>
@@ -399,9 +584,21 @@ export function CompanyDetailSheet({
                     {tier}
                   </span>
                 )}
+                {company.decision_maker_reachable && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-medium border"
+                        style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a", borderColor: "rgba(22,163,74,0.25)" }}>
+                    DM ✓
+                  </span>
+                )}
+                {!company.decision_maker_reachable && company.champion_reachable && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-medium border"
+                        style={{ background: "rgba(22,163,74,0.08)", color: "#16a34a", borderColor: "rgba(22,163,74,0.2)" }}>
+                    Champion ✓
+                  </span>
+                )}
               </div>
               {(company.city || company.country) && (
-                <p className="text-[11px] text-muted-foreground mt-1">
+                <p className="text-[11px] text-muted-foreground mt-0.5">
                   {[company.city, company.country].filter(Boolean).join(", ")}
                 </p>
               )}
@@ -411,106 +608,74 @@ export function CompanyDetailSheet({
             </button>
           </div>
 
-          {/* Quick links */}
-          <div className="flex gap-2 pt-3">
+          {/* Links */}
+          <div className="flex gap-2 mb-2">
             {domain && (
               <a href={company.website_url ?? `https://${domain}`} target="_blank" rel="noopener noreferrer"
-                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border border-white/60 bg-white/50 hover:bg-white/80 transition-colors"
+                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-white/60 bg-white/50 hover:bg-white/80 transition-colors"
                  style={{ color: ACCENT }}>
                 <Globe className="w-3 h-3" /> Website
               </a>
             )}
             {company.linkedin_url && (
               <a href={company.linkedin_url} target="_blank" rel="noopener noreferrer"
-                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border border-white/60 bg-white/50 hover:bg-white/80 transition-colors"
+                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-white/60 bg-white/50 hover:bg-white/80 transition-colors"
                  style={{ color: ACCENT }}>
-                <Linkedin className="w-3 h-3" /> LinkedIn
+                <Globe className="w-3 h-3" /> LinkedIn
               </a>
             )}
           </div>
 
-          {/* ── Company summary ── */}
+          {/* Summary */}
           {company.short_description && (
-            <div className="mt-4">
-              <p className="text-[12px] text-muted-foreground leading-relaxed">{company.short_description}</p>
-            </div>
+            <p className="text-[12px] text-muted-foreground leading-relaxed mb-2">
+              {company.short_description}
+            </p>
           )}
 
-          {/* ── ICP score + rationale ── */}
-          {score != null && (
-            <div className="mt-4 glass-card rounded-2xl border border-white/60 p-4 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold" style={{ color: "#131b2e" }}>ICP Fit</span>
-                <span className="font-bold" style={{ color }}>{score}/100</span>
-              </div>
-              <div className="h-2 rounded-full bg-black/5 overflow-hidden">
-                <div className="h-full rounded-full transition-all"
-                     style={{ width: `${score}%`, background: `linear-gradient(90deg,${color}99,${color})` }} />
-              </div>
-              {rationale && <p className="text-[11px] text-muted-foreground">{rationale}</p>}
-            </div>
-          )}
-
-          {/* ── Outreach angle ── */}
+          {/* Suggested angle */}
           {angle && (
-            <div className="mt-4 glass-card rounded-2xl border border-white/60 p-4"
-                 style={{ background: `${ACCENT}06` }}>
-              <div className="flex items-center gap-2 mb-2">
-                <Target className="w-3.5 h-3.5 shrink-0" style={{ color: ACCENT }} />
-                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: ACCENT }}>
-                  Suggested Angle
-                </p>
-              </div>
-              <p className="text-[13px] leading-relaxed" style={{ color: "#334155" }}>{angle}</p>
+            <div className="px-2.5 py-2 rounded-xl"
+                 style={{ background: `${ACCENT}08`, borderLeft: `2px solid ${ACCENT}35` }}>
+              <p className="text-[9px] font-bold uppercase tracking-wide mb-0.5" style={{ color: ACCENT }}>Suggested angle</p>
+              <p className="text-[12px] leading-relaxed" style={{ color: "#334155" }}>{angle}</p>
             </div>
           )}
+        </div>
 
-          {/* ── Buying signals ── */}
-          {(company.latest_funding_stage || (company.employee_count_6_month_growth ?? 0) > 0 || company.technology_names?.length) && (
-            <div className="mt-4 glass-card rounded-2xl border border-white/60 px-4 py-3 space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Buying Signals</p>
-              {company.latest_funding_stage?.toLowerCase().match(/seed|series [ab]/) && (
-                <div className="flex items-start gap-2 text-[12px]">
-                  <Zap className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "#f59e0b" }} />
-                  <span style={{ color: "#475569" }}><strong className="text-foreground">Early-stage funding</strong> — open to new tools as they build out the stack.</span>
-                </div>
-              )}
-              {company.latest_funding_stage?.toLowerCase().match(/series [cd]|growth|late/) && (
-                <div className="flex items-start gap-2 text-[12px]">
-                  <TrendingUp className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "#22c55e" }} />
-                  <span style={{ color: "#475569" }}><strong className="text-foreground">Growth-stage</strong> — scaling fast, efficiency is top of mind.</span>
-                </div>
-              )}
-              {(company.employee_count_6_month_growth ?? 0) > 0.08 && (
-                <div className="flex items-start gap-2 text-[12px]">
-                  <Users className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: ACCENT }} />
-                  <span style={{ color: "#475569" }}><strong className="text-foreground">+{Math.round((company.employee_count_6_month_growth ?? 0) * 100)}% headcount growth</strong> — operational capacity under pressure.</span>
-                </div>
-              )}
-              {company.technology_names?.some(t => ["salesforce","hubspot","marketo","pipedrive"].some(e => t.toLowerCase().includes(e))) && (
-                <div className="flex items-start gap-2 text-[12px]">
-                  <Zap className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "#818cf8" }} />
-                  <span style={{ color: "#475569" }}><strong className="text-foreground">Enterprise tech stack</strong> — already invests in tooling, integration-ready.</span>
-                </div>
-              )}
-            </div>
-          )}
+        {/* ── Mobile tabs ── */}
+        <div className="flex border-b border-black/5 shrink-0 md:hidden bg-white/20">
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className="flex-1 py-2.5 text-[11px] font-semibold transition-colors truncate px-1"
+              style={activeTab === t.key
+                ? { color: ACCENT, borderBottom: `2px solid ${ACCENT}` }
+                : { color: "var(--muted-foreground)" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-          {/* ── Contacts ── */}
-          <div className="mt-4 glass-card rounded-2xl border border-white/60 overflow-hidden">
-            <div className="px-4 py-3 border-b border-white/40 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <Users className="w-3.5 h-3.5" />
+        {/* ── 3-column layout ── */}
+        <div className="flex-1 overflow-hidden flex min-h-0">
+
+          {/* Left — Contacts */}
+          <div className={`flex flex-col border-r border-black/5 overflow-hidden ${
+            activeTab !== "contacts" ? "hidden md:flex md:w-1/3" : "flex w-full md:w-1/3"
+          }`}>
+            <div className="px-3 py-2 border-b border-black/5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Users className="w-3 h-3" />
                 Contacts {contacts.length > 0 && `(${contacts.length})`}
               </div>
-              {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+              {loadingMore && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
             </div>
-
-            <div className="px-2 py-2">
+            <div className="flex-1 overflow-y-auto px-1.5 py-1.5">
               {sorted.length === 0 && !loadingMore ? (
-                <div className="flex items-center gap-2 px-3 py-3 text-[12px] text-muted-foreground">
+                <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-muted-foreground">
                   <UserRound className="w-4 h-4 shrink-0" />
-                  No contacts found.{company.linkedin_url && (
+                  No contacts found.
+                  {company.linkedin_url && (
                     <> <a href={company.linkedin_url} target="_blank" rel="noopener noreferrer"
                           className="underline hover:text-primary">Search LinkedIn</a>.</>
                   )}
@@ -521,7 +686,11 @@ export function CompanyDetailSheet({
                     key={person.id}
                     person={person}
                     selected={selectedId === person.id}
-                    onClick={() => setSelectedId(person.id === selectedId ? null : person.id)}
+                    onClick={() => {
+                      const newId = person.id === selectedId ? null : person.id;
+                      setSelectedId(newId);
+                      if (newId) setActiveTab("research");
+                    }}
                     onAdd={() => handleAdd(person)}
                     isAdding={addingId === person.id}
                     isAdded={addedIds.has(person.id)}
@@ -532,36 +701,29 @@ export function CompanyDetailSheet({
             </div>
           </div>
 
-          {/* ── Outreach / Email ── */}
-          <div className="mt-4 glass-card rounded-2xl border border-white/60 p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Mail className="w-3.5 h-3.5 shrink-0" style={{ color: ACCENT }} />
-              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: ACCENT }}>
-                {selectedPerson ? `Email ${selectedPerson.first_name}` : "AI Outreach Email"}
-              </p>
+          {/* Middle — Contact research */}
+          <div className={`flex flex-col border-r border-black/5 overflow-hidden ${
+            activeTab !== "research" ? "hidden md:flex md:w-1/3" : "flex w-full md:w-1/3"
+          }`}>
+            <div className="px-3 py-2 border-b border-black/5 shrink-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Research</p>
             </div>
-            <EmailPanel
+            <ContactResearchPanel
               person={selectedPerson}
               company={company}
-              companyDescription={company.short_description ?? null}
-              companyIndustry={company.industry ?? null}
+              icp={icp}
               suggestedAngle={angle}
             />
           </div>
 
-          {/* ── Sequence teaser ── */}
-          <div className="mt-4 rounded-2xl border px-4 py-3 flex items-start gap-3 mb-4"
-               style={{ background: `${ACCENT}08`, borderColor: `${ACCENT}20` }}>
-            <div className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center mt-0.5"
-                 style={{ background: `${ACCENT}18` }}>
-              <ArrowRight className="w-3.5 h-3.5" style={{ color: ACCENT }} />
+          {/* Right — Sequence */}
+          <div className={`flex flex-col overflow-hidden ${
+            activeTab !== "sequence" ? "hidden md:flex md:w-1/3" : "flex w-full md:w-1/3"
+          }`}>
+            <div className="px-3 py-2 border-b border-black/5 shrink-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">8-Touch Sequence</p>
             </div>
-            <div>
-              <p className="text-[12px] font-semibold" style={{ color: "#131b2e" }}>8-touch sequence</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Multi-channel cadence — email + LinkedIn over 30 days. Coming soon.
-              </p>
-            </div>
+            <SequencePanel person={selectedPerson} suggestedAngle={angle} />
           </div>
 
         </div>

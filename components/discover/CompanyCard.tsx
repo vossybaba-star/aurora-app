@@ -10,6 +10,8 @@ import {
   Users,
   Check,
   ArrowRight,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type { ApolloCompany, ApolloPerson } from "@/lib/apollo";
 import { useCompanyEnrichment } from "@/hooks/useCompanyEnrichment";
@@ -172,6 +174,7 @@ export function CompanyCard({
   const [connectedIds,  setConnectedIds]  = useState<Set<string>>(new Set());
   const [failedIds,     setFailedIds]     = useState<Set<string>>(new Set());
   const [saved,         setSaved]         = useState(isSaved);
+  const [expanded,      setExpanded]      = useState(false);
 
   const { enrichCompany, enriching, result } = useCompanyEnrichment();
 
@@ -323,19 +326,24 @@ export function CompanyCard({
           </p>
         )}
 
-        {company.short_description && (
-          <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
-            {company.short_description}
-          </p>
-        )}
-
-        {/* Outreach angle (pre-computed or enriched) */}
         {(result?.suggested_angle || company.recommended_angle) && (
-          <div className="mt-2 px-2 py-1.5 rounded-lg"
-               style={{ background: `${ACCENT}08`, borderLeft: `2px solid ${ACCENT}30` }}>
-            <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
-              {result?.suggested_angle ?? company.recommended_angle}
-            </p>
+          <div className="mt-2" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setExpanded(v => !v)}
+              className="flex items-center gap-1 text-[10px] font-semibold hover:opacity-70 transition-opacity"
+              style={{ color: ACCENT }}
+            >
+              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              Suggested angle
+            </button>
+            {expanded && (
+              <div className="mt-1.5 px-2 py-1.5 rounded-lg"
+                   style={{ background: `${ACCENT}08`, borderLeft: `2px solid ${ACCENT}30` }}>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {result?.suggested_angle ?? company.recommended_angle}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -417,12 +425,6 @@ export function CompanyCard({
         {enriching && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
       </div>
 
-      {/* ── Enrichment panel ── */}
-      {result && !enriching && (
-        <div className="px-4 py-3 border-t border-white/40" style={{ background: "rgba(124,110,247,0.03)" }}>
-          <InlineAnalysisPanel result={result} accent={ACCENT} />
-        </div>
-      )}
     </div>
   );
 }
