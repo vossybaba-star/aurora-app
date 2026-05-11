@@ -286,20 +286,20 @@ interface GeneratedStep {
 }
 
 function SequencePanel({
-  person, company, suggestedAngle,
+  person, company, suggestedAngle, personaType,
 }: {
   person:         ApolloPerson | null;
   company:        ApolloCompany;
   suggestedAngle: string | null;
+  personaType:    "champion" | "decision_maker";
 }) {
-  const [persona,    setPersona]    = useState<"champion" | "decision_maker">("champion");
   const [generating, setGenerating] = useState(false);
   const [steps,      setSteps]      = useState<GeneratedStep[] | null>(null);
   const [genError,   setGenError]   = useState<string | null>(null);
 
-  useEffect(() => { setSteps(null); setGenError(null); }, [person?.id, persona]);
+  useEffect(() => { setSteps(null); setGenError(null); }, [person?.id]);
 
-  const staticDescs = persona === "champion" ? CHAMPION_DESCS : DM_DESCS;
+  const staticDescs = personaType === "decision_maker" ? DM_DESCS : CHAMPION_DESCS;
 
   const generateSequence = async () => {
     if (!person) return;
@@ -314,7 +314,7 @@ function SequencePanel({
           recipient_first_name: person.first_name,
           recipient_title:      person.title ?? null,
           angle:                suggestedAngle ?? "",
-          persona_type:         persona,
+          persona_type:         personaType,
         }),
       });
       const data = await res.json();
@@ -334,17 +334,6 @@ function SequencePanel({
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-3 space-y-3">
-        <div className="flex rounded-xl border border-white/60 overflow-hidden bg-white/30">
-          {(["champion", "decision_maker"] as const).map(role => (
-            <button key={role} onClick={() => setPersona(role)}
-              className="flex-1 py-1.5 text-[10px] font-semibold transition-all"
-              style={persona === role
-                ? { background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, color: "white" }
-                : { color: "var(--muted-foreground)" }}>
-              {role === "champion" ? "Champion" : "DM"}
-            </button>
-          ))}
-        </div>
 
         <button
           onClick={generateSequence}
@@ -747,6 +736,11 @@ export function CompanyDetailSheet({
 
   const selectedPerson = contacts.find(c => c.id === selectedId) ?? null;
 
+  const selectedPersonIsDM = icp?.decision_makers?.some(t =>
+    selectedPerson?.title?.toLowerCase().includes(t.toLowerCase())
+  );
+  const selectedPersonaType: "champion" | "decision_maker" = selectedPersonIsDM ? "decision_maker" : "champion";
+
   const TABS = [
     { key: "contacts" as const, label: `Contacts${contacts.length > 0 ? ` (${contacts.length})` : ""}` },
     { key: "research" as const, label: selectedPerson ? selectedPerson.first_name : "Research" },
@@ -940,6 +934,7 @@ export function CompanyDetailSheet({
               person={selectedPerson}
               company={company}
               suggestedAngle={angle}
+              personaType={selectedPersonaType}
             />
           </div>
 
