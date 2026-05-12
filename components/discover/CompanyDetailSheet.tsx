@@ -372,9 +372,17 @@ function SequencePanel({
                   </div>
                   <textarea
                     value={value}
-                    onChange={e => setEditedSteps(prev => ({ ...prev, [i]: e.target.value }))}
                     rows={2}
-                    className="w-full resize-none rounded-lg text-[10px] leading-relaxed bg-transparent border border-transparent hover:border-black/10 focus:border-black/20 focus:bg-white/60 focus:outline-none transition-all px-1.5 py-1 -mx-1.5 text-muted-foreground"
+                    onChange={e => {
+                      setEditedSteps(prev => ({ ...prev, [i]: e.target.value }));
+                      e.target.style.height = "auto";
+                      e.target.style.height = `${e.target.scrollHeight}px`;
+                    }}
+                    onFocus={e => {
+                      e.target.style.height = "auto";
+                      e.target.style.height = `${e.target.scrollHeight}px`;
+                    }}
+                    className="w-full resize-none rounded-lg text-[10px] leading-relaxed bg-transparent border border-transparent hover:border-black/10 focus:border-black/20 focus:bg-white/60 focus:outline-none transition-all px-1.5 py-1 -mx-1.5 text-muted-foreground overflow-hidden"
                     style={{ minHeight: "2.5rem" }}
                   />
                 </div>
