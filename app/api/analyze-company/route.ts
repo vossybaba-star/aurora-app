@@ -75,10 +75,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { companyName, domain, websiteUrl, shortDescription } = await request.json();
+    const { companyName, domain, websiteUrl, shortDescription, apolloId } = await request.json();
 
     if (!domain && !websiteUrl) {
       return NextResponse.json({ error: "domain or websiteUrl required" }, { status: 400 });
+    }
+
+    const cacheKey = domain || new URL(websiteUrl).hostname.replace(/^www\./, "");
+
+    // ── Shared description cache check (30-day TTL) ───────────────────────────
+    const CACHE_TTL_DAYS = 30;
+    const { data: cachedDesc } = await supabase
+      .from("company_descriptions")
+      .select("description")
+      .eq("domain", cacheKey)
+      .gt("cached_at", new Date(Date.now() - CACHE_TTL_DAYS * 86400_000).toISOString())
+      .maybeSingle();
+
+    if (cachedDesc?.description) {
+      return NextResponse.json({ success: true, analysis: { description: cachedDesc.description }, cached: true });
     }
 
     const baseUrl = websiteUrl || `https://${domain}`;
@@ -158,6 +173,16 @@ Return ONLY valid JSON — no markdown, no explanation:
       objections:      {},
       geography:       Array.isArray(icpRaw.geography)       ? icpRaw.geography.map(String)       : ["United Kingdom"],
     };
+
+    // Write description to shared cache
+    if (analysis.description && cacheKey) {
+      await supabase.from("company_descriptions").upsert({
+        domain:      cacheKey,
+        apollo_id:   apolloId ?? null,
+        description: analysis.description,
+        cached_at:   new Date().toISOString(),
+      }, { onConflict: "domain" });
+    }
 
     return NextResponse.json({
       success:      true,

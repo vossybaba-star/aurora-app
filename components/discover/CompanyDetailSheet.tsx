@@ -293,17 +293,18 @@ function SequencePanel({
   suggestedAngle: string | null;
   personaType:    "champion" | "decision_maker";
 }) {
-  const [generating, setGenerating] = useState(false);
-  const [steps,      setSteps]      = useState<GeneratedStep[] | null>(null);
-  const [genError,   setGenError]   = useState<string | null>(null);
+  const [generating,  setGenerating]  = useState(false);
+  const [steps,       setSteps]       = useState<GeneratedStep[] | null>(null);
+  const [genError,    setGenError]    = useState<string | null>(null);
+  const [editedSteps, setEditedSteps] = useState<Record<number, string>>({});
 
-  useEffect(() => { setSteps(null); setGenError(null); }, [person?.id]);
+  useEffect(() => { setSteps(null); setGenError(null); setEditedSteps({}); }, [person?.id]);
 
   const staticDescs = personaType === "decision_maker" ? DM_DESCS : CHAMPION_DESCS;
 
   const generateSequence = async () => {
     if (!person) return;
-    setGenerating(true); setSteps(null); setGenError(null);
+    setGenerating(true); setSteps(null); setGenError(null); setEditedSteps({});
     try {
       const res = await fetch("/api/contacts/generate-sequence", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -351,26 +352,35 @@ function SequencePanel({
         {genError && <p className="text-[10px] text-red-500 text-center">{genError}</p>}
 
         <div>
-          {displaySteps.map((s, i) => (
-            <div key={s.step} className="flex gap-2.5 items-start">
-              <div className="shrink-0 flex flex-col items-center pt-0.5">
-                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
-                     style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
-                  {s.step}
+          {displaySteps.map((s, i) => {
+            const value = editedSteps[i] ?? s.preview;
+            return (
+              <div key={s.step} className="flex gap-2.5 items-start">
+                <div className="shrink-0 flex flex-col items-center pt-0.5">
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                       style={{ background: `linear-gradient(135deg,${ACCENT},${ACCENT2})` }}>
+                    {s.step}
+                  </div>
+                  {i < displaySteps.length - 1 && (
+                    <div className="w-px flex-1 min-h-[20px] bg-black/10 my-0.5" />
+                  )}
                 </div>
-                {i < displaySteps.length - 1 && (
-                  <div className="w-px flex-1 min-h-[20px] bg-black/10 my-0.5" />
-                )}
-              </div>
-              <div className="flex-1 pb-3">
-                <div className="flex items-baseline justify-between gap-1 mb-0.5">
-                  <p className="text-[11px] font-semibold" style={{ color: "#131b2e" }}>{s.label}</p>
-                  <span className="text-[9px] text-muted-foreground shrink-0">Day {s.day}</span>
+                <div className="flex-1 pb-3">
+                  <div className="flex items-baseline justify-between gap-1 mb-0.5">
+                    <p className="text-[11px] font-semibold" style={{ color: "#131b2e" }}>{s.label}</p>
+                    <span className="text-[9px] text-muted-foreground shrink-0">Day {s.day}</span>
+                  </div>
+                  <textarea
+                    value={value}
+                    onChange={e => setEditedSteps(prev => ({ ...prev, [i]: e.target.value }))}
+                    rows={2}
+                    className="w-full resize-none rounded-lg text-[10px] leading-relaxed bg-transparent border border-transparent hover:border-black/10 focus:border-black/20 focus:bg-white/60 focus:outline-none transition-all px-1.5 py-1 -mx-1.5 text-muted-foreground"
+                    style={{ minHeight: "2.5rem" }}
+                  />
                 </div>
-                <p className="text-[10px] text-muted-foreground leading-relaxed">{s.preview}</p>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {person ? (
@@ -647,6 +657,7 @@ export function CompanyDetailSheet({
           domain:           company.primary_domain ?? undefined,
           websiteUrl:       company.website_url ?? undefined,
           shortDescription: null,
+          apolloId:         company.id,
         }),
       })
         .then(r => r.json())

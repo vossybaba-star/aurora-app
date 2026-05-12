@@ -30,6 +30,26 @@ export async function POST(req: Request) {
   } = body;
   if (!company) return NextResponse.json({ error: "company is required" }, { status: 400 });
 
+  // ── DB cache check ────────────────────────────────────────────────────────
+  const CACHE_TTL_DAYS = 7;
+  const { data: cached } = await supabase
+    .from("company_score_cache")
+    .select("score, score_label, suggested_angle, caution, why_good")
+    .eq("user_id", user.id)
+    .eq("apollo_id", company.id)
+    .gt("cached_at", new Date(Date.now() - CACHE_TTL_DAYS * 86400_000).toISOString())
+    .maybeSingle();
+
+  if (cached) {
+    return NextResponse.json({
+      score:           cached.score,
+      score_label:     cached.score_label,
+      suggested_angle: cached.suggested_angle,
+      caution:         cached.caution,
+      why_good:        cached.why_good,
+    });
+  }
+
   const contactLines = contacts?.length
     ? contacts.map((c) => `${c.title ?? "Unknown role"} - ${c.first_name} ${c.last_name}`).join("\n")
     : "No key contacts found";
@@ -138,6 +158,18 @@ Return as JSON only.
       caution:         parsed.caution ?? null,
       why_good:        Array.isArray(parsed.why_good) ? parsed.why_good : [],
     };
+
+    // Write to DB score cache
+    await supabase.from("company_score_cache").upsert({
+      user_id:         user.id,
+      apollo_id:       company.id,
+      score,
+      score_label,
+      suggested_angle: result.suggested_angle,
+      caution:         result.caution,
+      why_good:        result.why_good,
+      cached_at:       new Date().toISOString(),
+    }, { onConflict: "user_id,apollo_id" });
 
     // Persist score to opportunity row if caller provides opportunity_id
     if (opportunity_id) {
