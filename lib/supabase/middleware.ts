@@ -12,7 +12,6 @@ export async function updateSession(request: NextRequest) {
   // If the Supabase env vars are not present at runtime, skip auth handling
   // instead of throwing — a hard throw here would 500 every route in the app.
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.log("[v0] Supabase env vars missing in middleware runtime")
     return supabaseResponse
   }
 
